@@ -9,7 +9,9 @@ publish = false
 [dependencies]
 mix-core.workspace = true
 cpal.workspace = true
+hound.workspace = true
 log.workspace = true
+rtrb.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 
