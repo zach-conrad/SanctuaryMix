@@ -11,7 +11,7 @@ guardrails (see [docs/AUTOMIX.md](docs/AUTOMIX.md)). Not yet tried on a real
 dLive.
 
 - Mac first, packaged as a normal `SanctuaryMix.app` you drag into Applications.
-- Windows builds from the same code (CI already checks it).
+- Windows builds from the same code (checked on every release).
 - Consoles: **Allen & Heath dLive** first. Others plug in behind one interface.
 - Accounts: the interface is in place; sign-in comes later.
 
@@ -117,8 +117,8 @@ npm run app:build:mac  # universal build (Apple Silicon + Intel); needs:
 
 The app ends up in `target/release/bundle/macos/SanctuaryMix.app` (or
 `target/universal-apple-darwin/release/...` for the universal build). Drag it
-into Applications. Every CI run on GitHub also attaches a ready-made `.dmg`
-under the run's **Artifacts**.
+into Applications. GitHub Actions builds are paused for now, so this is how
+the app gets built: see [docs/BUILDING.md](docs/BUILDING.md).
 
 Builds are not code-signed yet, so the first launch needs a right-click on the
 app, then **Open**. Signing and notarization will be added before handing it to

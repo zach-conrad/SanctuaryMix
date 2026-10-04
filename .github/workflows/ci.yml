@@ -6,11 +6,13 @@ name: CI
 # should require. The release workflow calls this file too, so a tag can never
 # ship without the same checks.
 
+# PAUSED (2026-10-04): GitHub Actions minutes cost money on this private repo
+# (macOS bills at 10x), so this only runs when started by hand (Actions tab,
+# then Run workflow) or from a release tag. Apps are built on a Mac instead:
+# see docs/BUILDING.md. To turn automatic runs back on, restore the triggers
+# listed in that doc.
+
 on:
-  push:
-    branches: [main]
-  pull_request:
-  merge_group:
   workflow_dispatch:
   workflow_call:
 
@@ -84,6 +86,8 @@ jobs:
   macos:
     name: macOS app (.app + .dmg)
     needs: [web, rust]
+    # Release tags build macOS themselves in release.yml, so CI skips it there.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
@@ -124,6 +128,7 @@ jobs:
   windows:
     name: Windows build check
     needs: [web, rust]
+    if: github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
@@ -151,12 +156,21 @@ jobs:
     steps:
       - name: Check every job succeeded
         env:
-          RESULTS: ${{ join(needs.*.result, ' ') }}
+          REQUIRED: ${{ needs.web.result }} ${{ needs.rust.result }} ${{ needs.website.result }}
+          PLATFORM: ${{ needs.macos.result }} ${{ needs.windows.result }}
         run: |
-          echo "Job results: $RESULTS"
-          for r in $RESULTS; do
+          echo "Fast checks: $REQUIRED"
+          echo "Platform builds: $PLATFORM"
+          for r in $REQUIRED; do
             if [ "$r" != "success" ]; then
               echo "::error::A required CI job did not succeed ($r)."
+              exit 1
+            fi
+          done
+          # Skipped is fine: release tags build the platforms in release.yml.
+          for r in $PLATFORM; do
+            if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
+              echo "::error::A platform build did not succeed ($r)."
               exit 1
             fi
           done

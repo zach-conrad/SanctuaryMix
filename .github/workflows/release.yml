@@ -5,7 +5,7 @@ name: Release
 #   npm version 0.2.0 --no-git-tag-version   # then bump tauri.conf.json + Cargo.toml (see docs/CI.md)
 #   git tag v0.2.0 && git push origin v0.2.0
 #
-# The run re-runs all of CI on the tagged commit, then waits for approval on
+# The run re-runs CI's checks on the tagged commit, then waits for approval on
 # the "production" environment before building, signing (when Apple
 # credentials are configured) and publishing the GitHub release.
 

@@ -4,13 +4,13 @@ name: Security
 # so a newly published advisory against a dependency we already use is caught
 # even when nobody is pushing code.
 
+# PAUSED (2026-10-04): GitHub Actions minutes cost money on this private repo
+# (macOS bills at 10x), so this only runs when started by hand (Actions tab,
+# then Run workflow). Apps are built on a Mac instead:
+# see docs/BUILDING.md. To turn automatic runs back on, restore the triggers
+# listed in that doc.
+
 on:
-  push:
-    branches: [main]
-  pull_request:
-  merge_group:
-  schedule:
-    - cron: "0 13 * * 1" # Mondays 13:00 UTC
   workflow_dispatch:
 
 permissions:

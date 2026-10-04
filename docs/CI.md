@@ -1,5 +1,11 @@
 # CI/CD and release flow
 
+> **Paused since 2026-10-04 to stay within GitHub's free minutes.** CI,
+> security scans and dev builds only run by hand (Run workflow) or inside a
+> release; the app is built on a Mac instead. See [BUILDING.md](BUILDING.md)
+> for how to build and how to turn automatic runs back on. The rest of this
+> doc describes the full pipeline as it works when turned on.
+
 The goal: catch mistakes at the earliest, cheapest point, and make it
 impossible for anything to reach users without passing every check and going
 through the dev channel first.
