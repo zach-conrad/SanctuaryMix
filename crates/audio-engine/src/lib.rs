@@ -12,9 +12,11 @@
 pub mod devices;
 pub mod engine;
 pub mod meter;
+pub mod permission;
 
 pub use devices::{list_input_devices, AudioDeviceInfo};
 pub use engine::{start_metering, MeterHandle};
+pub use permission::{microphone_access, request_microphone_access, MicAccess};
 
 #[derive(Debug, thiserror::Error)]
 pub enum AudioError {
@@ -24,6 +26,10 @@ pub enum AudioError {
     NoDefaultDevice,
     #[error("unsupported sample format {0}")]
     UnsupportedFormat(String),
+    #[error(
+        "SanctuaryMix isn't allowed to hear audio inputs. Turn it on in System Settings › Privacy & Security › Microphone."
+    )]
+    PermissionDenied,
     #[error("audio backend error: {0}")]
     Backend(String),
 }

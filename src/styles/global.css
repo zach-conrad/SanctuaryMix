@@ -118,6 +118,11 @@ main { flex: 1; min-width: 0; overflow: auto; background: var(--bg); }
 .device[data-selected="true"] { border-color: var(--accent); background: var(--accent-subtle); }
 .device input { accent-color: var(--accent); width: 18px; height: 18px; }
 .device-text { flex: 1; display: flex; flex-direction: column; }
+.permission-off {
+  display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4);
+  border-radius: var(--radius-md); border: 1px solid var(--warning); background: var(--surface-raised);
+}
+.permission-off .actions { margin-top: var(--space-2); }
 
 .form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
 .form .sm-field { max-width: none; }

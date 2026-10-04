@@ -9,6 +9,7 @@ import type {
   ConsoleEvent,
   MeterFrame,
   MeteringInfo,
+  MicAccess,
   Session,
 } from "./types";
 import { createDemoBackend } from "./demoBackend";
@@ -17,6 +18,10 @@ type Unlisten = () => void;
 
 export interface Backend {
   readonly isDemo: boolean;
+  microphoneAccess(): Promise<MicAccess>;
+  /** Shows the macOS prompt if the user hasn't answered yet. */
+  requestMicrophoneAccess(): Promise<MicAccess>;
+  openMicrophoneSettings(): Promise<void>;
   listAudioDevices(): Promise<AudioDeviceInfo[]>;
   startMetering(device: string | null): Promise<MeteringInfo>;
   stopMetering(): Promise<void>;
@@ -38,6 +43,9 @@ async function createTauriBackend(): Promise<Backend> {
   const { listen } = await import("@tauri-apps/api/event");
   return {
     isDemo: false,
+    microphoneAccess: () => invoke("microphone_access"),
+    requestMicrophoneAccess: () => invoke("request_microphone_access"),
+    openMicrophoneSettings: () => invoke("open_microphone_settings"),
     listAudioDevices: () => invoke("list_audio_devices"),
     startMetering: (device) => invoke("start_metering", { device }),
     stopMetering: () => invoke("stop_metering"),

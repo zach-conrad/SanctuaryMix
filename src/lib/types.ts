@@ -37,6 +37,9 @@ export interface ConsoleConfig {
   inputCount: number;
 }
 
+/** macOS microphone permission. Always "granted" off macOS. */
+export type MicAccess = "granted" | "undetermined" | "denied";
+
 export interface AudioDeviceInfo {
   name: string;
   maxInputChannels: number;

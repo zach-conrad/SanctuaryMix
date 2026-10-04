@@ -18,6 +18,9 @@ pub fn run() {
         )
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
+            commands::microphone_access,
+            commands::request_microphone_access,
+            commands::open_microphone_settings,
             commands::list_audio_devices,
             commands::start_metering,
             commands::stop_metering,
