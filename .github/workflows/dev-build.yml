@@ -53,6 +53,8 @@ jobs:
           rustup toolchain install
           if [ -n "${{ matrix.targets }}" ]; then rustup target add ${{ matrix.targets }}; fi
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false # reuse CI's main cache rather than storing another copy
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
