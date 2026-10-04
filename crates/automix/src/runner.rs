@@ -15,6 +15,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
+use mix_core::hearing::HearingFrame;
 use mix_core::{ConsoleEvent, MeterFrame};
 use tokio::sync::{mpsc, oneshot};
 
@@ -63,6 +64,7 @@ enum Command {
 
 enum Input {
     Meter(MeterFrame),
+    Hearing(HearingFrame),
     Console(ConsoleEvent),
     Command(Command),
 }
@@ -77,6 +79,11 @@ impl AutoMixHandle {
     /// Called from the audio thread; never blocks. Drops the frame if the loop is behind.
     pub fn push_meters(&self, frame: MeterFrame) {
         let _ = self.tx.try_send(Input::Meter(frame));
+    }
+
+    /// Latest listening results. Never blocks; dropped if the loop is behind.
+    pub fn push_hearing(&self, frame: HearingFrame) {
+        let _ = self.tx.try_send(Input::Hearing(frame));
     }
 
     /// Never blocks.
@@ -228,6 +235,10 @@ impl<S: FaderSink, O: Observer> Runner<S, O> {
                     Some(Input::Meter(frame)) => {
                         let now = self.now();
                         self.mix.on_meter(&frame, now);
+                    }
+                    Some(Input::Hearing(frame)) => {
+                        let now = self.now();
+                        self.mix.on_hearing(&frame, now);
                     }
                     Some(Input::Console(event)) => {
                         let now = self.now();

@@ -6,8 +6,9 @@
 //! covers both, so this crate has no platform-specific code.
 //!
 //! The real-time callback only does lock-free accumulation ([`meter::MeterBank`]);
-//! a separate thread publishes [`mix_core::MeterFrame`]s at ~30 Hz. Future
-//! analysis (spectrum, feedback detection, auto-gain) hangs off the same tap.
+//! a separate thread publishes [`mix_core::MeterFrame`]s at ~30 Hz. Raw audio
+//! for slower analysis (the listening models today; spectrum and feedback
+//! detection later) comes off the same callback through [`tap::AudioTap`].
 //! Recording ([`record`]) copies the same buffers into a ring for a writer
 //! thread; playback ([`playback`]) is output only and needs no permission.
 
@@ -17,12 +18,14 @@ pub mod meter;
 pub mod permission;
 pub mod playback;
 pub mod record;
+pub mod tap;
 
 pub use devices::{list_input_devices, AudioDeviceInfo};
 pub use engine::{start_metering, MeterHandle};
 pub use permission::{microphone_access, request_microphone_access, MicAccess};
 pub use playback::{list_output_devices, OutputDeviceInfo, PlaybackPosition, Player};
 pub use record::{AudioRecordOptions, AudioRecorder, RecordStats, WrittenFile, WrittenFileKind};
+pub use tap::AudioBlock;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AudioError {

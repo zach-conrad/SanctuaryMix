@@ -127,6 +127,36 @@ export interface AutoMixConfig {
   nudges: Nudges;
   channels: ManagedChannel[];
   guardrails: Guardrails;
+  /** Use the on-device listening models to tell voices from bleed. */
+  listen: boolean;
+}
+
+/** What the on-device listening models hear on a mic (mix-core/src/hearing.rs). */
+export type Sound =
+  | "speech"
+  | "singing"
+  | "choir"
+  | "drums"
+  | "bass"
+  | "electricGuitar"
+  | "acousticGuitar"
+  | "piano"
+  | "organ"
+  | "keys"
+  | "brass"
+  | "strings"
+  | "music"
+  | "other";
+
+/** What an input has mostly sounded like during a listen. */
+export interface HeardChannel {
+  channel: number;
+  sound: Sound;
+  /** Share of what was heard that was `sound`, 0 to 1. */
+  share: number;
+  seconds: number;
+  /** Set when what it hears doesn't fit the role it has. */
+  suggestedRole: ChannelRole | null;
 }
 
 export type ChannelMode =
@@ -138,6 +168,7 @@ export type ChannelMode =
   | "waitingForFader"
   | "muted"
   | "clipping"
+  | "bleed"
   | "noAudio"
   | "idle"
   | "waitingForLead"
@@ -154,6 +185,10 @@ export interface ChannelStatus {
   baselineDb: number | null;
   targetDb: number | null;
   levelDb: number | null;
+  /** What the listening models hear on it, if they're running. */
+  heard: Sound | null;
+  /** Someone is talking or singing into it, if listening. */
+  voice: boolean | null;
 }
 
 export interface AutoMixStatus {
@@ -161,6 +196,8 @@ export interface AutoMixStatus {
   frozen: boolean;
   consoleOnline: boolean;
   audioOk: boolean;
+  /** The listening models are running and reporting. */
+  listening: boolean;
   feel: RoomFeel;
   speechChannel: number | null;
   leadChannel: number | null;

@@ -53,6 +53,8 @@ pub fn run() {
             commands::automix_undo_all,
             commands::automix_status,
             commands::automix_log,
+            commands::automix_listen_scan,
+            commands::automix_heard,
             recording::get_recording_settings,
             recording::set_recording_settings,
             recording::start_recording,

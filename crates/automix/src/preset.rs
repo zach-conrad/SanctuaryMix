@@ -10,6 +10,7 @@
 //! speech mics are the anchors and ride toward a reference level so the
 //! pastor and worship leader sound the same every week.
 
+use mix_core::hearing::Sound;
 use serde::{Deserialize, Serialize};
 
 /// What a channel carries. Decides its target and which limits apply.
@@ -70,7 +71,8 @@ impl ChannelRole {
         matches!(self, ChannelRole::Kick | ChannelRole::Bass)
     }
 
-    fn is_vocal(self) -> bool {
+    /// A person's voice: speech, lead, backing or choir.
+    pub fn is_vocal(self) -> bool {
         matches!(
             self,
             ChannelRole::Speech
@@ -79,6 +81,26 @@ impl ChannelRole {
                 | ChannelRole::Choir
         )
     }
+}
+
+/// The role to suggest for an input that mostly sounds like `heard`, or
+/// `None` when what it hears already fits `current` (or says nothing useful).
+pub fn suggest_role(current: ChannelRole, heard: Sound) -> Option<ChannelRole> {
+    use ChannelRole as R;
+    let (suggested, fits): (ChannelRole, &[ChannelRole]) = match heard {
+        Sound::Speech => (R::Speech, &[R::Speech]),
+        Sound::Singing => (R::LeadVocal, &[R::LeadVocal, R::BackingVocal, R::Choir]),
+        Sound::Choir => (R::Choir, &[R::Choir, R::BackingVocal]),
+        Sound::Drums => (R::Drums, &[R::Drums, R::Kick]),
+        Sound::Bass => (R::Bass, &[R::Bass, R::Kick]),
+        Sound::ElectricGuitar => (R::ElectricGuitar, &[R::ElectricGuitar]),
+        Sound::AcousticGuitar => (R::AcousticGuitar, &[R::AcousticGuitar]),
+        Sound::Piano | Sound::Organ => (R::PianoOrgan, &[R::PianoOrgan, R::KeysPads]),
+        Sound::Keys => (R::KeysPads, &[R::KeysPads, R::PianoOrgan, R::Playback]),
+        Sound::Brass | Sound::Strings => (R::Other, &[R::Other, R::Playback]),
+        Sound::Music | Sound::Other => return None,
+    };
+    (!fits.contains(&current)).then_some(suggested)
 }
 
 /// Best guess at a channel's role from its console name. The operator can change it.
@@ -395,5 +417,22 @@ mod tests {
             assert_eq!(p.admin_only, feel == RoomFeel::BigLoud);
             assert_eq!(p.warning.is_some(), p.admin_only);
         }
+    }
+
+    #[test]
+    fn suggests_a_role_only_when_what_it_hears_does_not_fit() {
+        use ChannelRole as R;
+        assert_eq!(suggest_role(R::Other, Sound::Speech), Some(R::Speech));
+        assert_eq!(suggest_role(R::Speech, Sound::Speech), None);
+        // Singing fits any sung role; lead vs backing is the operator's call.
+        assert_eq!(suggest_role(R::BackingVocal, Sound::Singing), None);
+        assert_eq!(
+            suggest_role(R::KeysPads, Sound::Singing),
+            Some(R::LeadVocal)
+        );
+        assert_eq!(suggest_role(R::Kick, Sound::Drums), None);
+        assert_eq!(suggest_role(R::LeadVocal, Sound::Drums), Some(R::Drums));
+        assert_eq!(suggest_role(R::KeysPads, Sound::Organ), None);
+        assert_eq!(suggest_role(R::Bass, Sound::Music), None);
     }
 }

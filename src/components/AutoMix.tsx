@@ -1,8 +1,9 @@
-import { Hand, Play, PowerOff, RotateCcw, Undo2 } from "lucide-react";
+import { Ear, Hand, Play, PowerOff, RotateCcw, Undo2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { getBackend } from "../lib/backend";
 import { formatDb } from "../lib/levels";
-import type { Adjustment, ChannelRole, ChannelStatus, Nudges } from "../lib/types";
-import { MODE_DETAIL, MODE_LABEL, ROLE_LABEL, useAutoMix } from "../store/automix";
+import type { Adjustment, ChannelRole, ChannelStatus, HeardChannel, Nudges } from "../lib/types";
+import { MODE_DETAIL, MODE_LABEL, ROLE_LABEL, SOUND_LABEL, useAutoMix } from "../store/automix";
 import { useMixer } from "../store/mixer";
 
 const ROLES = Object.keys(ROLE_LABEL) as ChannelRole[];
@@ -172,11 +173,14 @@ function NudgeSliders() {
 export function ChannelPicker() {
   const strips = useMixer((s) => s.strips);
   const managed = useAutoMix((s) => s.config?.channels ?? []);
+  const listen = useAutoMix((s) => s.config?.listen ?? false);
   const statuses = useAutoMix((s) => s.status?.channels ?? []);
-  const { setManaged, setRole, undo, resumeChannel } = useAutoMix();
+  const scanResults = useAutoMix((s) => s.scan.results);
+  const { setManaged, setRole, setListen, undo, resumeChannel, applySuggestion } = useAutoMix();
 
   const roleOf = new Map(managed.map((c) => [c.channel, c.role]));
   const statusOf = new Map(statuses.map((c) => [c.channel, c]));
+  const heardOf = new Map(scanResults.map((h) => [h.channel, h]));
 
   async function pickVoices() {
     const roles = await (await getBackend()).automixGuessRoles(strips.map((s) => s.name));
@@ -193,6 +197,7 @@ export function ChannelPicker() {
         <button className="sm-btn" onClick={() => void pickVoices()}>
           Select vocals and speech
         </button>
+        <ListenForRolesButton />
         <button
           className="sm-btn sm-btn--ghost"
           disabled={managed.length === 0}
@@ -205,12 +210,23 @@ export function ChannelPicker() {
         Start with vocals and speech. Leave out room mics and anything you want to ride yourself. Channels you don't
         pick are never touched.
       </p>
+      <label className="am-listen">
+        <input type="checkbox" checked={listen} onChange={(e) => void setListen(e.target.checked)} />
+        <span>
+          <span className="text-body-strong">Listen to each mic</span>
+          <span className="text-caption muted">
+            Tells a voice from the band bleeding into a mic, so bleed is never turned up and the band only steps back
+            when someone is really talking. It runs on this computer; nothing is recorded or sent anywhere.
+          </span>
+        </span>
+      </label>
       <table className="am-table">
         <thead>
           <tr>
             <th className="text-label">Auto</th>
             <th className="text-label">Channel</th>
             <th className="text-label">What it is</th>
+            <th className="text-label">Hears</th>
             <th className="text-label">Now</th>
             <th className="text-label">Fader</th>
             <th>
@@ -251,6 +267,15 @@ export function ChannelPicker() {
                     </select>
                   )}
                 </td>
+                <td>
+                  <HeardCell
+                    status={st}
+                    scanned={heardOf.get(strip.index)}
+                    name={strip.name}
+                    role={role}
+                    apply={applySuggestion}
+                  />
+                </td>
                 <td>{st && <ModeWord status={st} />}</td>
                 <td className="text-readout">{st && <FaderChange status={st} />}</td>
                 <td className="am-row-actions">{st && <ChannelActions status={st} undo={undo} resume={resumeChannel} />}</td>
@@ -260,6 +285,89 @@ export function ChannelPicker() {
         </tbody>
       </table>
     </section>
+  );
+}
+
+/** Listens to every input for a while and suggests roles from what it hears. */
+function ListenForRolesButton() {
+  const until = useAutoMix((s) => s.scan.until);
+  const listenForRoles = useAutoMix((s) => s.listenForRoles);
+  const audioOn = useMixer((s) => s.audioStatus === "on");
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (until === null) return;
+    const timer = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(timer);
+  }, [until]);
+
+  if (until !== null) {
+    const left = Math.max(0, Math.ceil((until - now) / 1000));
+    return (
+      <button className="sm-btn am-listening" disabled aria-live="polite">
+        <Ear />
+        Listening, {left} s
+      </button>
+    );
+  }
+  return (
+    <button
+      className="sm-btn"
+      disabled={!audioOn}
+      title={audioOn ? "Play or sing through every mic while it listens." : "Start Dante audio in Setup first."}
+      onClick={() => void listenForRoles()}
+    >
+      <Ear />
+      Listen and suggest roles
+    </button>
+  );
+}
+
+/** What the listening models hear on a channel, and a role to apply when it doesn't fit. */
+function HeardCell({
+  status,
+  scanned,
+  name,
+  role,
+  apply,
+}: {
+  status: ChannelStatus | undefined;
+  scanned: HeardChannel | undefined;
+  name: string;
+  role: ChannelRole | undefined;
+  apply(channel: number, role: ChannelRole): Promise<void>;
+}) {
+  const live = status?.heard ?? null;
+  const suggestion = scanned?.suggestedRole ?? null;
+  if (live === null && !scanned) return null;
+  return (
+    <span className="am-heard">
+      {live !== null ? (
+        <span className="am-heard-word" title="What the listening models hear on this mic right now.">
+          {SOUND_LABEL[live]}
+        </span>
+      ) : (
+        scanned && (
+          <span
+            className="am-heard-word"
+            title={`Mostly this (${Math.round(scanned.share * 100)}% of what it heard) during the last listen.`}
+          >
+            {SOUND_LABEL[scanned.sound]}
+          </span>
+        )
+      )}
+      {suggestion && scanned && (
+        <button
+          className="sm-btn sm-btn--sm am-suggest"
+          title={`${name} sounds like ${SOUND_LABEL[scanned.sound].toLowerCase()}${
+            role ? `, not ${ROLE_LABEL[role].toLowerCase()}` : ""
+          }.`}
+          onClick={() => void apply(scanned.channel, suggestion)}
+        >
+          Use {ROLE_LABEL[suggestion]}
+          <span className="visually-hidden"> for {name}</span>
+        </button>
+      )}
+    </span>
   );
 }
 
@@ -404,6 +512,10 @@ export function RulesList() {
         <li>It never pushes a fader above 0 dB unless you already had it there, and never pulls one all the way down.</li>
         <li>It never mutes or unmutes, and never touches gain, routing, scenes or channels you didn't pick.</li>
         <li>It never raises a mic nobody is using, and leaves a clipping input for you to fix at the preamp.</li>
+        <li>
+          While it listens, a voice mic that only hears the band is left alone: it isn't turned up, and it doesn't
+          make the band step back.
+        </li>
         <li>Move a fader it's riding and that channel is yours until you hand it back. Freeze stops everything at once.</li>
         <li>Every move is logged on this computer with the reason.</li>
       </ul>

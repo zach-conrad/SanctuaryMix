@@ -10,6 +10,7 @@ use mix_core::MeterFrame;
 use crate::devices::find_input_device;
 use crate::meter::MeterBank;
 use crate::record::RecordTap;
+use crate::tap::{AudioBlock, AudioTap};
 use crate::{AudioError, Result};
 
 /// What was actually opened, which may differ from what was asked for.
@@ -44,10 +45,14 @@ impl Drop for MeterHandle {
 }
 
 /// Opens `device_name` (or the system default) with as many input channels as
-/// it offers and calls `on_frame` ~30 times a second with fresh levels.
+/// it offers and calls `on_frame` ~30 times a second with fresh levels, and
+/// `on_audio` just before it with the raw audio captured since the last call.
+/// Both run on the capture thread, never the real-time callback; `on_audio`
+/// must hand the audio off quickly rather than analyse it in place.
 pub fn start_metering(
     device_name: Option<String>,
     on_frame: impl Fn(MeterFrame) + Send + 'static,
+    mut on_audio: impl FnMut(AudioBlock) + Send + 'static,
 ) -> Result<MeterHandle> {
     let stop = Arc::new(AtomicBool::new(false));
     let (ready_tx, ready_rx) = mpsc::channel::<Result<Opened>>();
@@ -60,7 +65,7 @@ pub fn start_metering(
         .name("sanctuarymix-audio".into())
         .spawn(move || {
             let opened = open_stream(device_name.as_deref(), thread_tap);
-            let (stream, bank, info) = match opened {
+            let (stream, bank, listen_tap, info) = match opened {
                 Ok(v) => v,
                 Err(e) => {
                     let _ = ready_tx.send(Err(e));
@@ -68,9 +73,19 @@ pub fn start_metering(
                 }
             };
             let sample_rate = info.sample_rate;
+            let channels = info.channels;
             let _ = ready_tx.send(Ok(info));
+            let mut audio = Vec::new();
             while !thread_stop.load(Ordering::SeqCst) {
                 std::thread::sleep(FRAME_INTERVAL);
+                listen_tap.take(&mut audio);
+                if !audio.is_empty() {
+                    on_audio(AudioBlock {
+                        channels,
+                        sample_rate,
+                        samples: &audio,
+                    });
+                }
                 on_frame(bank.take_frame(sample_rate));
             }
             drop(stream);
@@ -101,10 +116,9 @@ pub fn start_metering(
     }
 }
 
-fn open_stream(
-    device_name: Option<&str>,
-    tap: Arc<RecordTap>,
-) -> Result<(cpal::Stream, Arc<MeterBank>, Opened)> {
+type OpenedStream = (cpal::Stream, Arc<MeterBank>, Arc<AudioTap>, Opened);
+
+fn open_stream(device_name: Option<&str>, tap: Arc<RecordTap>) -> Result<OpenedStream> {
     let device = find_input_device(device_name)?;
     let name = device.name()?;
     let default = device.default_input_config()?;
@@ -121,6 +135,14 @@ fn open_stream(
     let format = best.sample_format();
     let config: StreamConfig = best.into();
     let bank = Arc::new(MeterBank::new(config.channels as usize));
+    let listen_tap = Arc::new(AudioTap::new(
+        config.channels as usize,
+        config.sample_rate.0,
+    ));
+    let taps = Taps {
+        record: tap,
+        listen: listen_tap.clone(),
+    };
     let err_fn = |e| log::error!("audio stream error: {e}");
 
     let stream = match format {
@@ -130,20 +152,21 @@ fn open_stream(
                 &config,
                 move |d: &[f32], _| {
                     bank.push_interleaved(d);
-                    tap.push(d);
+                    taps.push(d);
                 },
                 err_fn,
                 None,
             )?
         }
-        SampleFormat::I16 => build_converting::<i16>(&device, &config, bank.clone(), tap, err_fn)?,
-        SampleFormat::I32 => build_converting::<i32>(&device, &config, bank.clone(), tap, err_fn)?,
+        SampleFormat::I16 => build_converting::<i16>(&device, &config, bank.clone(), taps, err_fn)?,
+        SampleFormat::I32 => build_converting::<i32>(&device, &config, bank.clone(), taps, err_fn)?,
         other => return Err(AudioError::UnsupportedFormat(format!("{other:?}"))),
     };
     stream.play()?;
     Ok((
         stream,
         bank,
+        listen_tap,
         Opened {
             device_name: name,
             channels: config.channels,
@@ -152,11 +175,24 @@ fn open_stream(
     ))
 }
 
+/// Everything besides metering that reads the real-time callback's audio.
+struct Taps {
+    record: Arc<RecordTap>,
+    listen: Arc<AudioTap>,
+}
+
+impl Taps {
+    fn push(&self, data: &[f32]) {
+        self.record.push(data);
+        self.listen.push_interleaved(data);
+    }
+}
+
 fn build_converting<T>(
     device: &cpal::Device,
     config: &StreamConfig,
     bank: Arc<MeterBank>,
-    tap: Arc<RecordTap>,
+    taps: Taps,
     err_fn: impl FnMut(cpal::StreamError) + Send + 'static,
 ) -> Result<cpal::Stream>
 where
@@ -174,7 +210,7 @@ where
                     .map(|&s| <f32 as cpal::FromSample<T>>::from_sample_(s)),
             );
             bank.push_interleaved(&scratch);
-            tap.push(&scratch);
+            taps.push(&scratch);
         },
         err_fn,
         None,

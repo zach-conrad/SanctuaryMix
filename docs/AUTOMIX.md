@@ -26,6 +26,33 @@ comes later. The numbers come from the project's church live-mix research
   plus the fader position. Without a calibrated room mic the app manages
   balance only and leaves the main fader to the operator.
 
+## Listening
+
+Two small models run on the computer (never in the cloud), in the `listen`
+crate:
+
+- **Silero VAD** says every 32 ms whether someone is talking or singing into a
+  mic.
+- **YAMNet** recognises the kind of sound about once a second: speech,
+  singing, choir, drums, bass, guitars, piano, organ, keys, brass, strings.
+
+With listening on (the default, a checkbox on the Assist screen), a speech or
+vocal mic only counts as in use while a voice is heard on it. A pastor's mic
+that only hears the band, or a vocal mic full of drums between songs, shows
+"Bleed only": it is held, it doesn't make the band step back, and it can't
+become the lead vocal the band is balanced against. If the models stop
+reporting for 1.5 s, or can't load, auto-mix goes back to levels alone.
+
+"Listen and suggest roles" listens to every input with signal for 20 seconds
+and offers a role wherever what a channel sounds like doesn't fit its name or
+current role (for example, "Handheld 2" that is really on a guitar amp).
+Nothing changes until the operator presses the suggestion.
+
+The models only describe what they hear. They never move a fader: every
+decision and every limit below stays in `crates/automix`. Listening runs on its
+own thread and drops audio rather than ever slowing metering or the console.
+Model provenance and licenses: `crates/listen/models/README.md`.
+
 ## Guardrails
 
 All enforced in Rust (`crates/automix/src/guardrails.rs`), not the UI. Settings
@@ -59,6 +86,9 @@ from the UI are clamped to hard limits, and the choke point clamps again.
 
 - `crates/automix`: presets (`preset.rs`), guardrails, the controller
   (`engine.rs`, synchronous, time passed in) and the async loop (`runner.rs`).
+- `crates/listen`: the listening models (resampling to 16 kHz, YAMNet's
+  log-mel features, Silero and YAMNet via `tract`, the per-channel listening
+  thread). `crates/audio-engine/src/tap.rs` hands it raw audio.
 - `crates/store`: local SQLite (settings and the auto-mix log).
 - `src-tauri/src/state.rs`: wires the loop to the console and the UI;
   `commands.rs` has the `automix_*` commands.
@@ -76,5 +106,10 @@ from the UI are clamped to hard limits, and the choke point clamps again.
   AMM for speech gain sharing. Whether it can be configured over the MIDI/TCP
   protocol still needs checking against Allen & Heath's protocol document and
   a real desk; this PR doesn't use it.
+- **Listening on real services.** The models are checked against their
+  reference outputs and on test recordings, not yet on a church's own
+  multitracks. A singer's voice bleeding into the pastor's mic still counts as
+  a voice. `cargo run --release -p listen --example hear -- file.wav N` shows
+  what they hear on channel N of a recording.
 - Later: feedback detection, measurement-mic calibration, per-channel feedback
   ceilings from a ring-out, week-to-week baseline learning, service segments.

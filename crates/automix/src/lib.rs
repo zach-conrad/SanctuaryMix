@@ -36,5 +36,5 @@ pub use engine::{
     FaderMove, ManagedChannel,
 };
 pub use guardrails::{Guardrails, Limit, RideLimits};
-pub use preset::{guess_role, ChannelRole, Nudges, Preset, RoomFeel};
+pub use preset::{guess_role, suggest_role, ChannelRole, Nudges, Preset, RoomFeel};
 pub use runner::{start, AutoMixHandle, FaderSink, Observer, Stopped};

@@ -5,6 +5,7 @@ use audio_engine::MeterHandle;
 use auth::{AuthProvider, LocalGuest};
 use automix::{Adjustment, AutoMixConfig, AutoMixHandle, AutoMixStatus, FaderSink, Observer};
 use console::{ConsoleAdapter, ConsoleError};
+use listen::{ListenTarget, Listener, Models};
 use mix_core::{ChangeSource, ChannelId, ConsoleEvent};
 use store::Store;
 use tauri::async_runtime::JoinHandle;
@@ -22,6 +23,9 @@ pub struct AppState {
     pub auth: Box<dyn AuthProvider>,
     pub store: Arc<Mutex<Store>>,
     pub automix: AutoMixHandle,
+    /// On-device listening models; `None` if they couldn't load (auto-mix
+    /// then works from levels alone).
+    pub listener: Option<Arc<Listener>>,
     /// Every control change from every source; recordings listen here.
     pub control: ControlBus,
     /// `None` only if the recordings folder couldn't be opened.
@@ -42,6 +46,7 @@ impl AppState {
                 None
             })
             .unwrap_or_default();
+        let targets = listen_targets(&config);
         let (automix, task) = automix::start(
             config,
             Arc::new(ConsoleSink(app.clone())),
@@ -51,6 +56,7 @@ impl AppState {
             },
         );
         tauri::async_runtime::spawn(task);
+        let listener = start_listening(&automix, targets);
         Self {
             metering: Mutex::new(None),
             console: tokio::sync::Mutex::new(None),
@@ -58,6 +64,7 @@ impl AppState {
             auth: Box::new(LocalGuest),
             store,
             automix,
+            listener,
             control: ControlBus::default(),
             recordings: Recordings::open(app)
                 .inspect_err(|e| log::error!("recordings are off this run: {e}"))
@@ -65,6 +72,36 @@ impl AppState {
             playback: Playback::default(),
         }
     }
+}
+
+/// Loads the listening models and points them at auto-mix's channels.
+fn start_listening(automix: &AutoMixHandle, targets: Vec<ListenTarget>) -> Option<Arc<Listener>> {
+    let models = match Models::load() {
+        Ok(m) => m,
+        Err(e) => {
+            log::error!("listening models didn't load, auto-mix will use levels only: {e}");
+            return None;
+        }
+    };
+    let automix = automix.clone();
+    let listener = Listener::start(models, move |frame| automix.push_hearing(frame));
+    listener.set_targets(targets);
+    Some(Arc::new(listener))
+}
+
+/// The channels to listen to for this auto-mix setup. Voice mics also get the voice detector.
+pub fn listen_targets(config: &AutoMixConfig) -> Vec<ListenTarget> {
+    if !config.listen {
+        return Vec::new();
+    }
+    config
+        .channels
+        .iter()
+        .map(|c| ListenTarget {
+            channel: c.channel,
+            voice: c.role.is_vocal(),
+        })
+        .collect()
 }
 
 /// `<app data>/sanctuarymix.db`, or an in-memory database if that can't be opened.

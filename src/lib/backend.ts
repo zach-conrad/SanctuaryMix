@@ -8,6 +8,7 @@ import type {
   AutoMixConfig,
   AutoMixStatus,
   ChannelRole,
+  HeardChannel,
   Preset,
   ChannelId,
   ConsoleConfig,
@@ -61,6 +62,10 @@ export interface Backend {
   automixStatus(): Promise<AutoMixStatus>;
   /** Newest first. */
   automixLog(limit?: number): Promise<Adjustment[]>;
+  /** Listens to every input with signal for `seconds`, to suggest roles by ear. */
+  automixListenScan(seconds: number): Promise<void>;
+  /** What each input has mostly sounded like. `names` are the console channel names, by index. */
+  automixHeard(names: string[]): Promise<HeardChannel[]>;
   onAutomix(cb: (status: AutoMixStatus) => void): Promise<Unlisten>;
   onAutomixAdjustment(cb: (adjustment: Adjustment) => void): Promise<Unlisten>;
 
@@ -132,6 +137,8 @@ async function createTauriBackend(): Promise<Backend> {
     automixUndoAll: () => invoke("automix_undo_all"),
     automixStatus: () => invoke("automix_status"),
     automixLog: (limit) => invoke("automix_log", { limit: limit ?? null }),
+    automixListenScan: (seconds) => invoke("automix_listen_scan", { seconds }),
+    automixHeard: (names) => invoke("automix_heard", { names }),
     onAutomix: (cb) => listen<AutoMixStatus>("automix", (e) => cb(e.payload)),
     onAutomixAdjustment: (cb) => listen<Adjustment>("automix-adjustment", (e) => cb(e.payload)),
     onMeters: (cb) => listen<MeterFrame>("meters", (e) => cb(e.payload)),

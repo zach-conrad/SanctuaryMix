@@ -21,6 +21,7 @@ auth.workspace = true
 recorder.workspace = true
 automix.workspace = true
 store.workspace = true
+listen.workspace = true
 
 async-trait.workspace = true
 

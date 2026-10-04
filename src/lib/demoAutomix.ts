@@ -1,8 +1,9 @@
 // Browser-demo stand-in for crates/automix, so `npm run dev` shows auto-mix
 // working without the Rust core. It follows the same rules in simplified form
 // (anchors to a reference, the band to the lead vocal, speech ducking, 0.5 dB
-// steps, range and unity limits, hands off when a person moves a fader). The
-// real guardrails live in Rust; nothing here ships in the app's control path.
+// steps, range and unity limits, hands off when a person moves a fader, holds
+// voice mics that only hear bleed). The real guardrails and listening models
+// live in Rust; nothing here ships in the app's control path.
 
 import type {
   Adjustment,
@@ -11,9 +12,11 @@ import type {
   ChannelMode,
   ChannelRole,
   ChannelStatus,
+  HeardChannel,
   MeterFrame,
   Preset,
   RoomFeel,
+  Sound,
 } from "./types";
 
 const BALANCE_ORDER: ChannelRole[] = [
@@ -84,6 +87,27 @@ export function guessRole(name: string): ChannelRole {
   return "other";
 }
 
+/** Mirrors automix::suggest_role: a role only when what it hears doesn't fit the current one. */
+export function suggestRole(current: ChannelRole, heard: Sound): ChannelRole | null {
+  const table: Partial<Record<Sound, [ChannelRole, ChannelRole[]]>> = {
+    speech: ["speech", ["speech"]],
+    singing: ["leadVocal", ["leadVocal", "backingVocal", "choir"]],
+    choir: ["choir", ["choir", "backingVocal"]],
+    drums: ["drums", ["drums", "kick"]],
+    bass: ["bass", ["bass", "kick"]],
+    electricGuitar: ["electricGuitar", ["electricGuitar"]],
+    acousticGuitar: ["acousticGuitar", ["acousticGuitar"]],
+    piano: ["pianoOrgan", ["pianoOrgan", "keysPads"]],
+    organ: ["pianoOrgan", ["pianoOrgan", "keysPads"]],
+    keys: ["keysPads", ["keysPads", "pianoOrgan", "playback"]],
+    brass: ["other", ["other", "playback"]],
+    strings: ["other", ["other", "playback"]],
+  };
+  const entry = table[heard];
+  if (!entry) return null;
+  return entry[1].includes(current) ? null : entry[0];
+}
+
 export const DEFAULT_AUTOMIX_CONFIG: AutoMixConfig = {
   feel: "fullModern",
   nudges: { loudnessDb: 0, lowEndDb: 0, vocalPresenceDb: 0 },
@@ -94,11 +118,14 @@ export const DEFAULT_AUTOMIX_CONFIG: AutoMixConfig = {
     gateDbfs: -50,
     noRaiseAbovePeakDbfs: -3,
   },
+  listen: true,
 };
 
 interface Track {
   level: number | null;
   activeSince: number | null;
+  /** Last time it was above the gate, voice or not. */
+  lastSignal: number;
   baseline: number | null;
   held: "operator" | "undone" | null;
   converging: boolean;
@@ -114,6 +141,8 @@ export interface DemoAutomixHooks {
   fader(channel: number): number | null;
   name(channel: number): string;
   muted(channel: number): boolean;
+  /** What the (pretend) listening models hear on a channel. */
+  hear(channel: number): { voice: boolean; sound: Sound | null };
   setFader(channel: number, db: number): void;
   status(s: AutoMixStatus): void;
   adjustment(a: Adjustment): void;
@@ -129,7 +158,7 @@ export function createDemoAutomix(hooks: DemoAutomixHooks) {
   const track = (ch: number): Track => {
     let t = tracks.get(ch);
     if (!t) {
-      t = { level: null, activeSince: null, baseline: null, held: null, converging: false, atLimit: false, lastMove: 0, pending: null, peak: -120 };
+      t = { level: null, activeSince: null, lastSignal: -Infinity, baseline: null, held: null, converging: false, atLimit: false, lastMove: 0, pending: null, peak: -120 };
       tracks.set(ch, t);
     }
     return t;
@@ -143,6 +172,13 @@ export function createDemoAutomix(hooks: DemoAutomixHooks) {
   };
   const note = (kind: Adjustment["kind"], reason: string, channel: number | null = null) =>
     record({ kind, reason, channel, channelName: channel === null ? null : hooks.name(channel), fromDb: null, toDb: null });
+  const roleOf = (ch: number) => config.channels.find((c) => c.channel === ch)?.role;
+  const isBleed = (ch: number, now: number) => {
+    const role = roleOf(ch);
+    return (
+      config.listen && role !== undefined && VOCAL.includes(role) && !hooks.hear(ch).voice && now - track(ch).lastSignal < 1500
+    );
+  };
   const inUse = (t: Track, now: number, ms: number) => t.activeSince !== null && now - t.activeSince >= ms && t.level !== null;
   const post = (ch: number) => {
     const t = track(ch);
@@ -193,6 +229,7 @@ export function createDemoAutomix(hooks: DemoAutomixHooks) {
     if (frozen) return "frozen";
     if (hooks.fader(ch) === null || t.baseline === null) return "waitingForFader";
     if (hooks.muted(ch)) return "muted";
+    if (isBleed(ch, now) && !inUse(t, now, 2000)) return "bleed";
     if (!inUse(t, now, 2000)) return "idle";
     if (target(role, r) === null) return "waitingForLead";
     return t.converging ? (t.atLimit ? "atLimit" : "riding") : "settled";
@@ -207,6 +244,7 @@ export function createDemoAutomix(hooks: DemoAutomixHooks) {
       frozen,
       consoleOnline: true,
       audioOk: true,
+      listening: config.listen && config.channels.length > 0,
       feel: config.feel,
       speechChannel: live && r.speech ? r.speech[0] : null,
       leadChannel: live && r.lead ? r.lead[0] : null,
@@ -219,6 +257,8 @@ export function createDemoAutomix(hooks: DemoAutomixHooks) {
         baselineDb: track(c.channel).baseline,
         targetDb: target(c.role, r),
         levelDb: inUse(track(c.channel), now, 2000) ? post(c.channel) : null,
+        heard: config.listen ? hooks.hear(c.channel).sound : null,
+        voice: config.listen ? hooks.hear(c.channel).voice : null,
       })),
     };
   }
@@ -349,13 +389,26 @@ export function createDemoAutomix(hooks: DemoAutomixHooks) {
     },
     status,
     log: (limit = 200) => log.slice(0, limit),
+    /** Every channel with signal and what it sounds like, as the scan would report it. */
+    heard(names: string[]): HeardChannel[] {
+      const now = performance.now();
+      const out: HeardChannel[] = [];
+      for (const [ch, t] of tracks) {
+        const sound = hooks.hear(ch).sound;
+        if (sound === null || now - t.lastSignal > 5000) continue;
+        const current = roleOf(ch) ?? guessRole(names[ch] ?? "");
+        out.push({ channel: ch, sound, share: 0.8, seconds: 20, suggestedRole: suggestRole(current, sound) });
+      }
+      return out.sort((a, b) => a.channel - b.channel);
+    },
     onMeters(frame: MeterFrame) {
       const now = performance.now();
       const gate = config.guardrails.gateDbfs;
       for (const m of frame.channels) {
         const t = track(m.channel);
         t.peak = Math.max(m.peakDb, t.peak - 0.33);
-        if (m.rmsDb > gate) {
+        if (m.rmsDb > gate) t.lastSignal = now;
+        if (m.rmsDb > gate && !isBleed(m.channel, now)) {
           t.activeSince ??= now;
           const p = 10 ** (m.rmsDb / 10);
           const old = t.level === null ? p : 10 ** (t.level / 10);
