@@ -161,10 +161,11 @@ every PR.
 To turn deploys on, create a free Vercel (Hobby) account and an access token
 (Account settings, then Tokens), and add it as the **repository** secret
 `VERCEL_TOKEN` (Settings, then Secrets and variables, then Actions). That's
-all: the first deploy creates a `sanctuarymix` project and links to it. The
+all: the workflow deploys to the existing `sanctuarymix` project in Zach's
+Hobby account, whose IDs (not secret) are the defaults in `website.yml`. The
 project is never connected to Git, so only CI deploys it, and every deploy
 includes the installer. (Optional: set both `VERCEL_ORG_ID` and
-`VERCEL_PROJECT_ID` to deploy to an existing project instead.)
+`VERCEL_PROJECT_ID` secrets to deploy to a different project.)
 
 Vercel's Hobby plan allows 100 MB of files per CLI deploy. The workflow fails
 with a clear message above 90 MB (the dmg is about 13 MB today).
