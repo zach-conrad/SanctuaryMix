@@ -330,3 +330,73 @@ export interface ReplayStatus {
   canRestore: boolean;
   message: string | null;
 }
+
+// Room loudness (crates/mix-core/src/spl.rs)
+
+export type Weighting = "a" | "c";
+
+export interface SplConfig {
+  /** 0-based input on the audio device; null turns the meter off. */
+  source: number | null;
+  /** dB SPL = dBFS (RMS) + this. */
+  offsetDb: number;
+  /** True while the offset came from a calibration that still matches the source, device and sample rate. */
+  calibrated: boolean;
+  /** What the last calibration was made against. */
+  calibration: CalibrationRecord | null;
+}
+
+export interface CalibrationRecord {
+  source: number;
+  device: string;
+  sampleRate: number;
+  weighting: Weighting;
+  referenceDb: number;
+  /** Unix time in ms. */
+  atMs: number;
+}
+
+/** Progress of a guided calibration (`spl-calibration` events). */
+export type CalibrationStatus =
+  | {
+      state: "listening";
+      levelDbfs: number;
+      steadySecs: number;
+      neededSecs: number;
+      elapsedSecs: number;
+      /** Why the steady count isn't growing, if it isn't. */
+      hold: string | null;
+    }
+  | { state: "done"; offsetDb: number; config: SplConfig }
+  | { state: "failed"; reason: string };
+
+/** One A/C pair of levels in dB SPL. */
+export interface AcLevel {
+  a: number;
+  c: number;
+}
+
+export interface SplReading {
+  source: number;
+  calibrated: boolean;
+  /** 125 ms time weighting. */
+  fast: AcLevel;
+  /** 1 s time weighting. */
+  slow: AcLevel;
+  leq1m: AcLevel;
+  leq15m: AcLevel;
+  /** Leq since the last reset. */
+  leqTotal: AcLevel;
+  /** LAFmax since the reset. */
+  aMax: number;
+  /** LCpeak since the reset. */
+  cPeak: number;
+  seconds: number;
+}
+
+/** One second of history: that second's Leq. `t` is seconds since the reset. */
+export interface SplPoint {
+  t: number;
+  a: number;
+  c: number;
+}
