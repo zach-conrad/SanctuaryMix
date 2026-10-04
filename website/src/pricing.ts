@@ -24,10 +24,20 @@ export interface Plan {
 }
 
 /**
- * While true, the section says the prices are samples. Set to false once
- * Zach approves the final numbers.
+ * While true, the section says the prices are samples. Prices were approved
+ * on 2026-10-04.
  */
-export const PRICES_ARE_PLACEHOLDERS = true;
+export const PRICES_ARE_PLACEHOLDERS = false;
+
+/**
+ * Launch offer: the first `spots` churches keep `percentOff` for as long as
+ * they stay subscribed. Set to null to take it off the site.
+ */
+export const FOUNDING_OFFER: { percentOff: number; spots: number } | null = { percentOff: 25, spots: 50 };
+
+/** A price after the founding-church discount, to the cent. */
+export const foundingPrice = (amount: number) =>
+  FOUNDING_OFFER ? Math.round(amount * (100 - FOUNDING_OFFER.percentOff)) / 100 : amount;
 
 export const CURRENCY = "USD";
 

@@ -35,6 +35,6 @@ Hosting isn't decided yet. The build uses a relative base, so `dist/` works at a
 
 ## Pricing
 
-Plans and prices live in one file, `src/pricing.ts`. The pricing section on the home page (monthly/yearly toggle, yearly saving) and the account page both read from it. While `PRICES_ARE_PLACEHOLDERS` is `true` the section says the prices are samples.
+Plans and prices live in one file, `src/pricing.ts`. The pricing section on the home page (monthly/yearly toggle, yearly saving) and the account page both read from it. While `PRICES_ARE_PLACEHOLDERS` is `true` the section says the prices are samples. `FOUNDING_OFFER` controls the founding-church banner; set it to `null` to remove it. Checkout will use Stripe.
 
 There's no checkout yet. **Start free trial** opens the sample account page as `/account/?plan=pro&billing=yearly`, which shows the chosen plan; a real checkout will replace that link.

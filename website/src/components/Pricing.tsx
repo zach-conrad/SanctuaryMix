@@ -1,6 +1,7 @@
-import { ArrowRight, Check, Info } from "lucide-react";
+import { ArrowRight, Check, Gift, Info } from "lucide-react";
 import { useState } from "react";
 import {
+  FOUNDING_OFFER,
   PLANS,
   PRICES_ARE_PLACEHOLDERS,
   PRICING_FOOTNOTE,
@@ -56,6 +57,16 @@ export function Pricing({ root }: Props) {
           <p className="preview-note text-caption pricing__note" role="note">
             <Info aria-hidden="true" />
             Sample prices. Final pricing will be posted before launch.
+          </p>
+        ) : null}
+
+        {FOUNDING_OFFER ? (
+          <p className="founding text-caption">
+            <Gift aria-hidden="true" />
+            <span>
+              <strong>Founding church offer.</strong> The first {FOUNDING_OFFER.spots} churches to subscribe get{" "}
+              {FOUNDING_OFFER.percentOff}% off any plan for as long as they stay subscribed.
+            </span>
           </p>
         ) : null}
 

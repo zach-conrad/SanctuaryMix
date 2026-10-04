@@ -2,7 +2,7 @@ import { CircleCheck, Download, Info, Laptop, Monitor } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
-import { TRIAL_DAYS, findPlan, formatPrice, type Billing } from "./pricing";
+import { FOUNDING_OFFER, TRIAL_DAYS, findPlan, formatPrice, foundingPrice, type Billing } from "./pricing";
 import { downloadUrl, fetchLatestRelease, type ReleaseLookup } from "./release";
 
 const ROOT = "../";
@@ -58,6 +58,11 @@ export function Account() {
                   {choice.billing === "yearly"
                     ? `${formatPrice(choice.plan.yearly)} a year`
                     : `${formatPrice(choice.plan.monthly)} a month`}
+                  {FOUNDING_OFFER
+                    ? `, or ${formatPrice(
+                        foundingPrice(choice.billing === "yearly" ? choice.plan.yearly : choice.plan.monthly),
+                      )} with the founding church offer`
+                    : ""}
                   . Checkout isn't built yet, so nothing is charged. <a href={`${ROOT}#pricing`}>Change plan</a>
                 </p>
               </div>
