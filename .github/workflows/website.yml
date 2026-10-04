@@ -81,21 +81,34 @@ jobs:
             exit 1
           fi
 
-      # Deploys the prebuilt folder as static files. The Vercel project
-      # should NOT also be connected to this repo through Vercel's Git
-      # integration, or its own builds would replace these and drop the
-      # installer.
+      # Deploys the prebuilt folder as static files with the Vercel CLI. Only
+      # VERCEL_TOKEN is needed: CI creates the "sanctuarymix" project on first
+      # run and links to it. The project is never connected to Git, so
+      # Vercel's own builds can't replace this deploy (which holds the installer).
+      # Optional: VERCEL_ORG_ID + VERCEL_PROJECT_ID (both or neither) to target
+      # an existing project instead.
       - name: Deploy to Vercel
         if: steps.site.outputs.exists == 'true'
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          PROJECT: sanctuarymix
         run: |
-          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
-            echo "::warning::VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID not set; built the site but did not deploy it."
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::warning::VERCEL_TOKEN not set; built the site but did not deploy it."
             exit 0
           fi
-          url=$(npx --yes vercel@62 deploy website/dist --prod --yes --token "$VERCEL_TOKEN")
+          vercel() { npx --yes vercel@62 "$@" --token "$VERCEL_TOKEN"; }
+          if [ -n "$ORG_ID" ] && [ -n "$PROJECT_ID" ]; then
+            export VERCEL_ORG_ID="$ORG_ID" VERCEL_PROJECT_ID="$PROJECT_ID"
+          else
+            if ! vercel project inspect "$PROJECT" >/dev/null 2>&1; then
+              echo "Creating Vercel project $PROJECT"
+              vercel project create "$PROJECT"
+            fi
+            vercel link --yes --project "$PROJECT" --cwd website/dist
+          fi
+          url=$(vercel deploy --prod --yes --cwd website/dist)
           echo "Deployed: $url"
           echo "Deployed to $url" >> "$GITHUB_STEP_SUMMARY"

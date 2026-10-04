@@ -158,23 +158,16 @@ and deploys the folder to Vercel as static files. It runs after every release,
 on every change to `website/` on main, and by hand. CI also builds the site on
 every PR.
 
-To turn deploys on:
+To turn deploys on, create a free Vercel (Hobby) account and an access token
+(Account settings, then Tokens), and add it as the **repository** secret
+`VERCEL_TOKEN` (Settings, then Secrets and variables, then Actions). That's
+all: the first deploy creates a `sanctuarymix` project and links to it. The
+project is never connected to Git, so only CI deploys it, and every deploy
+includes the installer. (Optional: set both `VERCEL_ORG_ID` and
+`VERCEL_PROJECT_ID` to deploy to an existing project instead.)
 
-1. Create a free Vercel (Hobby) project for the site. Don't connect it to
-   this GitHub repo with Vercel's Git integration (or turn its automatic
-   deployments off): CI deploys the site with the installer, and a Git
-   build would replace it without one.
-2. Add three **repository** secrets (Settings, then Secrets and variables,
-   then Actions):
-
-| Secret | Value |
-| --- | --- |
-| `VERCEL_TOKEN` | Vercel, then Account settings, then Tokens |
-| `VERCEL_ORG_ID` | Your team or account ID (Vercel settings, or `.vercel/project.json` after `vercel link`) |
-| `VERCEL_PROJECT_ID` | Project settings, then General, then Project ID |
-
-Vercel's Hobby plan limits upload size per deployment, so keep an eye on the
-dmg's size as the app grows.
+Vercel's Hobby plan allows 100 MB of files per CLI deploy. The workflow fails
+with a clear message above 90 MB (the dmg is about 13 MB today).
 
 Until real sign-in exists, anyone with the site's address can download. The
 installer is not linked from GitHub or listed anywhere public. The planned
