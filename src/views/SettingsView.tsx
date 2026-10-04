@@ -19,7 +19,7 @@ export function SettingsView() {
   const setTheme = useMixer((s) => s.setTheme);
   return (
     <div className="page page--narrow">
-      <PageHeader title="Settings">Your account and how SanctuaryMix looks on this computer.</PageHeader>
+      <PageHeader title="Settings" />
       <section className="panel">
         <div className="panel-head">
           <CircleUser size={20} strokeWidth={1.75} />
@@ -42,10 +42,6 @@ export function SettingsView() {
             </button>
           </div>
         )}
-        <p className="text-caption muted">
-          Team accounts will let your church share scenes, Assist settings and service history across computers. Until
-          then, SanctuaryMix runs on this computer with full control and no sign-in.
-        </p>
       </section>
       <section className="panel">
         <h2 className="text-heading">Appearance</h2>
@@ -53,9 +49,6 @@ export function SettingsView() {
           <div className="setting-row-text">
             <span className="text-body-strong" id="theme-label">
               Theme
-            </span>
-            <span className="text-caption muted">
-              Dark is easiest on the eyes in a dark room. Use Light for daytime setup.
             </span>
           </div>
           <div className="sm-seg" role="group" aria-labelledby="theme-label">

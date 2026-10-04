@@ -43,18 +43,13 @@ function ServicesList() {
 
   return (
     <div className="page">
-      <PageHeader title="Services">
-        Every recorded service with its mix and each fader and mute move. Open one to listen and see what changed.
-      </PageHeader>
+      <PageHeader title="Services" />
       <div className="page-split">
         <div className="page-main">
           {error && <p className="error">{error}</p>}
           {loaded && list.length === 0 && (
             <section className="panel">
-              <p className="muted">
-                No services yet. Press Record service in the top bar when the service starts; it saves when you press
-                Stop.
-              </p>
+              <p className="muted">No services yet. Press Record service to start.</p>
             </section>
           )}
           {groups.map((g) => (
@@ -191,14 +186,14 @@ function DiskPanel() {
           }}
         >
           <Trash2 />
-          Delete multitracks older than {RETENTION_DAYS} days
+          Delete old multitracks
         </button>
         <p className="text-caption muted">
           {!canDelete
             ? "Only engineers and admins can delete recordings."
             : old.length === 0
-              ? `No multitracks are older than ${RETENTION_DAYS} days.`
-              : `${old.length} ${old.length === 1 ? "service has" : "services have"} multitracks from before ${cutoff}, about ${formatBytes(oldBytes)}. The stereo mix and the moves stay.`}
+              ? `None older than ${RETENTION_DAYS} days.`
+              : `Older than ${RETENTION_DAYS} days: ${old.length} ${old.length === 1 ? "service" : "services"}, ${formatBytes(oldBytes)}. Stereo mixes stay.`}
         </p>
         {freed !== null && <p className="text-caption muted">Freed {formatBytes(freed)}.</p>}
       </div>
@@ -275,7 +270,7 @@ function RecordingSettingsPanel() {
 
   const options = Array.from({ length: inputs }, (_, i) => (
     <option key={i} value={i}>
-      Dante input {i + 1}
+      Input {i + 1}
     </option>
   ));
 
@@ -285,9 +280,7 @@ function RecordingSettingsPanel() {
         <Mic size={20} strokeWidth={1.75} />
         <h2 className="text-heading">Recording</h2>
       </div>
-      <p className="muted">
-        On the dLive, patch Main L and Main R to two Dante outputs, then pick the inputs they arrive on.
-      </p>
+      <p className="text-caption muted">Patch Main L/R to two Dante outputs.</p>
       <div className="mix-inputs">
         <label className="sm-field">
           <span className="sm-field__label">Main L</span>
@@ -304,7 +297,7 @@ function RecordingSettingsPanel() {
           </select>
         </label>
       </div>
-      {!stereo && <p className="text-caption muted">Without audio, only the fader and mute moves are recorded.</p>}
+      {!stereo && <p className="text-caption muted">Moves only, no audio.</p>}
 
       <div className="sm-field">
         <span className="sm-field__label" id="multitrack-label">
@@ -323,22 +316,18 @@ function RecordingSettingsPanel() {
           </button>
         </div>
         <span className="sm-field__help">
-          {settings.multitrack
-            ? `About ${formatGb(tracks * bytesPerHour(false, 1))} per hour for ${tracks} inputs, plus ${formatGb(STEREO_BYTES_PER_HOUR)} for the stereo mix.`
-            : stereo
-              ? `The stereo mix is about ${formatGb(STEREO_BYTES_PER_HOUR)} per hour. Multitrack adds about ${formatGb(tracks * bytesPerHour(false, 1))} per hour for ${tracks} inputs.`
-              : "Pick Main L and Main R to record audio."}
+          {stereo
+            ? `${formatGb(perHour)} per hour`
+            : "Pick Main L and R to record audio."}
         </span>
       </div>
 
       {stereo && (
         <p className={`text-caption ${short ? "warning-text" : "muted"}`}>
-          {short
-            ? `Not enough free space to start: this needs ${formatGb(need)}. Delete old multitracks or turn multitrack off.`
-            : `A 75-minute service is about ${formatGb(perHour * 1.25)}.`}
+          {short ? `Not enough space: needs ${formatGb(need)}.` : null}
         </p>
       )}
-      {recording && <p className="text-caption muted">Changes apply to the next recording.</p>}
+      {recording && <p className="text-caption muted">Applies to the next recording.</p>}
     </section>
   );
 }

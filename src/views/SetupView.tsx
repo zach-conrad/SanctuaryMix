@@ -8,7 +8,7 @@ import { useMixer } from "../store/mixer";
 export function SetupView() {
   return (
     <div className="page page--narrow">
-      <PageHeader title="Setup">Connect to your console, then pick where its audio comes in.</PageHeader>
+      <PageHeader title="Setup" />
       <ConsolePanel />
       <AudioPanel />
     </div>
@@ -88,18 +88,12 @@ function AudioPanel() {
           <RefreshCw />
         </button>
       </div>
-      <p className="muted">
-        Choose Dante Virtual Soundcard. In Dante Controller, route the dLive's channels to it one to one: console input
-        1 to input 1, and so on.
-      </p>
+      <p className="text-caption muted">Route dLive inputs 1:1 to Dante Virtual Soundcard.</p>
       {listError && <p className="error">{listError}</p>}
       {access === "denied" ? (
         <div className="permission-off" role="status">
           <p className="text-body-strong">Microphone access is off</p>
-          <p className="muted">
-            SanctuaryMix needs it to hear the Dante channels. In System Settings, open Privacy &amp; Security ›
-            Microphone and turn on SanctuaryMix, then check again.
-          </p>
+          <p className="muted">Turn on SanctuaryMix in Privacy &amp; Security › Microphone.</p>
           <div className="actions">
             <button className="sm-btn sm-btn--lg sm-btn--ghost" onClick={refresh} disabled={loading}>
               Check again
@@ -210,7 +204,7 @@ function ConsolePanel() {
                 onBlur={() => setHostTouched(true)}
               />
               <span className="sm-field__help">
-                {hostTouched && hostProblem ? hostProblem : "Shown on the dLive under Utility › Control › Network."}
+                {hostTouched && hostProblem ? hostProblem : "dLive: Utility › Control › Network"}
               </span>
             </label>
             <label className="sm-field">
@@ -226,7 +220,7 @@ function ConsolePanel() {
                   </option>
                 ))}
               </select>
-              <span className="sm-field__help">Match Utility › Control › MIDI on the console.</span>
+              <span className="sm-field__help">dLive: Utility › Control › MIDI</span>
             </label>
           </>
         )}
@@ -243,7 +237,6 @@ function ConsolePanel() {
               </option>
             ))}
           </select>
-          <span className="sm-field__help">How many channel strips the mixer shows.</span>
         </label>
       </div>
       {consoleError && <p className="error">{consoleError}</p>}

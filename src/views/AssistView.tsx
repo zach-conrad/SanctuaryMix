@@ -25,7 +25,7 @@ export function AssistView() {
   const insights = useInsights();
   return (
     <div className="page">
-      <PageHeader title="Assist">Suggestions while you mix, and auto-mix for the channels you pick.</PageHeader>
+      <PageHeader title="Assist" />
       <AutoMixControls />
       <div className="page-split">
         <div className="page-main">
@@ -35,9 +35,6 @@ export function AssistView() {
           <RoomFeelPicker />
           <section className="panel">
             <h2 className="text-heading">Right now</h2>
-            <p className="text-caption muted">
-              Assist checks every input while you mix. Select a note to jump to that channel.
-            </p>
             <InsightList insights={insights} />
           </section>
           <ActivityLog />
@@ -50,9 +47,8 @@ export function AssistView() {
               {MODES.map(({ icon: Icon, title, body }) => (
                 <li key={title}>
                   <Icon size={20} strokeWidth={1.75} aria-hidden />
-                  <span>
-                    <span className="text-body-strong">{title}</span>
-                    <span className="text-caption muted">{body}</span>
+                  <span className="text-body-strong" title={body}>
+                    {title}
                   </span>
                 </li>
               ))}

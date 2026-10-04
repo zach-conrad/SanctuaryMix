@@ -32,18 +32,18 @@ export function AutoMixControls() {
   const frozen = status?.frozen ?? false;
   const count = config?.channels.length ?? 0;
   const blocker = !consoleOn
-    ? "Connect to the console in Setup first."
+    ? "Connect the console in Setup."
     : !audioOn
-      ? "Start Dante audio in Setup first."
+      ? "Start Dante audio in Setup."
       : count === 0
-        ? "Pick at least one channel below."
+        ? "Pick channels below."
         : null;
 
   const state = !engaged
-    ? "Off. Nothing moves until you start it."
+    ? "Off"
     : frozen
-      ? "Frozen. Nothing moves until you resume."
-      : `Riding ${count} ${count === 1 ? "channel" : "channels"}. Move any of them yourself and it lets go of that one. Press Esc to freeze everything.`;
+      ? "Frozen"
+      : `Riding ${count} ${count === 1 ? "channel" : "channels"} · Esc to freeze`;
 
   return (
     <section className="panel automix-panel" aria-labelledby="automix-title">
@@ -54,11 +54,11 @@ export function AutoMixControls() {
           </h2>
           {engaged && <span className="sm-assist-badge">{frozen ? "Frozen" : "Auto"}</span>}
         </div>
-        <p className="text-caption muted">
-          Keeps the channels you pick at a steady, balanced level every week. It only moves those faders, in small
-          steps, and never mutes or unmutes anything.
-        </p>
-        <span className="text-body-strong automix-state" role="status">
+        <span
+          className="muted automix-state"
+          role="status"
+          title="Rides only the channels you pick, in small steps. Never mutes. Move a fader to take it back."
+        >
           {!engaged && blocker ? blocker : state}
         </span>
         {error && <p className="error">{error}</p>}
@@ -111,7 +111,7 @@ export function RoomFeelPicker() {
         Room feel
       </h2>
       <label className="sm-field feel-field">
-        <span className="sm-field__label">How should the room feel?</span>
+        <span className="visually-hidden">Room feel</span>
         <select
           className="sm-input"
           value={feel ?? ""}
@@ -126,17 +126,13 @@ export function RoomFeelPicker() {
           ))}
         </select>
         {chosen && (
-          <span className="sm-field__help">
-            {chosen.description} Room level {chosen.roomLevel}.
+          <span className="sm-field__help" title={`Room level ${chosen.roomLevel}`}>
+            {chosen.description}
           </span>
         )}
       </label>
       {chosen?.warning && <p className="text-caption feel-warning">{chosen.warning}</p>}
       <NudgeSliders />
-      <p className="text-caption muted">
-        Room levels are a guide. Without a measurement mic, auto-mix keeps the balance between channels and leaves the
-        main fader to you.
-      </p>
     </section>
   );
 }
@@ -162,7 +158,7 @@ function NudgeSliders() {
   return (
     <div className="nudges">
       {NUDGES.map(({ key, label, help }) => (
-        <label key={key} className="nudge">
+        <label key={key} className="nudge" title={help}>
           <span className="nudge-head">
             <span className="text-body-strong">{label}</span>
             <span className="text-readout">{signed(nudges[key])}</span>
@@ -176,7 +172,6 @@ function NudgeSliders() {
             aria-valuetext={signed(nudges[key])}
             onChange={(e) => void setNudge(key, Number(e.target.value))}
           />
-          <span className="text-caption muted">{help}</span>
         </label>
       ))}
     </div>
@@ -208,16 +203,12 @@ export function ChannelPicker() {
     <section className="panel" aria-labelledby="channels-title">
       <div className="panel-head">
         <h2 id="channels-title" className="text-heading">
-          Channels auto-mix may ride
+          Channels
         </h2>
         <span className="text-caption muted">
           {managed.length} of {strips.length} picked
         </span>
       </div>
-      <p className="text-caption muted">
-        Start with vocals and speech. Leave out room mics and anything you want to ride yourself. Channels you don't
-        pick are never touched.
-      </p>
       <div className="toolbar">
         <button className="sm-btn" onClick={() => void pickVoices()}>
           Select vocals and speech
@@ -236,15 +227,12 @@ export function ChannelPicker() {
           Clear
         </button>
       </div>
-      <label className="am-listen">
+      <label
+        className="am-listen"
+        title="Tells a real voice from band bleed, so bleed is never turned up. Runs on this computer only."
+      >
         <input type="checkbox" checked={listen} onChange={(e) => void setListen(e.target.checked)} />
-        <span>
-          <span className="text-body-strong">Listen to each mic</span>
-          <span className="text-caption muted">
-            Tells a voice from the band bleeding into a mic, so bleed is never turned up and the band only steps back
-            when someone is really talking. It runs on this computer; nothing is recorded or sent anywhere.
-          </span>
-        </span>
+        <span className="text-body-strong">Listen to each mic</span>
       </label>
       <div className="am-table-scroll">
         <table className="am-table">
@@ -498,7 +486,7 @@ export function ActivityLog({ limit = 40 }: { limit?: number }) {
         What auto-mix did
       </h2>
       {log.length === 0 ? (
-        <p className="empty">Nothing yet. Every move shows up here with the reason, and you can undo it.</p>
+        <p className="empty">No moves yet.</p>
       ) : (
         <ol className="activity">
           {log.slice(0, limit).map((a, i) => {
@@ -551,7 +539,7 @@ export function RulesList() {
   return (
     <details className="panel disclosure">
       <summary>
-        <h2 className="text-heading">Rules auto-mix always follows</h2>
+        <h2 className="text-heading">Auto-mix rules</h2>
         <ChevronRight size={20} strokeWidth={1.75} aria-hidden />
       </summary>
       <ul className="rules disclosure-body">

@@ -150,7 +150,7 @@ function DetailHeader() {
           }}
           onBlur={() => void commit()}
         />
-        <span className="sm-field__help">{saved ? "Saved." : "Saved when you click away."}</span>
+        {saved && <span className="sm-field__help">Saved</span>}
       </label>
       {confirmDelete && (
         <Dialog
@@ -248,9 +248,7 @@ function Transport({ lanes }: { lanes: Lane[] }) {
       </div>
       <div className="transport-foot">
         <span className="text-caption muted">
-          {playback && !playback.hasAudio
-            ? "No audio in this recording. The timeline and the mixer below still play."
-            : "To play it in the room, choose Dante Virtual Soundcard and patch it to the PA."}
+          {playback && !playback.hasAudio ? "No audio in this recording." : null}
         </span>
         <SendMoves lanes={lanes} />
       </div>
@@ -447,7 +445,6 @@ function MixerPanel({ state, lanes, positionMs }: { state: ChannelState[]; lanes
           </button>
         </div>
       </div>
-      <p className="text-caption muted">Read only. Nothing here goes to the console.</p>
       <MiniMixer state={state} moved={lanes} all={all} />
     </section>
   );
