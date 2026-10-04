@@ -155,7 +155,11 @@ function SplPopup({ id, anchor, onClose }: { id: string; anchor: RefObject<HTMLB
       </div>
       <SplGraph points={live ? history : []} spanSecs={span * 60} />
 
-      {live && <SplTable reading={live} />}
+      {live && (
+        <div className="spl-group spl-group--pad">
+          <SplTable reading={live} />
+        </div>
+      )}
       <SplSettings />
     </div>
   );
@@ -343,31 +347,64 @@ function SplSettings() {
   };
 
   return (
-    <div className="spl-settings">
-      <label className="sm-field">
-        <span className="sm-field__label">Measurement input</span>
-        <select
-          className="sm-input"
-          value={config.source ?? ""}
-          onChange={(e) => void setSource(e.target.value === "" ? null : Number(e.target.value))}
-        >
-          <option value="">Off</option>
-          {Array.from({ length: Math.max(inputs, (config.source ?? -1) + 1) }, (_, i) => (
-            <option key={i} value={i}>
-              {`Input ${i + 1}${name(i) ? ` · ${name(i)}` : ""}`}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <fieldset className="spl-calibrate" disabled={config.source === null || listening}>
-        <legend className="sm-field__label">Calibrate</legend>
-        <CalibrationSummary />
-        <div className="spl-calibrate__row">
-          <label className="sm-field spl-calibrate__ref">
-            <span className="sm-field__label">Reference meter (slow)</span>
-            <input
+    <>
+      <section className="spl-section">
+        <h3 className="spl-section__head">Measurement</h3>
+        <div className="spl-group">
+          <label className="spl-row" title="A measurement mic in the room, not a stage mic">
+            <span className="spl-row__label">Input</span>
+            <select
               className="sm-input"
+              value={config.source ?? ""}
+              onChange={(e) => void setSource(e.target.value === "" ? null : Number(e.target.value))}
+            >
+              <option value="">Off</option>
+              {Array.from({ length: Math.max(inputs, (config.source ?? -1) + 1) }, (_, i) => (
+                <option key={i} value={i}>
+                  {`Input ${i + 1}${name(i) ? ` · ${name(i)}` : ""}`}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="spl-row" title="Added to the input's dBFS level. Typing one clears the calibration.">
+            <span className="spl-row__label">Offset</span>
+            <input
+              className="sm-input spl-offset"
+              inputMode="decimal"
+              aria-label="Offset in dB"
+              value={offset}
+              onChange={(e) => setOffsetText(e.target.value)}
+              onBlur={commitOffset}
+              onKeyDown={(e) => e.key === "Enter" && commitOffset()}
+            />
+            <span className="text-caption muted">dB</span>
+          </label>
+          <div className="spl-row">
+            <span className="spl-row__label">Averages</span>
+            <button
+              className="sm-btn sm-btn--ghost"
+              disabled={config.source === null}
+              title="Clears the graph, Leq, max and peak"
+              onClick={() => void reset()}
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="spl-section">
+        <h3 className="spl-section__head">Calibrate</h3>
+        <div className="spl-group">
+          <fieldset className="spl-fieldset" disabled={config.source === null || listening}>
+            <legend className="spl-sr-only">Calibrate</legend>
+          <label
+            className="spl-row"
+            title="Slow weighting. Hold an SPL meter at the mic, play pink noise, and enter its reading. A 94 dB calibrator works too."
+          >
+            <span className="spl-row__label">Reference</span>
+            <input
+              className="sm-input spl-offset"
               inputMode="decimal"
               placeholder="94.0"
               value={reference}
@@ -377,49 +414,33 @@ function SplSettings() {
                 dismissCalibration();
               }}
             />
+            <div className="sm-seg" role="group" aria-label="Reference meter weighting">
+              {(["a", "c"] as const).map((w) => (
+                <button key={w} type="button" aria-pressed={weighting === w} onClick={() => setWeighting(w)}>
+                  dB{w.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="sm-btn"
+              disabled={reference.trim() === ""}
+              onClick={() => void calibrate(weighting, Number(reference.replace(MINUS, "-")))}
+            >
+              Calibrate
+            </button>
           </label>
-          <div className="sm-seg" role="group" aria-label="Reference meter weighting">
-            {(["a", "c"] as const).map((w) => (
-              <button key={w} type="button" aria-pressed={weighting === w} onClick={() => setWeighting(w)}>
-                dB{w.toUpperCase()}
-              </button>
-            ))}
-          </div>
-          <button
-            className="sm-btn"
-            disabled={reference.trim() === ""}
-            onClick={() => void calibrate(weighting, Number(reference.replace(MINUS, "-")))}
-          >
-            Calibrate
-          </button>
+          </fieldset>
+          <CalibrationProgress />
         </div>
-      </fieldset>
-      <CalibrationProgress />
-
-      <label className="sm-field">
-        <span className="sm-field__label">Offset (dB)</span>
-        <input
-          className="sm-input spl-offset"
-          inputMode="decimal"
-          value={offset}
-          onChange={(e) => setOffsetText(e.target.value)}
-          onBlur={commitOffset}
-          onKeyDown={(e) => e.key === "Enter" && commitOffset()}
-        />
-      </label>
-
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-
-      <div className="spl-settings__actions">
-        <button className="sm-btn sm-btn--ghost" disabled={config.source === null} onClick={() => void reset()}>
-          Reset averages
-        </button>
-      </div>
-    </div>
+        <CalibrationSummary />
+        {error && (
+          <p className="error spl-section__foot" role="alert">
+            {error}
+          </p>
+        )}
+      </section>
+    </>
   );
 }
 
@@ -434,9 +455,9 @@ function CalibrationSummary() {
     return null;
   }
   return config.calibrated ? (
-    <p className="text-caption muted">Calibrated {dateTime.format(record.atMs)}</p>
+    <p className="spl-section__foot">Calibrated {dateTime.format(record.atMs)}</p>
   ) : (
-    <p className="text-caption spl-uncal">Out of date. Calibrate again.</p>
+    <p className="spl-section__foot spl-uncal">Out of date. Calibrate again.</p>
   );
 }
 
@@ -455,7 +476,7 @@ function CalibrationProgress() {
   }
   const { steadySecs, neededSecs, levelDbfs, hold } = calibration;
   return (
-    <div className="spl-cal-progress" role="status">
+    <div className="spl-row spl-cal-progress" role="status">
       <div className="spl-cal-progress__head">
         <span className="text-body-strong">Listening</span>
         <span className="text-readout">
