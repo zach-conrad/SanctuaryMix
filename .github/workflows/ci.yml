@@ -54,7 +54,11 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libasound2-dev librsvg2-dev
       - name: Install Rust (version from rust-toolchain.toml)
         run: rustup toolchain install && rustc --version
+      # Only main saves, so PR branches reuse main's cache instead of each
+      # filling the 10 GB cache quota with its own copy.
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
@@ -92,7 +96,11 @@ jobs:
         run: |
           rustup toolchain install
           rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      # Only main saves, so PR branches reuse main's cache instead of each
+      # filling the 10 GB cache quota with its own copy.
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -130,7 +138,11 @@ jobs:
       - uses: actions/checkout@v7
       - name: Install Rust (version from rust-toolchain.toml)
         run: rustup toolchain install
+      # Only main saves, so PR branches reuse main's cache instead of each
+      # filling the 10 GB cache quota with its own copy.
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc

@@ -4,6 +4,22 @@ The goal: catch mistakes at the earliest, cheapest point, and make it
 impossible for anything to reach users without passing every check and going
 through the dev channel first.
 
+**Cost.** The repo is public (since 2026-10-04), so GitHub's standard Linux,
+macOS and Windows runners are free with no minute limit, and everything below
+runs on every PR. To build the app with no CI at all, see
+[BUILDING.md](BUILDING.md).
+
+**If the repo goes private again**, the Free plan's 2,000 minutes a month come
+back, and macOS minutes count 10x (Windows 2x). Building the Mac app on every
+push used those up in a day. The fallback is the trimmed setup from PR #16:
+keep the fast Linux jobs on every PR, make the `macos` and `windows` jobs in
+`ci.yml` run only on `workflow_dispatch` (let "CI passed" accept `skipped`),
+and run `dev-build.yml` and `security.yml` by hand. Build the app on a Mac
+meanwhile (BUILDING.md).
+
+**Never add a self-hosted runner to this repo while it is public.** Anyone can
+open a pull request, and its code would run on that machine.
+
 ```
  your machine            pull request               main                    tag vX.Y.Z
  ────────────            ────────────               ────                    ──────────
@@ -41,7 +57,7 @@ Run everything CI's fast checks run with `npm run check`. In an emergency,
    `Cargo.lock` must be up to date).
 2. Only if those pass: **macOS** universal `.app` + `.dmg` build and a
    **Windows** clippy + test run (catches `cfg(windows)` code). This saves
-   macOS minutes, which GitHub bills at 10x on private repos.
+   runner time and gives quick feedback.
 3. **CI passed**: one summary check. This is the one to require in branch
    protection.
 
@@ -90,7 +106,7 @@ points at a separate dev Supabase project (see section 6).
      are set, see below);
    - builds the Mac universal `.dmg` (signed and notarized once Apple secrets
      exist) and Windows `.exe`/`.msi`;
-   - publishes a GitHub release (private, like the repo) with generated notes
+   - publishes a GitHub release (public, like the repo) with generated notes
      and `SHA256SUMS.txt`;
    - triggers the website deploy, which puts the new installer on the site
      (see "Website downloads" below).
@@ -124,14 +140,22 @@ Settings, then Environments:
   anything ships.
 - **development**: no reviewers needed. Restrict to the `main` branch.
 
-### Security features (free on private repos)
+### Security features
 
 Settings, then Code security: turn on Dependabot alerts, Dependabot security
-updates, and (if offered) Secret Protection push protection.
+updates, and Secret Protection push protection.
 
-CodeQL code scanning and the dependency-review action need GitHub Advanced
-Security on private repos, so they are not included. They can be added if
-the repo becomes public or GHAS is enabled.
+CodeQL code scanning and the dependency-review action are free on public
+repos and can be added. They need GitHub Advanced Security if the repo goes
+private again.
+
+### Pull requests from outside the project
+
+The repo is public, so anyone can fork it and open a pull request. Its CI runs
+without access to any secrets, and nothing that deploys or publishes runs on
+pull requests. Settings, then Actions, then General: under "Approval for
+running fork pull request workflows", choose **Require approval for all
+external contributors** so nothing runs until you've looked at it.
 
 ### Secrets and variables (when ready)
 
@@ -150,8 +174,8 @@ Signing needs an Apple Developer Program membership ($99/year).
 
 ### Website downloads (Vercel)
 
-End users download from the website, never from GitHub. GitHub releases stay
-private as the internal copy. `.github/workflows/website.yml` builds
+End users download from the website. GitHub releases are public too now
+that the repo is, but the website is the place we send people. `.github/workflows/website.yml` builds
 `website/`, copies the newest release's `SanctuaryMix-mac-universal.dmg` into
 `downloads/` with a `latest.json` manifest (contract: `website/src/release.ts`),
 and deploys the folder to Vercel as static files. It runs after every release,

@@ -118,7 +118,7 @@ npm run app:build:mac  # universal build (Apple Silicon + Intel); needs:
 The app ends up in `target/release/bundle/macos/SanctuaryMix.app` (or
 `target/universal-apple-darwin/release/...` for the universal build). Drag it
 into Applications. Every CI run on GitHub also attaches a ready-made `.dmg`
-under the run's **Artifacts**.
+under the run's **Artifacts**. Step-by-step setup: [docs/BUILDING.md](docs/BUILDING.md).
 
 Builds are not code-signed yet, so the first launch needs a right-click on the
 app, then **Open**. Signing and notarization will be added before handing it to
