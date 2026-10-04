@@ -1,0 +1,23 @@
+[package]
+name = "recorder"
+description = "Service recordings: local SQLite store, control-event log, replay state and the sync boundary."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+mix-core.workspace = true
+auth.workspace = true
+async-trait.workspace = true
+fs4.workspace = true
+rusqlite = { version = "0.37", features = ["bundled"] }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio.workspace = true
