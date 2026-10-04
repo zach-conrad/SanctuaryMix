@@ -26,6 +26,7 @@ export function Header({ root, signedIn = false }: Props) {
           <nav className="site-header__nav" aria-label="Main">
             <a className="site-header__link" href={`${root}#features`}>Features</a>
             <a className="site-header__link" href={`${root}#platforms`}>Mac and Windows</a>
+            <a className="site-header__link" href={`${root}#pricing`}>Pricing</a>
             <a className="sm-btn" href={`${root}account/`}>
               <LogIn aria-hidden="true" />
               Log in
