@@ -148,26 +148,33 @@ Put these on the **production** environment, not the repo:
 
 Signing needs an Apple Developer Program membership ($99/year).
 
-### Website downloads (Netlify)
+### Website downloads (Vercel)
 
 End users download from the website, never from GitHub. GitHub releases stay
 private as the internal copy. `.github/workflows/website.yml` builds
 `website/`, copies the newest release's `SanctuaryMix-mac-universal.dmg` into
 `downloads/` with a `latest.json` manifest (contract: `website/src/release.ts`),
-and deploys to Netlify. It runs after every release, on every change to
-`website/` on main, and by hand. CI also builds the site on every PR.
+and deploys the folder to Vercel as static files. It runs after every release,
+on every change to `website/` on main, and by hand. CI also builds the site on
+every PR.
 
 To turn deploys on:
 
-1. Create a free Netlify account and a site (Add new site, then Deploy
-   manually; any placeholder folder is fine, CI replaces it).
-2. Add two **repository** secrets (Settings, then Secrets and variables, then
-   Actions):
+1. Create a free Vercel (Hobby) project for the site. Don't connect it to
+   this GitHub repo with Vercel's Git integration (or turn its automatic
+   deployments off): CI deploys the site with the installer, and a Git
+   build would replace it without one.
+2. Add three **repository** secrets (Settings, then Secrets and variables,
+   then Actions):
 
 | Secret | Value |
 | --- | --- |
-| `NETLIFY_AUTH_TOKEN` | Netlify, then User settings, then Applications, then Personal access token |
-| `NETLIFY_SITE_ID` | Netlify, then Site configuration, then Site ID |
+| `VERCEL_TOKEN` | Vercel, then Account settings, then Tokens |
+| `VERCEL_ORG_ID` | Your team or account ID (Vercel settings, or `.vercel/project.json` after `vercel link`) |
+| `VERCEL_PROJECT_ID` | Project settings, then General, then Project ID |
+
+Vercel's Hobby plan limits upload size per deployment, so keep an eye on the
+dmg's size as the app grows.
 
 Until real sign-in exists, anyone with the site's address can download. The
 installer is not linked from GitHub or listed anywhere public. The planned

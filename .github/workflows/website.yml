@@ -69,15 +69,21 @@ jobs:
           gh release download "$tag" --pattern "SanctuaryMix-mac-universal.dmg" --dir website/dist/downloads
           node scripts/write-site-manifest.mjs website/dist/downloads "$tag" "$published"
 
-      - name: Deploy to Netlify
+      # Deploys the prebuilt folder as static files. The Vercel project
+      # should NOT also be connected to this repo through Vercel's Git
+      # integration, or its own builds would replace these and drop the
+      # installer.
+      - name: Deploy to Vercel
         if: steps.site.outputs.exists == 'true'
         env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
-            echo "::warning::NETLIFY_AUTH_TOKEN / NETLIFY_SITE_ID not set; built the site but did not deploy it."
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "::warning::VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID not set; built the site but did not deploy it."
             exit 0
           fi
-          npx --yes netlify-cli@27 deploy --prod --dir website/dist \
-            --site "$NETLIFY_SITE_ID" --message "${GITHUB_SHA::7} (${GITHUB_EVENT_NAME})"
+          url=$(npx --yes vercel@62 deploy website/dist --prod --yes --token "$VERCEL_TOKEN")
+          echo "Deployed: $url"
+          echo "Deployed to $url" >> "$GITHUB_STEP_SUMMARY"
