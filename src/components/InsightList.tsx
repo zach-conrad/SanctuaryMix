@@ -21,7 +21,11 @@ const SEVERITY_WORD = { alert: "Clipping", warn: "Hot", info: "No signal" };
 export function InsightList({ insights, limit }: { insights: Insight[]; limit?: number }) {
   const select = useMixer((s) => s.select);
   if (insights.length === 0) {
-    return <p className="empty">All clear.</p>;
+    return (
+      <div className="group">
+        <div className="row empty">All clear.</div>
+      </div>
+    );
   }
   return (
     <ul className="insights">

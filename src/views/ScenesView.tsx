@@ -5,14 +5,11 @@ export function ScenesView() {
   return (
     <div className="page page--narrow">
       <PageHeader title="Scenes" />
-      <section className="panel">
-        <div className="panel-head">
-          <Layers size={20} strokeWidth={1.75} />
-          <h2 className="text-heading">Scenes</h2>
-          <span className="text-label muted">Coming soon</span>
-        </div>
+      <div className="empty-state">
+        <Layers size={40} strokeWidth={1.5} aria-hidden />
+        <h2 className="text-heading">Scenes are coming</h2>
         <p className="muted">Recall and save dLive scenes, with Undo.</p>
-      </section>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { AudioLines, RefreshCw, Router } from "lucide-react";
+import { Check, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getBackend } from "../lib/backend";
 import type { AudioDeviceInfo, ConsoleConfig, MicAccess } from "../lib/types";
@@ -74,10 +74,9 @@ function AudioPanel() {
 
   const running = audioStatus === "on";
   return (
-    <section className="panel">
-      <div className="panel-head">
-        <AudioLines size={20} strokeWidth={1.75} />
-        <h2 className="text-heading">Dante audio</h2>
+    <section className="section" aria-labelledby="audio-title">
+      <div className="section-head">
+        <h2 id="audio-title">Dante audio</h2>
         <button
           className="sm-btn sm-btn--ghost sm-btn--sm"
           onClick={refresh}
@@ -88,64 +87,70 @@ function AudioPanel() {
           <RefreshCw />
         </button>
       </div>
-      <p className="text-caption muted">Route dLive inputs 1:1 to Dante Virtual Soundcard.</p>
-      {listError && <p className="error">{listError}</p>}
       {access === "denied" ? (
-        <div className="permission-off" role="status">
-          <p className="text-body-strong">Microphone access is off</p>
-          <p className="muted">Turn on SanctuaryMix in Privacy &amp; Security › Microphone.</p>
-          <div className="actions">
-            <button className="sm-btn sm-btn--lg sm-btn--ghost" onClick={refresh} disabled={loading}>
+        <div className="group">
+          <div className="row" role="status">
+            <span className="row-text">
+              <span className="text-body-strong">Microphone access is off</span>
+              <span className="text-caption">Turn on SanctuaryMix in Privacy &amp; Security › Microphone.</span>
+            </span>
+            <button className="sm-btn sm-btn--ghost" onClick={refresh} disabled={loading}>
               Check again
             </button>
-            <button className="sm-btn sm-btn--lg" onClick={openSettings}>
-              Open System Settings
+            <button className="sm-btn" onClick={openSettings}>
+              Open Settings
             </button>
           </div>
         </div>
       ) : (
-        <div className="device-list" role="radiogroup" aria-label="Audio input">
+        <div className="group" role="radiogroup" aria-label="Audio input">
           {devices.map((d) => (
-            <label key={d.name} className="device" data-selected={selected === d.name}>
-              <input type="radio" name="device" checked={selected === d.name} onChange={() => setSelected(d.name)} />
-              <span className="device-text">
+            <label key={d.name} className="row">
+              <input
+                className="visually-hidden"
+                type="radio"
+                name="device"
+                checked={selected === d.name}
+                onChange={() => setSelected(d.name)}
+              />
+              <span className="row-text">
                 <span className="text-body-strong">{d.name}</span>
-                <span className="text-caption muted">
+                <span className="text-caption">
                   {d.maxInputChannels} {d.maxInputChannels === 1 ? "input" : "inputs"} · {d.defaultSampleRate / 1000}{" "}
-                  kHz
+                  kHz{d.isDante ? " · Dante" : d.isDefault ? " · System default" : ""}
                 </span>
               </span>
-              {d.isDante && <span className="text-label muted">Dante</span>}
-              {d.isDefault && !d.isDante && <span className="text-label muted">System default</span>}
+              {selected === d.name && <Check className="row-check" size={20} strokeWidth={2} aria-hidden />}
             </label>
           ))}
-          {access === null && <p className="empty">Checking audio inputs…</p>}
+          {access === null && <div className="row empty">Checking audio inputs…</div>}
           {access === "granted" && devices.length === 0 && !listError && (
-            <p className="empty">No audio inputs found. Is Dante Virtual Soundcard running?</p>
+            <div className="row empty">No audio inputs. Is Dante Virtual Soundcard running?</div>
           )}
+          <div className="row row--actions">
+            <span className="muted">
+              {running && audio
+                ? `Listening · ${audio.channels} ch · ${audio.sampleRate / 1000} kHz`
+                : "Route dLive inputs 1:1 to Dante Virtual Soundcard."}
+            </span>
+            {running ? (
+              <button className="sm-btn" onClick={stopAudio}>
+                Stop listening
+              </button>
+            ) : (
+              <button
+                className="sm-btn sm-btn--primary"
+                disabled={!selected || access !== "granted" || audioStatus === "connecting"}
+                onClick={() => startAudio(selected)}
+              >
+                {audioStatus === "connecting" ? "Starting…" : "Start listening"}
+              </button>
+            )}
+          </div>
         </div>
       )}
-      {audioError && <p className="error">{audioError}</p>}
-      <div className="actions">
-        {running && audio && (
-          <span className="muted">
-            Listening to {audio.channels} channels at {audio.sampleRate / 1000} kHz
-          </span>
-        )}
-        {running ? (
-          <button className="sm-btn sm-btn--lg" onClick={stopAudio}>
-            Stop listening
-          </button>
-        ) : (
-          <button
-            className="sm-btn sm-btn--lg sm-btn--primary"
-            disabled={!selected || access !== "granted" || audioStatus === "connecting"}
-            onClick={() => startAudio(selected)}
-          >
-            {audioStatus === "connecting" ? "Starting…" : "Start listening"}
-          </button>
-        )}
-      </div>
+      {listError && <p className="error section-foot">{listError}</p>}
+      {audioError && <p className="error section-foot">{audioError}</p>}
     </section>
   );
 }
@@ -174,27 +179,31 @@ function ConsolePanel() {
   const hostProblem = form.model === "dlive" ? ipError(form.host) : null;
 
   return (
-    <section className="panel">
-      <div className="panel-head">
-        <Router size={20} strokeWidth={1.75} />
-        <h2 className="text-heading">Console</h2>
+    <section className="section" aria-labelledby="console-title">
+      <div className="section-head">
+        <h2 id="console-title">Console</h2>
       </div>
-      <div className="form">
-        <label className="sm-field">
-          <span className="sm-field__label">Console</span>
+      <div className="group">
+        <label className="row">
+          <span className="row-text">Console</span>
           <select
             className="sm-input"
             value={form.model}
             onChange={(e) => update({ model: e.target.value as ConsoleConfig["model"] })}
           >
             <option value="dlive">Allen &amp; Heath dLive</option>
-            <option value="simulated">Practice console (no hardware)</option>
+            <option value="simulated">Practice console</option>
           </select>
         </label>
         {form.model === "dlive" && (
           <>
-            <label className="sm-field" data-invalid={hostTouched && !!hostProblem}>
-              <span className="sm-field__label">MixRack or Surface IP address</span>
+            <label className="row" data-invalid={hostTouched && !!hostProblem}>
+              <span className="row-text">
+                <span>IP address</span>
+                <span className={`text-caption${hostTouched && hostProblem ? " error" : ""}`}>
+                  {hostTouched && hostProblem ? hostProblem : "Utility › Control › Network"}
+                </span>
+              </span>
               <input
                 className="sm-input"
                 value={form.host}
@@ -203,12 +212,12 @@ function ConsolePanel() {
                 onChange={(e) => update({ host: e.target.value.trim() })}
                 onBlur={() => setHostTouched(true)}
               />
-              <span className="sm-field__help">
-                {hostTouched && hostProblem ? hostProblem : "dLive: Utility › Control › Network"}
-              </span>
             </label>
-            <label className="sm-field">
-              <span className="sm-field__label">MIDI channel</span>
+            <label className="row">
+              <span className="row-text">
+                <span>MIDI channel</span>
+                <span className="text-caption">Utility › Control › MIDI</span>
+              </span>
               <select
                 className="sm-input"
                 value={form.midiChannel}
@@ -220,12 +229,11 @@ function ConsolePanel() {
                   </option>
                 ))}
               </select>
-              <span className="sm-field__help">dLive: Utility › Control › MIDI</span>
             </label>
           </>
         )}
-        <label className="sm-field">
-          <span className="sm-field__label">Inputs to show</span>
+        <label className="row">
+          <span className="row-text">Inputs to show</span>
           <select
             className="sm-input"
             value={form.inputCount}
@@ -238,24 +246,24 @@ function ConsolePanel() {
             ))}
           </select>
         </label>
+        <div className="row row--actions">
+          <span className="muted">{connected ? `Connected to ${consoleModel}` : "Not connected"}</span>
+          {connected ? (
+            <button className="sm-btn sm-btn--danger" onClick={disconnectConsole}>
+              Disconnect
+            </button>
+          ) : (
+            <button
+              className="sm-btn sm-btn--primary"
+              disabled={consoleStatus === "connecting" || !!hostProblem}
+              onClick={() => connectConsole(form)}
+            >
+              {consoleStatus === "connecting" ? "Connecting…" : "Connect"}
+            </button>
+          )}
+        </div>
       </div>
-      {consoleError && <p className="error">{consoleError}</p>}
-      <div className="actions">
-        {connected && <span className="muted">Connected to {consoleModel}</span>}
-        {connected ? (
-          <button className="sm-btn sm-btn--lg sm-btn--danger" onClick={disconnectConsole}>
-            Disconnect
-          </button>
-        ) : (
-          <button
-            className="sm-btn sm-btn--lg sm-btn--primary"
-            disabled={consoleStatus === "connecting" || !!hostProblem}
-            onClick={() => connectConsole(form)}
-          >
-            {consoleStatus === "connecting" ? "Connecting…" : "Connect"}
-          </button>
-        )}
-      </div>
+      {consoleError && <p className="error section-foot">{consoleError}</p>}
     </section>
   );
 }

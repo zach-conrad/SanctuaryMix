@@ -36,20 +36,29 @@ main { flex: 1; min-width: 0; overflow: auto; background: var(--bg); }
 .pill-button:hover { background: var(--control); }
 
 .rail {
-  width: calc(var(--space-8) + var(--space-2)); flex: none;
-  display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
-  padding: var(--space-3) 0; background: var(--surface); border-right: 1px solid var(--border);
+  width: var(--sidebar-width); flex: none;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--space-3) var(--space-2); background: var(--surface); border-right: 1px solid var(--border);
 }
 .rail-spacer { flex: 1; }
+/* A source-list sidebar: icon and label side by side, a soft rounded fill marks where you are. */
 .nav-item {
-  width: calc(var(--space-7) + var(--space-3)); min-height: var(--control-lg) ;
-  padding: var(--space-2) 0; border: 0; border-radius: var(--radius-md); background: none;
-  display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
-  color: var(--text-muted); font: var(--text-label); letter-spacing: var(--text-label-tracking);
+  height: var(--control-md); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-md); background: none;
+  display: flex; align-items: center; gap: var(--space-3);
+  color: var(--text-muted); font: var(--text-body-strong); letter-spacing: var(--text-body-tracking); text-align: left;
   transition: background-color var(--duration-fast) ease-out;
 }
 .nav-item:hover { background: var(--control); color: var(--text); }
 .nav-item.active { background: var(--accent-subtle); color: var(--accent-text); }
+/* Narrow windows: the sidebar folds into the icon rail so content keeps its room. */
+@media (max-width: 1439px) {
+  .rail { width: calc(var(--space-8) + var(--space-2)); align-items: center; padding-inline: 0; gap: var(--space-1); }
+  .nav-item {
+    width: calc(var(--space-7) + var(--space-3)); height: auto; min-height: var(--control-lg); padding: var(--space-2) 0;
+    flex-direction: column; gap: var(--space-1); justify-content: center;
+    font: var(--text-label); letter-spacing: var(--text-label-tracking);
+  }
+}
 
 /* Mixer: bay of strips + inspector. */
 .mixer { display: flex; height: 100%; }
@@ -115,19 +124,37 @@ main { flex: 1; min-width: 0; overflow: auto; background: var(--bg); }
 @media (max-width: 1439px) {
   .page-split { grid-template-columns: minmax(0, 1fr) calc(var(--side-width) - var(--space-6)); }
 }
-.page-main, .page-side { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.page-main, .page-side { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
 .panel {
   display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4) var(--space-5) var(--space-5);
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  background: var(--surface-raised); border-radius: var(--radius-lg);
 }
+
+/* Grouped list (macOS System Settings): a heading outside, then one filled group of rows split by hairlines. */
+.section { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.section-head { display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-1); }
+.section-head { min-height: var(--control-sm); }
+.section-head h2 { flex: 1; font: var(--text-body-strong); letter-spacing: var(--text-body-tracking); }
+.section-foot { padding: 0 var(--space-1); font: var(--text-caption); color: var(--text-muted); }
+.group { background: var(--surface-raised); border-radius: var(--radius-lg); overflow: hidden; }
+.row {
+  position: relative; display: flex; align-items: center; gap: var(--space-4);
+  min-height: calc(var(--hit-min) + var(--space-2)); padding: var(--space-2) var(--space-4);
+}
+.row + .row::before { content: ""; position: absolute; top: 0; left: var(--space-4); right: 0; height: 1px; background: var(--border); }
+.row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.row-text .text-caption { color: var(--text-muted); }
+.row > .sm-input, .row > select.sm-input { width: auto; min-width: 220px; flex: none; }
+.row-check { color: var(--accent-text); flex: none; }
+button.row, label.row { width: 100%; border: 0; background: none; color: var(--text); text-align: left; cursor: pointer; }
+button.row:hover, label.row:hover { background: var(--control); }
+.row--actions { justify-content: flex-end; }
+.row--actions .muted { flex: 1; font: var(--text-caption); }
 .panel-head { display: flex; align-items: center; gap: var(--space-2); }
 .panel-head h2, .panel-head h3 { flex: 1; }
 .section-title { margin-bottom: var(--space-3); }
 
 /* A settings row: what it is on the left, the control on the right. */
-.setting-row { display: flex; align-items: center; gap: var(--space-4); }
-.setting-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
-.setting-row > .sm-input, .setting-row > select { width: auto; min-width: 200px; flex: none; }
 
 /* Reference text kept one click away. */
 .disclosure { padding: 0; gap: 0; }
@@ -143,33 +170,11 @@ main { flex: 1; min-width: 0; overflow: auto; background: var(--bg); }
 .disclosure-body { padding: 0 var(--space-5) var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); }
 
 /* Planned features: a quiet list instead of a row of empty cards. */
-.coming-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
-.coming-list li { display: flex; gap: var(--space-3); align-items: flex-start; }
-.coming-list li > svg { flex: none; color: var(--text-muted); margin-top: 1px; }
-.coming-list li > span { display: flex; flex-direction: column; gap: var(--space-1); }
+.coming-list { list-style: none; margin: 0; padding: 0; }
+.coming-list li > svg { flex: none; color: var(--text-muted); }
 
-.device-list { display: flex; flex-direction: column; gap: var(--space-2); }
-.device {
-  display: flex; align-items: center; gap: var(--space-3); min-height: var(--control-lg); padding: var(--space-3);
-  border-radius: var(--radius-md); border: 1px solid var(--border-strong); background: var(--surface-raised); cursor: pointer;
-}
-.device[data-selected="true"] { border-color: var(--accent); background: var(--accent-subtle); }
-.device input { accent-color: var(--accent); width: 18px; height: 18px; }
-.device-text { flex: 1; display: flex; flex-direction: column; }
-.permission-off {
-  display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4);
-  border-radius: var(--radius-md); border: 1px solid var(--warning); background: var(--surface-raised);
-}
-.permission-off .actions { margin-top: var(--space-2); }
-
-.form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
-.form .sm-field { max-width: none; }
-.form .sm-field:first-child { grid-column: 1 / -1; }
 select.sm-input { appearance: auto; }
-.actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); }
-.actions .muted { flex: 1; font: var(--text-caption); }
 
-.account { display: flex; align-items: center; gap: var(--space-3); }
 .avatar {
   width: var(--control-md); height: var(--control-md); border-radius: var(--radius-pill);
   display: grid; place-items: center; background: var(--accent-subtle); color: var(--accent-text); font: var(--text-body-strong);
@@ -190,14 +195,13 @@ select.sm-input { appearance: auto; }
 .automix-state { margin-top: var(--space-1); }
 .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
 
-.feel-field { max-width: none; }
 .feel-warning { color: var(--warning); }
 
-.nudges { display: flex; flex-direction: column; gap: var(--space-3); }
-.nudge { display: flex; flex-direction: column; gap: var(--space-1); }
-.nudge-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
-.nudge-head .text-readout { white-space: nowrap; }
-.nudge input[type="range"] { width: 100%; height: var(--hit-min); margin: 0; accent-color: var(--accent); }
+.nudge-label { flex: none; width: 8.5rem; }
+.nudge input[type="range"] { flex: 1; min-width: 0; height: var(--hit-min); margin: 0; accent-color: var(--accent); }
+.nudge-value { flex: none; width: 3.5rem; text-align: right; white-space: nowrap; }
+.page-side .row > select.sm-input { min-width: 0; width: 11rem; }
+.channels-group { padding: var(--space-3) var(--space-4) var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); }
 
 .am-table { width: 100%; border-collapse: collapse; }
 .am-table th { text-align: left; color: var(--text-muted); letter-spacing: var(--text-label-tracking); padding: 0 var(--space-2) var(--space-2); }
@@ -242,3 +246,14 @@ select.sm-input { appearance: auto; }
 .am-table td.text-readout { white-space: nowrap; }
 /* At the minimum window width the live columns can outgrow the panel; scroll inside it, never the page. */
 .am-table-scroll { overflow-x: auto; margin-inline: calc(-1 * var(--space-2)); padding-inline: var(--space-2); }
+/* A group inside a filled panel (the Inspector) drops its own fill. */
+.panel .group { background: none; }
+.panel .group .row { padding-inline: 0; }
+.panel .group .row + .row::before { left: 0; }
+/* Empty screen: centered symbol, one title, one line. */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2); text-align: center;
+  padding: var(--space-8) var(--space-5); color: var(--text);
+}
+.empty-state > svg { color: var(--text-muted); margin-bottom: var(--space-2); }
+.automix-panel .panel-head h2 { flex: none; }

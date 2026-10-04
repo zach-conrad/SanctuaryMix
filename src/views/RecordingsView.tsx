@@ -1,4 +1,4 @@
-import { ChevronRight, CloudOff, HardDrive, Mic, Trash2 } from "lucide-react";
+import { ChevronRight, CloudOff, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Dialog } from "../components/Dialog";
 import { PageHeader } from "../components/PageHeader";
@@ -48,19 +48,19 @@ function ServicesList() {
         <div className="page-main">
           {error && <p className="error">{error}</p>}
           {loaded && list.length === 0 && (
-            <section className="panel">
-              <p className="muted">No services yet. Press Record service to start.</p>
-            </section>
+            <div className="group">
+              <div className="row empty">No services yet. Press Record service to start.</div>
+            </div>
           )}
           {groups.map((g) => (
-            <section key={g.date} className="service-group" aria-label={serviceDateLabel(g.date)}>
-              <h2 className="text-heading service-date">
-                {serviceDateLabel(g.date)}
+            <section key={g.date} className="section" aria-label={serviceDateLabel(g.date)}>
+              <div className="section-head">
+                <h2>{serviceDateLabel(g.date)}</h2>
                 <span className="text-caption muted">
                   {g.items.length} {g.items.length === 1 ? "service" : "services"}
                 </span>
-              </h2>
-              <ul className="service-list">
+              </div>
+              <ul className="group service-list">
                 {g.items.map((r) => (
                   <li key={r.id}>
                     <ServiceRow r={r} />
@@ -144,59 +144,60 @@ function DiskPanel() {
   });
 
   return (
-    <section className="panel">
-      <div className="panel-head">
-        <HardDrive size={20} strokeWidth={1.75} />
-        <h2 className="text-heading">Disk space</h2>
+    <section className="section" aria-labelledby="disk-title">
+      <div className="section-head">
+        <h2 id="disk-title">Disk space</h2>
       </div>
-      {disk ? (
-        <dl className="disk-stats">
-          <div>
-            <dt className="text-caption muted">Free on this computer</dt>
-            <dd className="text-readout-lg">{formatBytes(disk.freeBytes)}</dd>
-          </div>
-          <div className="disk-row">
-            <dt className="text-caption muted">Service recordings</dt>
-            <dd className="text-readout">{formatBytes(disk.recordingsBytes)}</dd>
-          </div>
-          <div className="disk-row">
-            <dt className="text-caption muted">Multitracks in that</dt>
-            <dd className="text-readout">{formatBytes(disk.multitrackBytes)}</dd>
-          </div>
-          <div className="disk-row">
-            <dt className="text-caption muted">Room for stereo recording</dt>
-            <dd className="text-readout">about {Math.floor(disk.freeBytes / STEREO_BYTES_PER_HOUR)} h</dd>
-          </div>
-        </dl>
-      ) : (
-        <p className="empty">Checking disk space…</p>
-      )}
+      <dl className="group">
+        {disk ? (
+          <>
+            <div className="row">
+              <dt className="row-text">Free</dt>
+              <dd className="text-readout">{formatBytes(disk.freeBytes)}</dd>
+            </div>
+            <div className="row">
+              <dt className="row-text">Recordings</dt>
+              <dd className="text-readout">{formatBytes(disk.recordingsBytes)}</dd>
+            </div>
+            <div className="row">
+              <dt className="row-text">Multitracks</dt>
+              <dd className="text-readout">{formatBytes(disk.multitrackBytes)}</dd>
+            </div>
+            <div className="row">
+              <dt className="row-text">Stereo time left</dt>
+              <dd className="text-readout">{Math.floor(disk.freeBytes / STEREO_BYTES_PER_HOUR)} h</dd>
+            </div>
+          </>
+        ) : (
+          <div className="row empty">Checking disk space…</div>
+        )}
+        <div className="row">
+          <button
+            className="sm-btn sm-btn--danger disk-delete"
+            disabled={!canDelete || old.length === 0}
+            title={!canDelete ? "Only engineers and admins can delete recordings." : undefined}
+            onClick={() => {
+              setFreed(null);
+              setConfirming(true);
+            }}
+          >
+            <Trash2 />
+            Delete old multitracks
+          </button>
+        </div>
+      </dl>
+      <p className="section-foot">
+        {freed !== null
+          ? `Freed ${formatBytes(freed)}.`
+          : old.length === 0
+            ? `None older than ${RETENTION_DAYS} days.`
+            : `${old.length} older than ${RETENTION_DAYS} days, ${formatBytes(oldBytes)}. Stereo mixes stay.`}
+      </p>
       {disk && (
-        <p className="text-caption muted folder" title={disk.folder}>
+        <p className="section-foot folder" title={disk.folder}>
           {disk.folder}
         </p>
       )}
-      <div className="disk-action">
-        <button
-          className="sm-btn sm-btn--danger"
-          disabled={!canDelete || old.length === 0}
-          onClick={() => {
-            setFreed(null);
-            setConfirming(true);
-          }}
-        >
-          <Trash2 />
-          Delete old multitracks
-        </button>
-        <p className="text-caption muted">
-          {!canDelete
-            ? "Only engineers and admins can delete recordings."
-            : old.length === 0
-              ? `None older than ${RETENTION_DAYS} days.`
-              : `Older than ${RETENTION_DAYS} days: ${old.length} ${old.length === 1 ? "service" : "services"}, ${formatBytes(oldBytes)}. Stereo mixes stay.`}
-        </p>
-        {freed !== null && <p className="text-caption muted">Freed {formatBytes(freed)}.</p>}
-      </div>
       {confirming && (
         <Dialog
           title="Delete old multitracks?"
@@ -275,59 +276,51 @@ function RecordingSettingsPanel() {
   ));
 
   return (
-    <section className="panel">
-      <div className="panel-head">
-        <Mic size={20} strokeWidth={1.75} />
-        <h2 className="text-heading">Recording</h2>
+    <section className="section" aria-labelledby="recording-title">
+      <div className="section-head">
+        <h2 id="recording-title">Recording</h2>
       </div>
-      <p className="text-caption muted">Patch Main L/R to two Dante outputs.</p>
-      <div className="mix-inputs">
-        <label className="sm-field">
-          <span className="sm-field__label">Main L</span>
+      <div className="group">
+        <label className="row" title="Patch Main L/R to two Dante outputs.">
+          <span className="row-text">Main L</span>
           <select className="sm-input" value={l ?? ""} onChange={(e) => pick(0, e.target.value)}>
-            <option value="">Don't record audio</option>
+            <option value="">No audio</option>
             {options}
           </select>
         </label>
-        <label className="sm-field">
-          <span className="sm-field__label">Main R</span>
+        <label className="row">
+          <span className="row-text">Main R</span>
           <select className="sm-input" value={r ?? ""} onChange={(e) => pick(1, e.target.value)} disabled={!stereo}>
-            {!stereo && <option value="">Don't record audio</option>}
+            {!stereo && <option value="">No audio</option>}
             {options}
           </select>
         </label>
-      </div>
-      {!stereo && <p className="text-caption muted">Moves only, no audio.</p>}
-
-      <div className="sm-field">
-        <span className="sm-field__label" id="multitrack-label">
-          Multitrack
-        </span>
-        <div className="sm-seg" role="group" aria-labelledby="multitrack-label">
-          <button aria-pressed={!settings.multitrack} onClick={() => void save({ ...settings, multitrack: false })}>
-            Off
-          </button>
-          <button
-            aria-pressed={settings.multitrack}
-            disabled={!stereo}
-            onClick={() => void save({ ...settings, multitrack: true })}
-          >
-            Every input
-          </button>
+        <div className="row">
+          <span className="row-text" id="multitrack-label">
+            Multitrack
+          </span>
+          <div className="sm-seg" role="group" aria-labelledby="multitrack-label">
+            <button aria-pressed={!settings.multitrack} onClick={() => void save({ ...settings, multitrack: false })}>
+              Off
+            </button>
+            <button
+              aria-pressed={settings.multitrack}
+              disabled={!stereo}
+              onClick={() => void save({ ...settings, multitrack: true })}
+            >
+              Every input
+            </button>
+          </div>
         </div>
-        <span className="sm-field__help">
-          {stereo
-            ? `${formatGb(perHour)} per hour`
-            : "Pick Main L and R to record audio."}
-        </span>
       </div>
-
-      {stereo && (
-        <p className={`text-caption ${short ? "warning-text" : "muted"}`}>
-          {short ? `Not enough space: needs ${formatGb(need)}.` : null}
-        </p>
-      )}
-      {recording && <p className="text-caption muted">Applies to the next recording.</p>}
+      <p className={`section-foot${short ? " warning-text" : ""}`}>
+        {!stereo
+          ? "Moves only, no audio."
+          : short
+            ? `Not enough space: needs ${formatGb(need)}.`
+            : `${formatGb(perHour)} per hour.`}
+        {recording && " Applies to the next recording."}
+      </p>
     </section>
   );
 }

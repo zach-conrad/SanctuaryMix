@@ -106,33 +106,35 @@ export function RoomFeelPicker() {
   const chosen = presets.find((p) => p.feel === feel);
 
   return (
-    <section className="panel" aria-labelledby="feel-title">
-      <h2 id="feel-title" className="text-heading">
-        Room feel
-      </h2>
-      <label className="sm-field feel-field">
-        <span className="visually-hidden">Room feel</span>
-        <select
-          className="sm-input"
-          value={feel ?? ""}
-          disabled={presets.length === 0}
-          onChange={(e) => void setFeel(e.target.value as RoomFeel)}
-        >
-          {presets.map((p) => (
-            <option key={p.feel} value={p.feel} disabled={p.adminOnly && !isAdmin}>
-              {p.name}
-              {p.adminOnly ? " (admins only)" : ""}
-            </option>
-          ))}
-        </select>
-        {chosen && (
-          <span className="sm-field__help" title={`Room level ${chosen.roomLevel}`}>
-            {chosen.description}
-          </span>
-        )}
-      </label>
-      {chosen?.warning && <p className="text-caption feel-warning">{chosen.warning}</p>}
-      <NudgeSliders />
+    <section className="section" aria-labelledby="feel-title">
+      <div className="section-head">
+        <h2 id="feel-title">Room feel</h2>
+      </div>
+      <div className="group">
+        <label className="row">
+          <span className="row-text">Feel</span>
+          <select
+            className="sm-input"
+            value={feel ?? ""}
+            disabled={presets.length === 0}
+            onChange={(e) => void setFeel(e.target.value as RoomFeel)}
+          >
+            {presets.map((p) => (
+              <option key={p.feel} value={p.feel} disabled={p.adminOnly && !isAdmin}>
+                {p.name}
+                {p.adminOnly ? " (admins only)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <NudgeSliders />
+      </div>
+      {chosen && (
+        <p className="section-foot" title={`Room level ${chosen.roomLevel}`}>
+          {chosen.description}
+        </p>
+      )}
+      {chosen?.warning && <p className="section-foot feel-warning">{chosen.warning}</p>}
     </section>
   );
 }
@@ -156,13 +158,10 @@ function NudgeSliders() {
   const setNudge = useAutoMix((s) => s.setNudge);
   if (!nudges) return null;
   return (
-    <div className="nudges">
+    <>
       {NUDGES.map(({ key, label, help }) => (
-        <label key={key} className="nudge" title={help}>
-          <span className="nudge-head">
-            <span className="text-body-strong">{label}</span>
-            <span className="text-readout">{signed(nudges[key])}</span>
-          </span>
+        <label key={key} className="row nudge" title={help}>
+          <span className="nudge-label">{label}</span>
           <input
             type="range"
             min={-3}
@@ -172,9 +171,10 @@ function NudgeSliders() {
             aria-valuetext={signed(nudges[key])}
             onChange={(e) => void setNudge(key, Number(e.target.value))}
           />
+          <span className="text-readout nudge-value">{signed(nudges[key])}</span>
         </label>
       ))}
-    </div>
+    </>
   );
 }
 
@@ -200,115 +200,115 @@ export function ChannelPicker() {
   }
 
   return (
-    <section className="panel" aria-labelledby="channels-title">
-      <div className="panel-head">
-        <h2 id="channels-title" className="text-heading">
-          Channels
-        </h2>
+    <section className="section" aria-labelledby="channels-title">
+      <div className="section-head">
+        <h2 id="channels-title">Channels</h2>
         <span className="text-caption muted">
           {managed.length} of {strips.length} picked
         </span>
       </div>
-      <div className="toolbar">
-        <button className="sm-btn" onClick={() => void pickVoices()}>
-          Select vocals and speech
-        </button>
-        <ListenForRolesButton />
-        <button
-          className="sm-btn sm-btn--ghost"
-          disabled={managed.length === 0}
-          onClick={() =>
-            void setManaged(
-              managed.map((c) => c.channel),
-              false,
-            )
-          }
+      <div className="group channels-group">
+        <div className="toolbar">
+          <button className="sm-btn" onClick={() => void pickVoices()}>
+            Select vocals and speech
+          </button>
+          <ListenForRolesButton />
+          <button
+            className="sm-btn sm-btn--ghost"
+            disabled={managed.length === 0}
+            onClick={() =>
+              void setManaged(
+                managed.map((c) => c.channel),
+                false,
+              )
+            }
+          >
+            Clear
+          </button>
+        </div>
+        <label
+          className="am-listen"
+          title="Tells a real voice from band bleed, so bleed is never turned up. Runs on this computer only."
         >
-          Clear
-        </button>
-      </div>
-      <label
-        className="am-listen"
-        title="Tells a real voice from band bleed, so bleed is never turned up. Runs on this computer only."
-      >
-        <input type="checkbox" checked={listen} onChange={(e) => void setListen(e.target.checked)} />
-        <span className="text-body-strong">Listen to each mic</span>
-      </label>
-      <div className="am-table-scroll">
-        <table className="am-table">
-          <thead>
-            <tr>
-              <th className="text-label">Auto</th>
-              <th className="text-label">Channel</th>
-              <th className="text-label">What it is</th>
-              {live && (
-                <>
-                  <th className="text-label">Hears</th>
-                  <th className="text-label">Now</th>
-                  <th className="text-label">Fader</th>
-                  <th>
-                    <span className="visually-hidden">Actions</span>
-                  </th>
-                </>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {strips.map((strip) => {
-              const role = roleOf.get(strip.index);
-              const st = statusOf.get(strip.index);
-              return (
-                <tr key={strip.index} data-managed={role !== undefined}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={role !== undefined}
-                      aria-label={`Let auto-mix ride ${strip.name}`}
-                      onChange={(e) => void setManaged([strip.index], e.target.checked)}
-                    />
-                  </td>
-                  <td>
-                    <span className="text-readout muted">Ch {strip.index + 1}</span> {strip.name}
-                  </td>
-                  <td>
-                    {role !== undefined && (
-                      <select
-                        className="sm-input"
-                        value={role}
-                        aria-label={`What ${strip.name} is`}
-                        onChange={(e) => void setRole(strip.index, e.target.value as ChannelRole)}
-                      >
-                        {ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {ROLE_LABEL[r]}
-                          </option>
-                        ))}
-                      </select>
+          <input type="checkbox" checked={listen} onChange={(e) => void setListen(e.target.checked)} />
+          <span className="text-body-strong">Listen to each mic</span>
+        </label>
+        <div className="am-table-scroll">
+          <table className="am-table">
+            <thead>
+              <tr>
+                <th className="text-label">Auto</th>
+                <th className="text-label">Channel</th>
+                <th className="text-label">What it is</th>
+                {live && (
+                  <>
+                    <th className="text-label">Hears</th>
+                    <th className="text-label">Now</th>
+                    <th className="text-label">Fader</th>
+                    <th>
+                      <span className="visually-hidden">Actions</span>
+                    </th>
+                  </>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {strips.map((strip) => {
+                const role = roleOf.get(strip.index);
+                const st = statusOf.get(strip.index);
+                return (
+                  <tr key={strip.index} data-managed={role !== undefined}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={role !== undefined}
+                        aria-label={`Let auto-mix ride ${strip.name}`}
+                        onChange={(e) => void setManaged([strip.index], e.target.checked)}
+                      />
+                    </td>
+                    <td>
+                      <span className="text-readout muted">Ch {strip.index + 1}</span> {strip.name}
+                    </td>
+                    <td>
+                      {role !== undefined && (
+                        <select
+                          className="sm-input"
+                          value={role}
+                          aria-label={`What ${strip.name} is`}
+                          onChange={(e) => void setRole(strip.index, e.target.value as ChannelRole)}
+                        >
+                          {ROLES.map((r) => (
+                            <option key={r} value={r}>
+                              {ROLE_LABEL[r]}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+                    {live && (
+                      <>
+                        <td>
+                          <HeardCell
+                            status={st}
+                            scanned={heardOf.get(strip.index)}
+                            name={strip.name}
+                            role={role}
+                            apply={applySuggestion}
+                          />
+                        </td>
+                        <td>{st && <ModeWord status={st} />}</td>
+                        <td className="text-readout">{st && <FaderChange status={st} />}</td>
+                        <td className="am-row-actions">
+                          {st && <ChannelActions status={st} undo={undo} resume={resumeChannel} compact />}
+                        </td>
+                      </>
                     )}
-                  </td>
-                  {live && (
-                    <>
-                      <td>
-                        <HeardCell
-                          status={st}
-                          scanned={heardOf.get(strip.index)}
-                          name={strip.name}
-                          role={role}
-                          apply={applySuggestion}
-                        />
-                      </td>
-                      <td>{st && <ModeWord status={st} />}</td>
-                      <td className="text-readout">{st && <FaderChange status={st} />}</td>
-                      <td className="am-row-actions">
-                        {st && <ChannelActions status={st} undo={undo} resume={resumeChannel} compact />}
-                      </td>
-                    </>
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   );
@@ -481,12 +481,14 @@ export function ActivityLog({ limit = 40 }: { limit?: number }) {
   const seen = new Set<number>();
 
   return (
-    <section className="panel" aria-labelledby="activity-title">
-      <h2 id="activity-title" className="text-heading">
-        What auto-mix did
-      </h2>
+    <section className="section" aria-labelledby="activity-title">
+      <div className="section-head">
+        <h2 id="activity-title">What auto-mix did</h2>
+      </div>
       {log.length === 0 ? (
-        <p className="empty">No moves yet.</p>
+        <div className="group">
+          <div className="row empty">No moves yet.</div>
+        </div>
       ) : (
         <ol className="activity">
           {log.slice(0, limit).map((a, i) => {

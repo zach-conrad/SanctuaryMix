@@ -33,23 +33,23 @@ export function AssistView() {
         </div>
         <aside className="page-side">
           <RoomFeelPicker />
-          <section className="panel">
-            <h2 className="text-heading">Right now</h2>
+          <section className="section" aria-labelledby="now-title">
+            <div className="section-head">
+              <h2 id="now-title">Right now</h2>
+            </div>
             <InsightList insights={insights} />
           </section>
           <ActivityLog />
           <RulesList />
-          <section className="panel">
-            <div className="panel-head">
-              <h2 className="text-heading">Coming next</h2>
+          <section className="section" aria-labelledby="coming-title">
+            <div className="section-head">
+              <h2 id="coming-title">Coming next</h2>
             </div>
-            <ul className="coming-list">
+            <ul className="group coming-list">
               {MODES.map(({ icon: Icon, title, body }) => (
-                <li key={title}>
+                <li key={title} className="row" title={body}>
                   <Icon size={20} strokeWidth={1.75} aria-hidden />
-                  <span className="text-body-strong" title={body}>
-                    {title}
-                  </span>
+                  <span className="row-text">{title}</span>
                 </li>
               ))}
             </ul>
