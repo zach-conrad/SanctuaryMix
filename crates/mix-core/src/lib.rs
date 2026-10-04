@@ -6,6 +6,7 @@
 
 pub mod hearing;
 pub mod level;
+pub mod spl;
 
 use serde::{Deserialize, Serialize};
 

@@ -12,6 +12,7 @@ mod commands;
 mod control;
 mod playback;
 mod recording;
+mod spl;
 mod state;
 
 use state::AppState;
@@ -76,6 +77,13 @@ pub fn run() {
             playback::start_replay,
             playback::stop_replay,
             playback::restore_before_replay,
+            spl::spl_get_config,
+            spl::spl_set_config,
+            spl::spl_calibrate,
+            spl::spl_cancel_calibration,
+            spl::spl_reset,
+            spl::spl_reading,
+            spl::spl_history,
             commands::get_session,
             commands::begin_sign_in,
             commands::complete_sign_in,
