@@ -1,16 +1,16 @@
-// Where the Download button points. The CI/CD pipeline publishes each release
-// as a GitHub Release on this repo and uploads the installers under these
-// stable, unversioned asset names. GitHub's /releases/latest/download/<name>
-// URL always redirects to the newest published (non-prerelease) release, so
+// Where the Download button points. The source repo is private, so the CI/CD
+// release workflow mirrors each tagged release to a public, binaries-only repo
+// and uploads the installers under these stable, unversioned asset names.
+// GitHub's /releases/latest/download/<name> URL always redirects to the newest published (non-prerelease) release, so
 // the site never needs a rebuild when a new build ships.
 //
-// If downloads move (a public releases repo, a CDN, the site host), change
-// only this file.
+// If downloads move (a CDN, the site host), change only this file.
 
-export const RELEASE_REPO = "zach-conrad/SanctuaryMix";
+export const RELEASE_REPO = "zach-conrad/sanctuarymix-releases";
 
 export const ASSETS = {
-  mac: "SanctuaryMix-macOS-universal.dmg",
+  mac: "SanctuaryMix-mac-universal.dmg",
+  windows: "SanctuaryMix-windows-x64-setup.exe",
 } as const;
 
 export const downloadUrl = (asset: string) =>
@@ -24,16 +24,23 @@ export interface LatestRelease {
   sizeBytes?: number;
 }
 
-// Best-effort lookup of the version and date to show next to the button.
-// Returns null when the API can't be reached or the repo is private; the
-// button still works through the stable redirect URL above.
-export async function fetchLatestRelease(signal?: AbortSignal): Promise<LatestRelease | null> {
+export type ReleaseLookup =
+  | { status: "ok"; release: LatestRelease }
+  // The releases repo or its first release doesn't exist yet.
+  | { status: "none" }
+  // Couldn't reach the API (offline, rate limited). The button still works
+  // through the stable redirect URL above.
+  | { status: "unknown" };
+
+// Best-effort lookup of the version, date and size to show next to the button.
+export async function fetchLatestRelease(signal?: AbortSignal): Promise<ReleaseLookup> {
   try {
     const res = await fetch(`https://api.github.com/repos/${RELEASE_REPO}/releases/latest`, {
       headers: { Accept: "application/vnd.github+json" },
       signal,
     });
-    if (!res.ok) return null;
+    if (res.status === 404) return { status: "none" };
+    if (!res.ok) return { status: "unknown" };
     const data = (await res.json()) as {
       tag_name: string;
       published_at: string;
@@ -41,11 +48,14 @@ export async function fetchLatestRelease(signal?: AbortSignal): Promise<LatestRe
     };
     const mac = data.assets?.find((a) => a.name === ASSETS.mac);
     return {
-      version: data.tag_name.replace(/^v/, ""),
-      publishedAt: new Date(data.published_at),
-      sizeBytes: mac?.size,
+      status: "ok",
+      release: {
+        version: data.tag_name.replace(/^v/, ""),
+        publishedAt: new Date(data.published_at),
+        sizeBytes: mac?.size,
+      },
     };
   } catch {
-    return null;
+    return { status: "unknown" };
   }
 }

@@ -11,15 +11,15 @@ npm run build    # static output in website/dist
 
 ## Download link
 
-The Download button is fed by CI. Each release the pipeline publishes a GitHub Release on `zach-conrad/SanctuaryMix` with the Mac installer under a stable asset name, `SanctuaryMix-macOS-universal.dmg`. The site links to
+The Download button is fed by CI. The source repo is private, so the release workflow mirrors each tagged release to the public, binaries-only repo `zach-conrad/sanctuarymix-releases`, with the Mac installer under a stable asset name, `SanctuaryMix-mac-universal.dmg` (Windows later: `SanctuaryMix-windows-x64-setup.exe`). The site links to
 
 ```
-https://github.com/zach-conrad/SanctuaryMix/releases/latest/download/SanctuaryMix-macOS-universal.dmg
+https://github.com/zach-conrad/sanctuarymix-releases/releases/latest/download/SanctuaryMix-mac-universal.dmg
 ```
 
-which GitHub redirects to the newest published release, so the site doesn't need a rebuild when a new build ships. The account page also asks the GitHub API for the latest version, date and size, and falls back to "Latest build" if it can't reach it.
+which GitHub redirects to the newest published release, so the site doesn't need a rebuild when a new build ships. The account page also asks the GitHub API for the latest version, date and size. Until the releases repo has its first release, the button shows as disabled with a "coming soon" note; if the API can't be reached, the button stays on and the details read "Latest build".
 
-While the repo is private, that link only works for people signed in to GitHub with access to the repo. To change where downloads come from, edit `src/release.ts` only.
+To change where downloads come from, edit `src/release.ts` only.
 
 ## Design
 

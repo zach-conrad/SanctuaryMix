@@ -2,7 +2,7 @@ import { Download, Info, Laptop, Monitor } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
-import { ASSETS, downloadUrl, fetchLatestRelease, releasesPageUrl, type LatestRelease } from "./release";
+import { ASSETS, downloadUrl, fetchLatestRelease, releasesPageUrl, type ReleaseLookup } from "./release";
 
 const ROOT = "../";
 
@@ -13,12 +13,14 @@ function formatSize(bytes: number) {
 }
 
 export function Account() {
-  const [release, setRelease] = useState<LatestRelease | null | undefined>(undefined);
+  const [lookup, setLookup] = useState<ReleaseLookup>({ status: "unknown" });
+  const release = lookup.status === "ok" ? lookup.release : null;
+  const notYet = lookup.status === "none";
 
   useEffect(() => {
     const ctrl = new AbortController();
     fetchLatestRelease(ctrl.signal).then((r) => {
-      if (!ctrl.signal.aborted) setRelease(r);
+      if (!ctrl.signal.aborted) setLookup(r);
     });
     return () => ctrl.abort();
   }, []);
@@ -46,11 +48,11 @@ export function Account() {
               <dl className="release-meta">
                 <div>
                   <dt className="text-label">Version</dt>
-                  <dd className={release ? "text-readout" : undefined}>{release ? release.version : "Latest build"}</dd>
+                  <dd className={release ? "text-readout" : undefined}>{release ? release.version : notYet ? "Coming soon" : "Latest build"}</dd>
                 </div>
                 <div>
                   <dt className="text-label">Released</dt>
-                  <dd className={release ? "text-readout" : undefined}>{release ? dateFormat.format(release.publishedAt) : "With each new build"}</dd>
+                  <dd className={release ? "text-readout" : undefined}>{release ? dateFormat.format(release.publishedAt) : notYet ? "Not yet" : "With each new build"}</dd>
                 </div>
                 {release?.sizeBytes ? (
                   <div>
@@ -59,14 +61,29 @@ export function Account() {
                   </div>
                 ) : null}
               </dl>
-              <a className="sm-btn sm-btn--primary sm-btn--lg" href={downloadUrl(ASSETS.mac)}>
-                <Download aria-hidden="true" />
-                Download for Mac
-              </a>
-              <p className="text-caption panel__foot">
-                Open the .dmg and drag SanctuaryMix to Applications.{" "}
-                <a href={releasesPageUrl}>All releases</a>
-              </p>
+              {notYet ? (
+                <>
+                  <button className="sm-btn sm-btn--primary sm-btn--lg" disabled>
+                    <Download aria-hidden="true" />
+                    Download for Mac
+                  </button>
+                  <p className="text-caption panel__foot">
+                    The first public build is on its way. This button turns on as soon as it's published.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <a className="sm-btn sm-btn--primary sm-btn--lg" href={downloadUrl(ASSETS.mac)}>
+                    <Download aria-hidden="true" />
+                    Download for Mac
+                  </a>
+                  <p className="text-caption panel__foot">
+                    Open the .dmg and drag SanctuaryMix to Applications. Early builds aren't signed yet: the first
+                    time, Control-click the app and choose Open.{" "}
+                    <a href={releasesPageUrl}>All releases</a>
+                  </p>
+                </>
+              )}
             </section>
 
             <section className="panel" aria-labelledby="win-heading">
