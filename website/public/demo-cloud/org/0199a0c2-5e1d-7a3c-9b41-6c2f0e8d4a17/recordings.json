@@ -1,0 +1,51 @@
+{
+  "_comment": "Demo stand-in for: select * from recordings where org_id = <org> and deleted_at is null, with recording_files. See website/src/cloud.",
+  "recordings": [
+    {
+      "id": "01a108d3-e648-70bc-aac8-4d59fd13aa7d",
+      "orgId": "0199a0c2-5e1d-7a3c-9b41-6c2f0e8d4a17",
+      "createdBy": "0199a0c2-7b40-7e21-8f3a-1d5c9e6b2a08",
+      "title": "Sunday 9:00 AM",
+      "serviceDate": "2026-09-27",
+      "startedAt": 1790499600000,
+      "endedAt": 1790499750000,
+      "durationMs": 150000,
+      "status": "complete",
+      "consoleModel": "dlive",
+      "sampleRate": 48000,
+      "audioMode": "stereo",
+      "mixChannels": [
+        16,
+        17
+      ],
+      "trackCount": 0,
+      "bytesOnDisk": 28800044,
+      "notes": "Sample service: walk-in, welcome, one song with a guitar solo, and the start of the sermon.",
+      "remoteKey": "org/0199a0c2-5e1d-7a3c-9b41-6c2f0e8d4a17/recordings/01a108d3-e648-70bc-aac8-4d59fd13aa7d",
+      "createdAt": 1790499600000,
+      "updatedAt": 1790499750000,
+      "deletedAt": null,
+      "eventCount": 68,
+      "files": [
+        {
+          "kind": "listen",
+          "channel": null,
+          "relPath": "listen.mp3",
+          "bytes": 2400813
+        },
+        {
+          "kind": "events",
+          "channel": null,
+          "relPath": "events.jsonl",
+          "bytes": 12750
+        },
+        {
+          "kind": "manifest",
+          "channel": null,
+          "relPath": "manifest.json",
+          "bytes": 801
+        }
+      ]
+    }
+  ]
+}

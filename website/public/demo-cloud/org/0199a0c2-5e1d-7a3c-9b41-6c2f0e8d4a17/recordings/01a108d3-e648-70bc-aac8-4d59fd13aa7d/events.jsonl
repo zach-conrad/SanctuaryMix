@@ -1,0 +1,116 @@
+{"seq":1,"tMs":0,"source":"snapshot","event":{"type":"name","id":{"kind":"input","index":0},"name":"Pastor"}}
+{"seq":2,"tMs":0,"source":"snapshot","event":{"type":"fader","id":{"kind":"input","index":0},"db":-4.0}}
+{"seq":3,"tMs":0,"source":"snapshot","event":{"type":"mute","id":{"kind":"input","index":0},"muted":true}}
+{"seq":4,"tMs":0,"source":"snapshot","event":{"type":"name","id":{"kind":"input","index":1},"name":"Worship Ld"}}
+{"seq":5,"tMs":0,"source":"snapshot","event":{"type":"fader","id":{"kind":"input","index":1},"db":-3.0}}
+{"seq":6,"tMs":0,"source":"snapshot","event":{"type":"mute","id":{"kind":"input","index":1},"muted":true}}
+{"seq":7,"tMs":0,"source":"snapshot","event":{"type":"name","id":{"kind":"input","index":2},"name":"BGV 1"}}
+{"seq":8,"tMs":0,"source":"snapshot","event":{"type":"fader","id":{"kind":"input","index":2},"db":-8.0}}
+{"seq":9,"tMs":0,"source":"snapshot","event":{"type":"mute","id":{"kind":"input","index":2},"muted":true}}
+{"seq":10,"tMs":0,"source":"snapshot","event":{"type":"name","id":{"kind":"input","index":3},"name":"BGV 2"}}
+{"seq":11,"tMs":0,"source":"snapshot","event":{"type":"fader","id":{"kind":"input","index":3},"db":-8.0}}
+{"seq":12,"tMs":0,"source":"snapshot","event":{"type":"mute","id":{"kind":"input","index":3},"muted":true}}
+{"seq":13,"tMs":0,"source":"snapshot","event":{"type":"name","id":{"kind":"input","index":4},"name":"Kick"}}
+{"seq":14,"tMs":0,"source":"snapshot","event":{"type":"fader","id":{"kind":"input","index":4},"db":-6.0}}
+{"seq":15,"tMs":0,"source":"snapshot","event":{"type":"mute","id":{"kind":"input","index":4},"muted":false}}
+{"seq":16,"tMs":0,"source":"snapshot","event":{"type":"name","id":{"kind":"input","index":5},"name":"Snare"}}
+{"seq":17,"tMs":0,"source":"snapshot","event":{"type":"fader","id":{"kind":"input","index":5},"db":-7.0}}
+{"seq":18,"tMs":0,"source":"snapshot","event":{"type":"mute","id":{"kind":"input","index":5},"muted":false}}
+{"seq":19,"tMs":0,"source":"snapshot","event":{"type":"name","id":{"kind":"input","index":6},"name":"OH L"}}
+{"seq":20,"tMs":0,"source":"snapshot","event":{"type":"fader","id":{"kind":"input","index":6},"db":-14.0}}
+{"seq":21,"tMs":0,"source":"snapshot","event":{"type":"mute","id":{"kind":"input","index":6},"muted":false}}
+{"seq":22,"tMs":0,"source":"snapshot","event":{"type":"name","id":{"kind":"input","index":7},"name":"OH R"}}
+{"seq":23,"tMs":0,"source":"snapshot","event":{"type":"fader","id":{"kind":"input","index":7},"db":-14.0}}
+{"seq":24,"tMs":0,"source":"snapshot","event":{"type":"mute","id":{"kind":"input","index":7},"muted":false}}
+{"seq":25,"tMs":0,"source":"snapshot","event":{"type":"name","id":{"kind":"input","index":8},"name":"Bass DI"}}
+{"seq":26,"tMs":0,"source":"snapshot","event":{"type":"fader","id":{"kind":"input","index":8},"db":-7.0}}
+{"seq":27,"tMs":0,"source":"snapshot","event":{"type":"mute","id":{"kind":"input","index":8},"muted":false}}
+{"seq":28,"tMs":0,"source":"snapshot","event":{"type":"name","id":{"kind":"input","index":9},"name":"Elec Gtr"}}
+{"seq":29,"tMs":0,"source":"snapshot","event":{"type":"fader","id":{"kind":"input","index":9},"db":-12.0}}
+{"seq":30,"tMs":0,"source":"snapshot","event":{"type":"mute","id":{"kind":"input","index":9},"muted":false}}
+{"seq":31,"tMs":0,"source":"snapshot","event":{"type":"name","id":{"kind":"input","index":10},"name":"Acous Gtr"}}
+{"seq":32,"tMs":0,"source":"snapshot","event":{"type":"fader","id":{"kind":"input","index":10},"db":-9.0}}
+{"seq":33,"tMs":0,"source":"snapshot","event":{"type":"mute","id":{"kind":"input","index":10},"muted":false}}
+{"seq":34,"tMs":0,"source":"snapshot","event":{"type":"name","id":{"kind":"input","index":11},"name":"Keys L"}}
+{"seq":35,"tMs":0,"source":"snapshot","event":{"type":"fader","id":{"kind":"input","index":11},"db":-11.0}}
+{"seq":36,"tMs":0,"source":"snapshot","event":{"type":"mute","id":{"kind":"input","index":11},"muted":false}}
+{"seq":37,"tMs":0,"source":"snapshot","event":{"type":"name","id":{"kind":"input","index":12},"name":"Keys R"}}
+{"seq":38,"tMs":0,"source":"snapshot","event":{"type":"fader","id":{"kind":"input","index":12},"db":-11.0}}
+{"seq":39,"tMs":0,"source":"snapshot","event":{"type":"mute","id":{"kind":"input","index":12},"muted":false}}
+{"seq":40,"tMs":0,"source":"snapshot","event":{"type":"name","id":{"kind":"input","index":13},"name":"Playback L"}}
+{"seq":41,"tMs":0,"source":"snapshot","event":{"type":"fader","id":{"kind":"input","index":13},"db":-10.0}}
+{"seq":42,"tMs":0,"source":"snapshot","event":{"type":"mute","id":{"kind":"input","index":13},"muted":false}}
+{"seq":43,"tMs":0,"source":"snapshot","event":{"type":"name","id":{"kind":"input","index":14},"name":"Playback R"}}
+{"seq":44,"tMs":0,"source":"snapshot","event":{"type":"fader","id":{"kind":"input","index":14},"db":-10.0}}
+{"seq":45,"tMs":0,"source":"snapshot","event":{"type":"mute","id":{"kind":"input","index":14},"muted":false}}
+{"seq":46,"tMs":0,"source":"snapshot","event":{"type":"name","id":{"kind":"input","index":15},"name":"Handheld 1"}}
+{"seq":47,"tMs":0,"source":"snapshot","event":{"type":"fader","id":{"kind":"input","index":15},"db":-6.0}}
+{"seq":48,"tMs":0,"source":"snapshot","event":{"type":"mute","id":{"kind":"input","index":15},"muted":true}}
+{"seq":49,"tMs":17600,"source":"console","event":{"type":"mute","id":{"kind":"input","index":15},"muted":false}}
+{"seq":50,"tMs":18500,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":13},"db":-12.0}}
+{"seq":51,"tMs":18500,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":14},"db":-12.0}}
+{"seq":52,"tMs":18900,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":13},"db":-16.0}}
+{"seq":53,"tMs":18900,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":14},"db":-16.0}}
+{"seq":54,"tMs":19300,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":13},"db":-20.0}}
+{"seq":55,"tMs":19300,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":14},"db":-20.0}}
+{"seq":56,"tMs":19700,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":13},"db":-24.0}}
+{"seq":57,"tMs":19700,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":14},"db":-24.0}}
+{"seq":58,"tMs":19800,"source":"console","event":{"type":"mute","id":{"kind":"input","index":0},"muted":false}}
+{"seq":59,"tMs":20100,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":13},"db":-28.0}}
+{"seq":60,"tMs":20100,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":14},"db":-28.0}}
+{"seq":61,"tMs":20500,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":13},"db":-32.0}}
+{"seq":62,"tMs":20500,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":14},"db":-32.0}}
+{"seq":63,"tMs":20900,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":13},"db":-36.0}}
+{"seq":64,"tMs":20900,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":14},"db":-36.0}}
+{"seq":65,"tMs":21300,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":13},"db":-40.0}}
+{"seq":66,"tMs":21300,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":14},"db":-40.0}}
+{"seq":67,"tMs":22000,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":13},"db":null}}
+{"seq":68,"tMs":22000,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":14},"db":null}}
+{"seq":69,"tMs":22400,"source":"console","event":{"type":"mute","id":{"kind":"input","index":15},"muted":true}}
+{"seq":70,"tMs":24000,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":0},"db":-3.5}}
+{"seq":71,"tMs":27000,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":0},"db":-3.0}}
+{"seq":72,"tMs":30000,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":0},"db":-2.5}}
+{"seq":73,"tMs":34200,"source":"console","event":{"type":"mute","id":{"kind":"input","index":1},"muted":false}}
+{"seq":74,"tMs":34400,"source":"console","event":{"type":"mute","id":{"kind":"input","index":2},"muted":false}}
+{"seq":75,"tMs":34500,"source":"console","event":{"type":"mute","id":{"kind":"input","index":3},"muted":false}}
+{"seq":76,"tMs":35000,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":13},"db":-16.0}}
+{"seq":77,"tMs":35000,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":14},"db":-16.0}}
+{"seq":78,"tMs":36000,"source":"console","event":{"type":"mute","id":{"kind":"input","index":0},"muted":true}}
+{"seq":79,"tMs":40000,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":1},"db":-2.5}}
+{"seq":80,"tMs":46500,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":1},"db":-2.0}}
+{"seq":81,"tMs":48000,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":2},"db":-7.5}}
+{"seq":82,"tMs":48200,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":3},"db":-8.0}}
+{"seq":83,"tMs":53000,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":1},"db":-2.5}}
+{"seq":84,"tMs":59500,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":1},"db":-2.0}}
+{"seq":85,"tMs":60000,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":2},"db":-7.0}}
+{"seq":86,"tMs":60200,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":3},"db":-7.5}}
+{"seq":87,"tMs":66000,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":1},"db":-1.5}}
+{"seq":88,"tMs":69000,"source":"console","event":{"type":"fader","id":{"kind":"input","index":9},"db":-10.0}}
+{"seq":89,"tMs":69500,"source":"console","event":{"type":"fader","id":{"kind":"input","index":9},"db":-8.0}}
+{"seq":90,"tMs":70000,"source":"console","event":{"type":"fader","id":{"kind":"input","index":9},"db":-6.5}}
+{"seq":91,"tMs":70500,"source":"console","event":{"type":"fader","id":{"kind":"input","index":9},"db":-6.0}}
+{"seq":92,"tMs":72000,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":2},"db":-7.5}}
+{"seq":93,"tMs":72200,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":3},"db":-8.0}}
+{"seq":94,"tMs":72500,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":1},"db":-2.0}}
+{"seq":95,"tMs":79000,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":1},"db":-1.5}}
+{"seq":96,"tMs":84000,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":2},"db":-8.0}}
+{"seq":97,"tMs":84200,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":3},"db":-8.5}}
+{"seq":98,"tMs":85500,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":1},"db":-1.0}}
+{"seq":99,"tMs":88000,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":4},"db":-5.0}}
+{"seq":100,"tMs":90000,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":8},"db":-6.0}}
+{"seq":101,"tMs":92000,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":1},"db":-1.5}}
+{"seq":102,"tMs":96500,"source":"console","event":{"type":"fader","id":{"kind":"input","index":9},"db":-9.0}}
+{"seq":103,"tMs":97200,"source":"console","event":{"type":"fader","id":{"kind":"input","index":9},"db":-12.0}}
+{"seq":104,"tMs":98500,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":1},"db":-1.0}}
+{"seq":105,"tMs":110000,"source":"console","event":{"type":"mute","id":{"kind":"input","index":0},"muted":false}}
+{"seq":106,"tMs":112200,"source":"console","event":{"type":"mute","id":{"kind":"input","index":1},"muted":true}}
+{"seq":107,"tMs":112400,"source":"console","event":{"type":"mute","id":{"kind":"input","index":2},"muted":true}}
+{"seq":108,"tMs":112600,"source":"console","event":{"type":"mute","id":{"kind":"input","index":3},"muted":true}}
+{"seq":109,"tMs":116000,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":0},"db":-3.0}}
+{"seq":110,"tMs":118000,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":13},"db":null}}
+{"seq":111,"tMs":118000,"source":"operator","event":{"type":"fader","id":{"kind":"input","index":14},"db":null}}
+{"seq":112,"tMs":121500,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":0},"db":-2.5}}
+{"seq":113,"tMs":127000,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":0},"db":-2.0}}
+{"seq":114,"tMs":132500,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":0},"db":-2.5}}
+{"seq":115,"tMs":138000,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":0},"db":-2.0}}
+{"seq":116,"tMs":143500,"source":"assist","event":{"type":"fader","id":{"kind":"input","index":0},"db":-1.5}}

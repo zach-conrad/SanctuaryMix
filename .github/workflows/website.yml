@@ -15,7 +15,7 @@ on:
     types: [completed]
   push:
     branches: [main]
-    paths: ["website/**", ".github/workflows/website.yml"]
+    paths: ["website/**", "src/lib/recordings.ts", "src/lib/levels.ts", "src/lib/types.ts", ".github/workflows/website.yml"]
   workflow_dispatch:
 
 permissions:
