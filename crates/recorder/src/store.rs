@@ -172,6 +172,12 @@ impl Store {
             deleted_at: None,
         };
         fs::create_dir_all(self.recording_dir(&rec.id))?;
+        self.insert_row(&rec)?;
+        Ok(rec)
+    }
+
+    /// Inserts a full row as given. Used for new recordings and imports.
+    pub(crate) fn insert_row(&self, rec: &Recording) -> Result<()> {
         let mix_channels = rec
             .mix_channels
             .map(|c| serde_json::to_string(&c))
@@ -188,24 +194,24 @@ impl Store {
                 rec.title,
                 rec.service_date,
                 rec.started_at as i64,
-                None::<i64>,
-                0i64,
+                rec.ended_at.map(|t| t as i64),
+                rec.duration_ms as i64,
                 rec.status.as_str(),
                 rec.console_model,
                 rec.sample_rate,
                 rec.audio_mode.as_str(),
                 mix_channels,
                 rec.track_count,
-                0i64,
+                rec.bytes_on_disk as i64,
                 rec.notes,
                 rec.sync_state.as_str(),
-                None::<String>,
-                now as i64,
-                now as i64,
-                None::<i64>,
+                rec.remote_key,
+                rec.created_at as i64,
+                rec.updated_at as i64,
+                rec.deleted_at.map(|t| t as i64),
             ],
         )?;
-        Ok(rec)
+        Ok(())
     }
 
     /// The raw row, including soft-deleted ones.

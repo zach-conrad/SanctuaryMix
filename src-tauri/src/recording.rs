@@ -85,6 +85,14 @@ impl Recordings {
                 log::error!("couldn't finish the bundle for {id}: {e}");
             }
         }
+        // Bundles copied in (a backup, a shared service, a test sample).
+        let report = recorder::import::import_bundles(&store).map_err(err)?;
+        for id in &report.imported {
+            log::info!("imported recording {id}");
+        }
+        for (dir, why) in &report.skipped {
+            log::warn!("skipped recording folder {}: {why}", dir.display());
+        }
         Ok(Self {
             store,
             sync: Box::new(recorder::LocalOnly),

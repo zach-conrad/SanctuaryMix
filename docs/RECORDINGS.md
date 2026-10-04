@@ -50,6 +50,10 @@ tracks/in-01.wav  multitrack, one file per input (if recorded)
 events.jsonl      every control change, one JSON object per line
 ```
 
+A bundle folder copied into the recordings folder (from a backup, another
+computer, or `scripts/make-sample-service.py`) is imported the next time the
+app starts. A folder not named by its id is renamed to it.
+
 The same relative paths become Supabase Storage object keys:
 `org/<org_id>/recordings/<id>/mix.wav`, and so on.
 

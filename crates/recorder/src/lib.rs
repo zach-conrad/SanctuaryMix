@@ -9,8 +9,10 @@
 //! - [`replay`]: pure helpers to rebuild mixer state and walk events in time.
 //! - [`sync`]: the cloud boundary (local only for now).
 //! - [`disk`]: size estimates and free-space guards.
+//! - [`import`]: picks up bundle folders copied into the recordings folder.
 
 pub mod disk;
+pub mod import;
 pub mod log;
 pub mod replay;
 pub mod store;
