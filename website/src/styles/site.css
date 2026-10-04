@@ -236,6 +236,7 @@ img { display: block; max-width: 100%; height: auto; }
 .panel__head { display: flex; align-items: center; gap: var(--space-2); }
 .panel__head svg { width: 20px; height: 20px; stroke-width: 1.75; color: var(--text-muted); }
 .panel__foot { color: var(--text-muted); }
+.panel__error { color: var(--danger); }
 .release-meta { display: flex; flex-wrap: wrap; gap: var(--space-5); }
 .release-meta dt { color: var(--text-subtle); }
 .release-meta dd { margin-top: var(--space-1); }

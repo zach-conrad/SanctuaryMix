@@ -1,64 +1,65 @@
-// Where the Download button points. Downloads are served by the website
-// itself, not GitHub, so visitors never need a GitHub account.
+// Where the Download button gets its file. Installers live in a PRIVATE
+// Supabase Storage bucket ("releases"). The CI/CD release workflow uploads
+// every tagged release to stable/latest/, so the newest build is always what
+// visitors get, with no website redeploy. Visitors never see a permanent
+// link: the `download` Edge Function (supabase/functions/download) signs a
+// link that expires after a few minutes.
 //
-// Contract with the CI/CD release workflow: on each tagged release it copies
-// the installers into the built site under downloads/ and writes
-// downloads/latest.json, then deploys the site:
-//
-//   downloads/SanctuaryMix-mac-universal.dmg
-//   downloads/latest.json
-//     {
-//       "version": "0.2.0",
-//       "publishedAt": "2026-10-04T19:00:00Z",
-//       "mac": { "file": "SanctuaryMix-mac-universal.dmg", "size": 48213504 }
-//     }
-//
-// A "windows" entry with the same shape is added once a Windows build ships.
-// Until the first release is deployed there is no latest.json, and the page
-// shows the button as coming soon.
+// Build-time settings (website/.env or CI):
+//   VITE_SUPABASE_URL       https://<project>.supabase.co
+//   VITE_SUPABASE_ANON_KEY  the project's public anon key (optional for now)
+// Without VITE_SUPABASE_URL the page shows the download as coming soon.
 
-export const DOWNLOADS_DIR = "downloads/";
-export const MANIFEST_FILE = "latest.json";
-
-export interface DownloadFile {
-  file: string;
-  size?: number;
-}
+export type Platform = "mac" | "windows";
 
 export interface LatestRelease {
-  version: string;
-  publishedAt?: Date;
-  mac: DownloadFile;
+  version: string | null;
+  publishedAt: Date | null;
+  size: number | null;
+  file: string;
+  url: string;
 }
 
 export type ReleaseLookup =
   | { status: "loading" }
   | { status: "ok"; release: LatestRelease }
-  // No release has been deployed to the site yet.
-  | { status: "none" };
+  // Supabase isn't set up yet, or no build has been uploaded.
+  | { status: "none" }
+  // The download service couldn't be reached.
+  | { status: "error" };
 
-/** URL of a file in downloads/, given the relative path to the site root. */
-export const downloadUrl = (root: string, file: string) => `${root}${DOWNLOADS_DIR}${encodeURIComponent(file)}`;
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.replace(/\/$/, "");
+const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-export async function fetchLatestRelease(root: string, signal?: AbortSignal): Promise<ReleaseLookup> {
+/** Asks the download function for the latest build and a fresh signed link. */
+export async function getDownload(platform: Platform, signal?: AbortSignal): Promise<ReleaseLookup> {
+  if (!SUPABASE_URL) return { status: "none" };
   try {
-    const res = await fetch(`${root}${DOWNLOADS_DIR}${MANIFEST_FILE}`, { cache: "no-store", signal });
-    if (!res.ok) return { status: "none" };
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/download?platform=${platform}`, {
+      headers: ANON_KEY ? { Authorization: `Bearer ${ANON_KEY}`, apikey: ANON_KEY } : {},
+      cache: "no-store",
+      signal,
+    });
+    if (res.status === 404) return { status: "none" };
+    if (!res.ok) return { status: "error" };
     const data = (await res.json()) as {
-      version?: string;
-      publishedAt?: string;
-      mac?: DownloadFile;
+      version: string | null;
+      publishedAt: string | null;
+      size: number | null;
+      file: string;
+      url: string;
     };
-    if (!data.version || !data.mac?.file) return { status: "none" };
     return {
       status: "ok",
       release: {
-        version: data.version.replace(/^v/, ""),
-        publishedAt: data.publishedAt ? new Date(data.publishedAt) : undefined,
-        mac: data.mac,
+        version: data.version,
+        publishedAt: data.publishedAt ? new Date(data.publishedAt) : null,
+        size: data.size,
+        file: data.file,
+        url: data.url,
       },
     };
   } catch {
-    return { status: "none" };
+    return { status: "error" };
   }
 }
