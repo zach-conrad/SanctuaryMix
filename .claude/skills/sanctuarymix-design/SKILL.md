@@ -53,7 +53,7 @@ If the shared folder isn't available (for example, working on the user's own mac
 
 ## Layout
 
-The app follows macOS conventions (System Settings, Finder, Mail): hierarchy, harmony, consistency. See `apple-direction.md` for the reasoning.
+The app follows macOS conventions (System Settings, Finder, Mail): hierarchy, harmony, consistency. See `/mnt/project-files/design/apple-direction.md` (in the repo: `.claude/skills/sanctuarymix-design/apple-direction.md`) for the reasoning.
 
 Window minimum 1280 × 800. Top bar 56px (logo, status pills: console, Dante, warnings, then the Assist mode badge last; Freeze while auto-mix runs and Record service together at the right). Source-list sidebar `--sidebar-width` (200px, icon + name; Mixer, Scenes, Services, Assist, Setup, Settings pinned at the bottom), folding to a 72px icon rail below 1440px. Mixer bay on `--bg` scrolling horizontally inside its own region, inspector `--inspector-width` on the right.
 
