@@ -82,17 +82,17 @@ jobs:
           fi
 
       # Deploys the prebuilt folder as static files with the Vercel CLI. Only
-      # VERCEL_TOKEN is needed: CI creates the "sanctuarymix" project on first
-      # run and links to it. The project is never connected to Git, so
-      # Vercel's own builds can't replace this deploy (which holds the installer).
-      # Optional: VERCEL_ORG_ID + VERCEL_PROJECT_ID (both or neither) to target
-      # an existing project instead.
+      # VERCEL_TOKEN is secret. The target is the existing "sanctuarymix"
+      # project in Zach's Hobby account; its IDs aren't secret, and the
+      # VERCEL_ORG_ID + VERCEL_PROJECT_ID secrets (both or neither) override
+      # them. The project is never connected to Git, so Vercel's own builds
+      # can't replace this deploy (which holds the installer).
       - name: Deploy to Vercel
         if: steps.site.outputs.exists == 'true'
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          ORG_ID: ${{ secrets.VERCEL_ORG_ID || 'team_0uDWfeDDUJNfIy4uoJZXKAQ8' }} # gitleaks:allow (ID, not a secret)
+          PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID || 'prj_mNuUAQyh8zSFbVFlH3grGfSmeV7C' }} # gitleaks:allow (ID, not a secret)
           PROJECT: sanctuarymix
         run: |
           if [ -z "$VERCEL_TOKEN" ]; then
