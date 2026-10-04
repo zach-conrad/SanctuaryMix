@@ -70,14 +70,10 @@ impl Inner {
     fn finish(&mut self, run: &Run, measured_dbfs: f32) -> CalibrationStatus {
         let offset = run.reference_db - measured_dbfs;
         let (Some(source), Some((device, sample_rate))) = (self.config.source, &self.device) else {
-            return failed(
-                "The measurement input went away during calibration. Start audio and try again.",
-            );
+            return failed("Input lost. Try again.");
         };
         if !SplConfig::OFFSET_RANGE.contains(&offset) {
-            return failed(
-                "That reading is too far from what this input hears. Check you picked the measurement mic and typed the right number.",
-            );
+            return failed("Reading doesn't match this input. Check the input and number.");
         }
         self.config = SplConfig {
             source: Some(source),
@@ -302,14 +298,14 @@ pub async fn spl_calibrate(
     reference_db: f32,
 ) -> CmdResult<()> {
     if !(30.0..=140.0).contains(&reference_db) {
-        return Err("Enter the reference meter's reading, between 30 and 140 dB.".into());
+        return Err("Enter 30 to 140 dB.".into());
     }
     let mut inner = state.spl.inner.lock().unwrap();
     if inner.config.source.is_none() {
-        return Err("Choose the measurement input first.".into());
+        return Err("Choose an input first.".into());
     }
     let Some((_, sample_rate)) = inner.device else {
-        return Err("Start Dante audio in Setup first, so there's something to measure.".into());
+        return Err("Start audio first.".into());
     };
     inner.calibration = Some(Run {
         calibrator: Calibrator::new(weighting, sample_rate),

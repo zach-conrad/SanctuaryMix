@@ -159,10 +159,10 @@ export function createDemoSpl(): DemoSpl {
     },
     calibrate(weighting, referenceDb) {
       if (!(referenceDb >= 30 && referenceDb <= 140)) {
-        throw new Error("Enter the reference meter's reading, between 30 and 140 dB.");
+        throw new Error("Enter 30 to 140 dB.");
       }
-      if (config.source === null) throw new Error("Choose the measurement input first.");
-      if (!timer) throw new Error("Start Dante audio in Setup first, so there's something to measure.");
+      if (config.source === null) throw new Error("Choose an input first.");
+      if (!timer) throw new Error("Start audio first.");
       cancelCal();
       let ticks = 0;
       const neededSecs = 5;

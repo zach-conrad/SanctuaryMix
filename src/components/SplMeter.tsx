@@ -26,12 +26,10 @@ export function SplReadout() {
   }, []);
 
   const live = audioOn && config?.source != null ? reading : null;
-  let note: string;
-  if (!config) note = "Loading";
-  else if (config.source === null) note = "Off · choose a measurement mic";
-  else if (!audioOn) note = "Start Dante audio in Setup";
-  else if (!live) note = "Waiting for audio";
-  else note = `Slow · ${live.calibrated ? "calibrated" : "uncalibrated"}`;
+  let note: string | null = null;
+  if (config?.source === null) note = "Off";
+  else if (config && !audioOn) note = "No audio";
+  else if (live && !live.calibrated) note = "Uncalibrated";
 
   return (
     <>
@@ -51,7 +49,7 @@ export function SplReadout() {
           <Level value={live?.slow.a} unit="dBA" large />
           <Level value={live?.slow.c} unit="dBC" />
         </span>
-        <span className={`spl-readout__note${live && !live.calibrated ? " spl-uncal" : ""}`}>{note}</span>
+        {note && <span className={`spl-readout__note${live && !live.calibrated ? " spl-uncal" : ""}`}>{note}</span>}
       </button>
       {open && <SplPopup id={popupId} anchor={button} onClose={() => setOpen(false)} />}
     </>
@@ -135,22 +133,12 @@ function SplPopup({ id, anchor, onClose }: { id: string; anchor: RefObject<HTMLB
         <h2 id={titleId} className="text-heading">
           Room level
         </h2>
-        {live && (
-          <span className={`text-caption ${live.calibrated ? "muted" : "spl-uncal"}`}>
-            {live.calibrated ? "Calibrated" : "Uncalibrated estimate"}
-          </span>
-        )}
+        {live && !live.calibrated && <span className="text-caption spl-uncal">Uncalibrated</span>}
         <span className="spl-spacer" />
         <button className="sm-btn sm-btn--ghost sm-btn--sm spl-icon-btn" aria-label="Close" title="Close" onClick={onClose}>
           <X size={20} strokeWidth={1.75} />
         </button>
       </div>
-
-      {live && !live.calibrated && (
-        <p className="text-caption muted">
-          Readings are only good for comparing louder and quieter moments until you calibrate below.
-        </p>
-      )}
 
       <div className="spl-graph-head">
         <span className="spl-legend" aria-hidden>
@@ -272,7 +260,7 @@ export function SplGraph({ points, spanSecs }: { points: SplPoint[]; spanSecs: n
           <line className="spl-crosshair" x1={x(hovered.t)} x2={x(hovered.t)} y1={PAD.t} y2={H - PAD.b} />
         )}
       </svg>
-      {!visible.length && <p className="spl-graph__empty text-caption muted">The graph fills in once the measurement mic has audio.</p>}
+      {!visible.length && <p className="spl-graph__empty text-caption muted">No data yet</p>}
       {hovered && (
         <div
           className="spl-tooltip"
@@ -301,7 +289,7 @@ function SplTable({ reading }: { reading: SplReading }) {
     ["Slow", reading.slow.a, reading.slow.c],
     ["Leq 1 min", reading.leq1m.a, reading.leq1m.c],
     ["Leq 15 min", reading.leq15m.a, reading.leq15m.c],
-    [`Leq since reset (${Math.floor(reading.seconds / 60)} min)`, reading.leqTotal.a, reading.leqTotal.c],
+    ["Leq total", reading.leqTotal.a, reading.leqTotal.c],
   ];
   return (
     <table className="spl-table">
@@ -321,7 +309,7 @@ function SplTable({ reading }: { reading: SplReading }) {
           </tr>
         ))}
         <tr>
-          <td>Loudest (A fast max) and C peak</td>
+          <td>Max / peak</td>
           <td className="text-readout">{formatSpl(reading.aMax)}</td>
           <td className="text-readout">{formatSpl(reading.cPeak)}</td>
         </tr>
@@ -370,22 +358,14 @@ function SplSettings() {
             </option>
           ))}
         </select>
-        <span className="sm-field__help">
-          A measurement mic out in the room, not a stage mic. Changing it starts the averages over.
-        </span>
       </label>
 
       <fieldset className="spl-calibrate" disabled={config.source === null || listening}>
         <legend className="sm-field__label">Calibrate</legend>
         <CalibrationSummary />
-        <ol className="spl-steps text-caption muted">
-          <li>Hold an SPL meter set to slow next to the measurement mic, or fit a 94 dB calibrator on it.</li>
-          <li>Play steady pink noise through the system (not needed with a calibrator) and keep the room quiet.</li>
-          <li>Enter what the meter reads and press Calibrate. SanctuaryMix waits for 5 seconds of steady level and averages it.</li>
-        </ol>
         <div className="spl-calibrate__row">
           <label className="sm-field spl-calibrate__ref">
-            <span className="sm-field__label">Reference meter reads</span>
+            <span className="sm-field__label">Reference meter (slow)</span>
             <input
               className="sm-input"
               inputMode="decimal"
@@ -426,10 +406,6 @@ function SplSettings() {
           onBlur={commitOffset}
           onKeyDown={(e) => e.key === "Enter" && commitOffset()}
         />
-        <span className="sm-field__help">
-          Added to the input's dBFS level. Typing one marks readings uncalibrated. Recalibrate after changing this
-          input's gain on the console.
-        </span>
       </label>
 
       {error && (
@@ -442,7 +418,6 @@ function SplSettings() {
         <button className="sm-btn sm-btn--ghost" disabled={config.source === null} onClick={() => void reset()}>
           Reset averages
         </button>
-        <span className="text-caption muted">Clears the graph, Leq, loudest and peak. Do it before the service starts.</span>
       </div>
     </div>
   );
@@ -456,18 +431,12 @@ function CalibrationSummary() {
   if (!config) return null;
   const record = config.calibration;
   if (!record) {
-    return <p className="text-caption spl-uncal">Not calibrated. Readings are estimates.</p>;
+    return null;
   }
-  const what = `${formatSpl(record.referenceDb)} dB${record.weighting.toUpperCase()} on Input ${record.source + 1}, ${record.device}`;
   return config.calibrated ? (
-    <p className="text-caption muted">
-      Calibrated {dateTime.format(record.atMs)} to {what}.
-    </p>
+    <p className="text-caption muted">Calibrated {dateTime.format(record.atMs)}</p>
   ) : (
-    <p className="text-caption spl-uncal">
-      The last calibration was for {what} at {record.sampleRate / 1000} kHz. Something has changed since, so calibrate
-      again.
-    </p>
+    <p className="text-caption spl-uncal">Out of date. Calibrate again.</p>
   );
 }
 
@@ -476,13 +445,7 @@ function CalibrationProgress() {
   const calibration = useSpl((s) => s.calibration);
   const cancel = useSpl((s) => s.cancelCalibration);
   if (!calibration) return null;
-  if (calibration.state === "done") {
-    return (
-      <p className="spl-cal-result text-caption" role="status">
-        Calibrated. Offset is now {formatSpl(calibration.offsetDb)} dB.
-      </p>
-    );
-  }
+  if (calibration.state === "done") return null;
   if (calibration.state === "failed") {
     return (
       <p className="error" role="alert">
@@ -514,7 +477,7 @@ function CalibrationProgress() {
         <span style={{ width: `${Math.min(100, (steadySecs / neededSecs) * 100)}%` }} />
       </div>
       <span className="text-caption muted">
-        {hold ?? `Steady for ${steadySecs.toFixed(1)} of ${neededSecs.toFixed(0)} seconds`}
+        {hold ?? `Steady ${steadySecs.toFixed(1)} of ${neededSecs.toFixed(0)} s`}
       </span>
     </div>
   );

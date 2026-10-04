@@ -34,7 +34,7 @@ describe("demo room level", () => {
     const config = spl.getConfig();
     expect(config.calibrated).toBe(true);
     expect(config.calibration?.referenceDb).toBe(94);
-    expect(() => spl.calibrate("a", 200)).toThrow(/between 30 and 140/);
+    expect(() => spl.calibrate("a", 200)).toThrow(/30 to 140/);
   });
 
   it("typing an offset or changing the source drops the calibration", () => {

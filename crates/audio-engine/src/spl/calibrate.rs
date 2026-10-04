@@ -155,7 +155,7 @@ impl Calibrator {
         } else if self.elapsed_secs() >= TIMEOUT_SECS {
             let why = self.last_hold.unwrap_or(UNSTEADY);
             self.result = Some(CalibrationProgress::Failed {
-                reason: format!("Calibration stopped after {TIMEOUT_SECS:.0} seconds. {why}"),
+                reason: format!("Stopped after {TIMEOUT_SECS:.0} s: {why}"),
             });
         }
     }
@@ -279,7 +279,7 @@ mod tests {
         quiet.feed(&tone(0.0001, TIMEOUT_SECS as f64 + 1.0));
         match quiet.progress() {
             CalibrationProgress::Failed { reason } => {
-                assert!(reason.contains("Too quiet"), "{reason}")
+                assert!(reason.contains(TOO_QUIET), "{reason}")
             }
             other => panic!("{other:?}"),
         }
