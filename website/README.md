@@ -27,6 +27,14 @@ To try it locally, drop any file and a matching `latest.json` into `public/downl
 
 Note: there's no real sign-in yet, so anyone who has the site's address can reach the account page and download. Hosting must allow files the size of the dmg (GitHub Pages caps files at 100 MB; Cloudflare Pages at 25 MB).
 
+## Recorded services and share links
+
+The account page lists the church's recorded services. Each opens at `/account/service/?id=<id>` with a player, the fader and mute timeline, the console state at the playhead, and the change list. **Share** makes a link to `/share/?t=<token>`, a public page that plays the mix (and the moves, if the link includes them) without signing in.
+
+Pages talk to the cloud only through `RecordingsCloud` in `src/cloud/types.ts`. Today `DemoCloud` serves the sample service from `public/demo-cloud/org/<org_id>/recordings/<id>/` (the same keys as Supabase Storage: `manifest.json`, `events.jsonl`, and `listen.mp3`, a 2.4 MB MP3 of the sample mix) and keeps share links in the browser's storage. A share link opened in another browser plays the sample service with a preview note. A Supabase implementation replaces `DemoCloud` in `src/cloud/index.ts`; its draft schema is in `docs/supabase/share_links.sql`.
+
+The timeline and recording helpers are shared with the desktop app: `src/lib/recordings.ts`, `levels.ts` and `types.ts` are imported from the app, and `src/mix/Timeline.tsx` is a copy of the app's component.
+
 ## Design
 
 Uses the SanctuaryMix design system: `src/styles/tokens.css` and `components.css` are copies of `design/tokens.css` and `design/components.css`, fonts are bundled with `@fontsource`, and the logos in `public/brand` are the supplied wordmark files. Dark theme is the default (`data-theme` on `<html>`).

@@ -141,3 +141,20 @@ a recent send. The recorder subscribes.
   `docs/supabase/recordings.sql` (not applied anywhere yet).
 - Roles: everyone in a church can list and listen; Engineer and Admin can
   replay to a console and delete; Admin can change retention.
+
+## On the website
+
+Signed-in members can open a synced service on the website's account page
+(`website/src/cloud`, `/account/service/?id=<id>`): listen, watch the fader and
+mute timeline, and see every change. It is playback only, with no output to
+choose and nothing sent to a console. Browsers stream a compressed copy,
+`listen.mp3`, stored next to the bundle (`recording_files.kind = 'listen'`),
+made when the bundle is uploaded.
+
+Engineer and Admin can make a share link (`/share/?t=<token>`) that lets anyone
+listen without an account, for 7 days, 30 days or until turned off, with or
+without the moves. Draft schema and the public lookup: `docs/supabase/share_links.sql`.
+
+Today the website reads a demo copy of the sample service from
+`website/public/demo-cloud/`, laid out like the Storage keys, and keeps share
+links in the browser. Nothing is uploaded yet.

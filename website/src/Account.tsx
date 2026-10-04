@@ -1,5 +1,7 @@
-import { CircleCheck, Download, Info, Laptop, Monitor } from "lucide-react";
+import { ChevronRight, CircleCheck, Download, Info, Laptop, Monitor, Music } from "lucide-react";
 import { useEffect, useState } from "react";
+import { audioModeLabel, formatClock, serviceDateLabel, timeOfDay } from "../../src/lib/recordings";
+import { connectCloud, type CloudRecording } from "./cloud";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
 import { FOUNDING_OFFER, TRIAL_DAYS, findPlan, formatPrice, foundingPrice, type Billing } from "./pricing";
@@ -70,7 +72,7 @@ export function Account() {
           ) : null}
 
           <h1 className="account__title">{choice ? "Welcome, Alex" : "Welcome back, Alex"}</h1>
-          <p className="section__lede">Download the latest SanctuaryMix for your booth computer.</p>
+          <p className="section__lede">Download SanctuaryMix for your booth computer, and listen back to your services.</p>
 
           <div className="account__grid">
             <section className="panel panel--download" aria-labelledby="mac-heading">
@@ -159,9 +161,58 @@ export function Account() {
               </dl>
             </section>
           </div>
+
+          <Services />
         </div>
       </main>
       <Footer />
     </>
+  );
+}
+
+const cloud = connectCloud(ROOT);
+
+/** Services the church's booth computers have uploaded. */
+function Services() {
+  const [list, setList] = useState<CloudRecording[] | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    cloud.listRecordings().then(setList, () => setError(true));
+  }, []);
+
+  return (
+    <section id="services" className="services" aria-labelledby="services-heading">
+      <div className="services__head">
+        <h2 id="services-heading" className="section__title">Recorded services</h2>
+        <p className="feature__body">
+          Mixes from your booth, with every fader and mute move. Listen back here or share a link.
+        </p>
+      </div>
+      {error ? <p className="mix-muted">Your services didn't load. Reload the page to try again.</p> : null}
+      {list && list.length === 0 ? (
+        <p className="mix-muted">No services yet. Recordings appear here after the booth computer uploads them.</p>
+      ) : null}
+      {list && list.length > 0 ? (
+        <ul className="services__list">
+          {list.map((r) => (
+            <li key={r.id}>
+              <a className="service-row" href={`${ROOT}account/service/?id=${encodeURIComponent(r.id)}`}>
+                <Music aria-hidden="true" />
+                <span className="service-row__main">
+                  <span className="text-body-strong">{r.title}</span>
+                  <span className="text-caption mix-muted">
+                    {serviceDateLabel(r.serviceDate)} · {timeOfDay(r.startedAt)} · {audioModeLabel(r)} ·{" "}
+                    {r.eventCount} moves
+                  </span>
+                </span>
+                <span className="text-readout mix-muted">{formatClock(r.durationMs)}</span>
+                <ChevronRight aria-hidden="true" />
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
   );
 }
