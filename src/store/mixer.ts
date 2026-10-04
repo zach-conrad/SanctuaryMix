@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { getBackend } from "../lib/backend";
 import type { ChannelId, ConsoleConfig, ConsoleEvent, MeterFrame, MeteringInfo, Session } from "../lib/types";
 
-export type View = "mixer" | "scenes" | "assist" | "setup" | "settings";
+export type View = "mixer" | "scenes" | "recordings" | "assist" | "setup" | "settings";
 export type Theme = "dark" | "light" | "system";
 type LinkStatus = "off" | "connecting" | "on" | "error";
 
