@@ -6,8 +6,7 @@ name: Website
 #   - a release finishes (new installer to publish),
 #   - website/ changes on main (new copy or design), or
 #   - someone runs it by hand.
-# The installer comes from the newest (non-prerelease) GitHub release, which
-# stays private as the internal copy. Contract with the site: website/src/release.ts.
+# The installer comes from the newest (non-prerelease) GitHub release. Contract with the site: website/src/release.ts.
 
 on:
   workflow_run:
