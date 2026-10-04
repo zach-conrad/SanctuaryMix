@@ -60,7 +60,7 @@ export function TopBar() {
         />
         <StatusPill tone={tone(audioStatus)} subject="Dante" meta={danteMeta} onClick={() => setView("setup")} />
         {unconfirmed && <StatusPill tone="warn" subject="Console" meta="Hasn't confirmed a change" />}
-        {isDemo && <StatusPill tone="warn" subject="Demo" meta="Simulated audio and console" />}
+        {isDemo && <StatusPill tone="warn" subject="Demo" meta="Simulated" />}
       </div>
       <div className="topbar-spacer" data-tauri-drag-region />
       <RecordControl />

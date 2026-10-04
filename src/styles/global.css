@@ -110,6 +110,11 @@ main { flex: 1; min-width: 0; overflow: auto; background: var(--bg); }
 .page-head-actions { display: flex; align-items: center; gap: var(--space-3); flex: none; }
 /* Main content with a side column for status, history and settings. */
 .page-split { display: grid; grid-template-columns: minmax(0, 1fr) var(--side-width); gap: var(--space-5); align-items: start; }
+.icon-btn-sm { width: var(--control-sm); padding: 0; }
+/* Near the minimum window width, give the main column a little more room. */
+@media (max-width: 1439px) {
+  .page-split { grid-template-columns: minmax(0, 1fr) calc(var(--side-width) - var(--space-6)); }
+}
 .page-main, .page-side { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 .panel {
   display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4) var(--space-5) var(--space-5);
@@ -199,14 +204,14 @@ select.sm-input { appearance: auto; }
 .am-table td { padding: var(--space-1) var(--space-2); height: var(--hit-min); border-top: 1px solid var(--border); vertical-align: middle; }
 .am-table tr[data-managed="false"] td:not(:first-child) { color: var(--text-muted); }
 .am-table input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); }
-.am-table select.sm-input { height: var(--control-sm); min-width: 180px; }
+.am-table select.sm-input { height: var(--control-sm); min-width: 150px; }
 .am-row-actions { text-align: right; white-space: nowrap; }
-.am-mode { font: var(--text-caption); color: var(--text-muted); }
+.am-mode { font: var(--text-caption); color: var(--text-muted); white-space: nowrap; }
 .am-mode[data-mode="riding"], .am-mode[data-mode="settled"] { color: var(--assist); }
 .am-mode[data-mode="clipping"] { color: var(--danger); }
 .am-mode[data-mode="heldByOperator"], .am-mode[data-mode="waitingForFader"], .am-mode[data-mode="atLimit"], .am-mode[data-mode="noAudio"],
 .am-mode[data-mode="consoleOffline"] { color: var(--warning); }
-.am-change { color: var(--assist); }
+.am-change { color: var(--assist); white-space: nowrap; }
 .am-mode[data-mode="bleed"] { color: var(--text-muted); }
 .am-heard { display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .am-heard-word { font: var(--text-caption); color: var(--assist); white-space: nowrap; }
@@ -233,4 +238,7 @@ select.sm-input { appearance: auto; }
 .inspector-auto-head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 /* Auto and the live columns size to their content; the channel name takes the rest. */
 .am-table th:first-child, .am-table td:first-child { width: var(--space-7); }
-.am-table th:nth-child(2), .am-table td:nth-child(2) { width: 1%; white-space: nowrap; padding-right: var(--space-6); }
+.am-table th:nth-child(2), .am-table td:nth-child(2) { width: 1%; white-space: nowrap; padding-right: var(--space-4); }
+.am-table td.text-readout { white-space: nowrap; }
+/* At the minimum window width the live columns can outgrow the panel; scroll inside it, never the page. */
+.am-table-scroll { overflow-x: auto; margin-inline: calc(-1 * var(--space-2)); padding-inline: var(--space-2); }

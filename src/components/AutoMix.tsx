@@ -246,80 +246,82 @@ export function ChannelPicker() {
           </span>
         </span>
       </label>
-      <table className="am-table">
-        <thead>
-          <tr>
-            <th className="text-label">Auto</th>
-            <th className="text-label">Channel</th>
-            <th className="text-label">What it is</th>
-            {live && (
-              <>
-                <th className="text-label">Hears</th>
-                <th className="text-label">Now</th>
-                <th className="text-label">Fader</th>
-                <th>
-                  <span className="visually-hidden">Actions</span>
-                </th>
-              </>
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {strips.map((strip) => {
-            const role = roleOf.get(strip.index);
-            const st = statusOf.get(strip.index);
-            return (
-              <tr key={strip.index} data-managed={role !== undefined}>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={role !== undefined}
-                    aria-label={`Let auto-mix ride ${strip.name}`}
-                    onChange={(e) => void setManaged([strip.index], e.target.checked)}
-                  />
-                </td>
-                <td>
-                  <span className="text-readout muted">Ch {strip.index + 1}</span> {strip.name}
-                </td>
-                <td>
-                  {role !== undefined && (
-                    <select
-                      className="sm-input"
-                      value={role}
-                      aria-label={`What ${strip.name} is`}
-                      onChange={(e) => void setRole(strip.index, e.target.value as ChannelRole)}
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>
-                          {ROLE_LABEL[r]}
-                        </option>
-                      ))}
-                    </select>
+      <div className="am-table-scroll">
+        <table className="am-table">
+          <thead>
+            <tr>
+              <th className="text-label">Auto</th>
+              <th className="text-label">Channel</th>
+              <th className="text-label">What it is</th>
+              {live && (
+                <>
+                  <th className="text-label">Hears</th>
+                  <th className="text-label">Now</th>
+                  <th className="text-label">Fader</th>
+                  <th>
+                    <span className="visually-hidden">Actions</span>
+                  </th>
+                </>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {strips.map((strip) => {
+              const role = roleOf.get(strip.index);
+              const st = statusOf.get(strip.index);
+              return (
+                <tr key={strip.index} data-managed={role !== undefined}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={role !== undefined}
+                      aria-label={`Let auto-mix ride ${strip.name}`}
+                      onChange={(e) => void setManaged([strip.index], e.target.checked)}
+                    />
+                  </td>
+                  <td>
+                    <span className="text-readout muted">Ch {strip.index + 1}</span> {strip.name}
+                  </td>
+                  <td>
+                    {role !== undefined && (
+                      <select
+                        className="sm-input"
+                        value={role}
+                        aria-label={`What ${strip.name} is`}
+                        onChange={(e) => void setRole(strip.index, e.target.value as ChannelRole)}
+                      >
+                        {ROLES.map((r) => (
+                          <option key={r} value={r}>
+                            {ROLE_LABEL[r]}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
+                  {live && (
+                    <>
+                      <td>
+                        <HeardCell
+                          status={st}
+                          scanned={heardOf.get(strip.index)}
+                          name={strip.name}
+                          role={role}
+                          apply={applySuggestion}
+                        />
+                      </td>
+                      <td>{st && <ModeWord status={st} />}</td>
+                      <td className="text-readout">{st && <FaderChange status={st} />}</td>
+                      <td className="am-row-actions">
+                        {st && <ChannelActions status={st} undo={undo} resume={resumeChannel} compact />}
+                      </td>
+                    </>
                   )}
-                </td>
-                {live && (
-                  <>
-                    <td>
-                      <HeardCell
-                        status={st}
-                        scanned={heardOf.get(strip.index)}
-                        name={strip.name}
-                        role={role}
-                        apply={applySuggestion}
-                      />
-                    </td>
-                    <td>{st && <ModeWord status={st} />}</td>
-                    <td className="text-readout">{st && <FaderChange status={st} />}</td>
-                    <td className="am-row-actions">
-                      {st && <ChannelActions status={st} undo={undo} resume={resumeChannel} />}
-                    </td>
-                  </>
-                )}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -433,10 +435,13 @@ export function ChannelActions({
   status,
   undo,
   resume,
+  compact = false,
 }: {
   status: ChannelStatus;
   undo(channel: number): Promise<void>;
   resume(channel: number): Promise<void>;
+  /** Icon-only Undo, for the channel table where width is tight. */
+  compact?: boolean;
 }) {
   const name = status.name ?? `Ch ${status.channel + 1}`;
   if (status.mode === "heldByOperator" || status.mode === "undone") {
@@ -451,6 +456,18 @@ export function ChannelActions({
   const moved =
     status.faderDb !== null && status.baselineDb !== null && Math.abs(status.faderDb - status.baselineDb) >= 0.25;
   if (!moved || status.mode === "off") return null;
+  if (compact) {
+    return (
+      <button
+        className="sm-btn sm-btn--sm icon-btn-sm"
+        onClick={() => void undo(status.channel)}
+        aria-label={`Undo auto-mix on ${name}`}
+        title="Undo"
+      >
+        <Undo2 />
+      </button>
+    );
+  }
   return (
     <button className="sm-btn sm-btn--sm" onClick={() => void undo(status.channel)}>
       <Undo2 />

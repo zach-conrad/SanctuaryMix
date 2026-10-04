@@ -73,11 +73,17 @@
 /* ---------- Service detail ---------- */
 .page.detail-page { gap: var(--space-4); }
 .back-btn { margin-left: calc(-1 * var(--space-3)); height: var(--hit-min); }
-.detail-head { gap: var(--space-3); }
+.detail-head { display: flex; flex-direction: column; gap: var(--space-4); }
 .detail-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
-.detail-fields { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(320px, 2fr); gap: var(--space-4); align-items: start; }
-.detail-fields .sm-field { max-width: none; }
-.title-field .sm-input { height: var(--control-lg); font: var(--text-heading); }
+.notes-field { max-width: none; }
+/* The title reads as the page title and edits in place: the outline shows on hover and focus. */
+.title-input {
+  height: var(--control-lg); margin-left: calc(-1 * var(--space-3)); width: calc(100% + var(--space-3));
+  font: var(--text-title); letter-spacing: var(--text-title-tracking);
+  background: transparent; border-color: transparent;
+}
+.title-input:hover { border-color: var(--border-strong); }
+.title-input:focus { background: var(--surface-raised); border-color: var(--border-strong); }
 .notes-input { height: auto; min-height: var(--control-lg); padding: var(--space-2) var(--space-3); resize: vertical; user-select: text; }
 .delete-btn { margin-left: auto; }
 textarea.sm-input { font: var(--text-body); }
