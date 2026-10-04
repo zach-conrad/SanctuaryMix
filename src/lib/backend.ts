@@ -26,6 +26,10 @@ import type {
   RecordingSettings,
   RecordingSummary,
   ReplayStatus,
+  SplConfig,
+  SplPoint,
+  SplReading,
+  Weighting,
 } from "./types";
 import { createDemoBackend } from "./demoBackend";
 
@@ -103,6 +107,19 @@ export interface Backend {
   stopReplay(): Promise<ReplayStatus>;
   restoreBeforeReplay(): Promise<ReplayStatus>;
   onReplay(cb: (status: ReplayStatus) => void): Promise<Unlisten>;
+
+  // Room loudness (A and C weighted SPL from one measurement input)
+  splGetConfig(): Promise<SplConfig>;
+  /** Returns the settings as the core will use them. A new source starts over. */
+  splSetConfig(config: SplConfig): Promise<SplConfig>;
+  /** Sets the offset so the current slow level reads `referenceDb`. */
+  splCalibrate(weighting: Weighting, referenceDb: number): Promise<SplConfig>;
+  /** Clears history, Leq, maximum and peak. */
+  splReset(): Promise<void>;
+  splReading(): Promise<SplReading | null>;
+  /** One point per second for the last `seconds`, oldest first. */
+  splHistory(seconds: number): Promise<SplPoint[]>;
+  onSpl(cb: (reading: SplReading) => void): Promise<Unlisten>;
 }
 
 function isTauri(): boolean {
@@ -170,6 +187,14 @@ async function createTauriBackend(): Promise<Backend> {
     stopReplay: () => invoke("stop_replay"),
     restoreBeforeReplay: () => invoke("restore_before_replay"),
     onReplay: (cb) => listen<ReplayStatus>("replay", (e) => cb(e.payload)),
+
+    splGetConfig: () => invoke("spl_get_config"),
+    splSetConfig: (config) => invoke("spl_set_config", { config }),
+    splCalibrate: (weighting, referenceDb) => invoke("spl_calibrate", { weighting, referenceDb }),
+    splReset: () => invoke("spl_reset"),
+    splReading: () => invoke("spl_reading"),
+    splHistory: (seconds) => invoke("spl_history", { seconds }),
+    onSpl: (cb) => listen<SplReading>("spl", (e) => cb(e.payload)),
   };
 }
 

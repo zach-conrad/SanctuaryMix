@@ -330,3 +330,47 @@ export interface ReplayStatus {
   canRestore: boolean;
   message: string | null;
 }
+
+// Room loudness (crates/mix-core/src/spl.rs)
+
+export type Weighting = "a" | "c";
+
+export interface SplConfig {
+  /** 0-based input on the audio device; null turns the meter off. */
+  source: number | null;
+  /** dB SPL = dBFS (RMS) + this. */
+  offsetDb: number;
+  /** True once the offset came from a reference meter or calibrator. */
+  calibrated: boolean;
+}
+
+/** One A/C pair of levels in dB SPL. */
+export interface AcLevel {
+  a: number;
+  c: number;
+}
+
+export interface SplReading {
+  source: number;
+  calibrated: boolean;
+  /** 125 ms time weighting. */
+  fast: AcLevel;
+  /** 1 s time weighting. */
+  slow: AcLevel;
+  leq1m: AcLevel;
+  leq15m: AcLevel;
+  /** Leq since the last reset. */
+  leqTotal: AcLevel;
+  /** LAFmax since the reset. */
+  aMax: number;
+  /** LCpeak since the reset. */
+  cPeak: number;
+  seconds: number;
+}
+
+/** One second of history: that second's Leq. `t` is seconds since the reset. */
+export interface SplPoint {
+  t: number;
+  a: number;
+  c: number;
+}

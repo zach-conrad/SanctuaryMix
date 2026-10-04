@@ -71,6 +71,7 @@ pub async fn start_metering(app: AppHandle, device: Option<String>) -> CmdResult
         let emitter = app.clone();
         let automix = state.automix.clone();
         let listener = state.listener.clone();
+        let audio_app = app.clone();
         let handle = audio_engine::start_metering(
             device,
             move |frame| {
@@ -78,6 +79,13 @@ pub async fn start_metering(app: AppHandle, device: Option<String>) -> CmdResult
                 let _ = emitter.emit("meters", frame);
             },
             move |block| {
+                // A few biquads on one channel: cheap enough to run right here.
+                audio_app.state::<AppState>().spl.push_audio(
+                    &audio_app,
+                    block.channels,
+                    block.sample_rate,
+                    block.samples,
+                );
                 if let Some(listener) = &listener {
                     listener.push_audio(block.channels, block.sample_rate, block.samples);
                 }

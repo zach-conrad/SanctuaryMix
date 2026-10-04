@@ -1,6 +1,7 @@
 import type { Backend } from "./backend";
 import { createDemoAutomix, guessRole } from "./demoAutomix";
 import { createDemoRecorder } from "./demoRecorder";
+import { createDemoSpl } from "./demoSpl";
 import type { Adjustment, AutoMixStatus, ChannelRole, ConsoleEvent, MeterFrame, Sound } from "./types";
 
 const NAMES = [
@@ -79,6 +80,7 @@ export function createDemoBackend(): Backend {
       return on;
     },
   });
+  const spl = createDemoSpl();
   let timer: ReturnType<typeof setInterval> | null = null;
   let channels = 0;
   const drift: number[] = [];
@@ -118,11 +120,13 @@ export function createDemoBackend(): Backend {
         automix.onMeters(frame);
         meterListeners.forEach((cb) => cb(frame));
       }, 33);
+      spl.start();
       return { deviceName: device ?? "Dante Virtual Soundcard", channels, sampleRate: 48000 };
     },
     async stopMetering() {
       if (timer) clearInterval(timer);
       timer = null;
+      spl.stop();
     },
     async connectConsole(config) {
       await new Promise((r) => setTimeout(r, 400));
@@ -212,6 +216,27 @@ export function createDemoBackend(): Backend {
     async onConsole(cb) {
       consoleListeners.add(cb);
       return () => consoleListeners.delete(cb);
+    },
+    async splGetConfig() {
+      return spl.getConfig();
+    },
+    async splSetConfig(config) {
+      return spl.setConfig(config);
+    },
+    async splCalibrate(weighting, referenceDb) {
+      return spl.calibrate(weighting, referenceDb);
+    },
+    async splReset() {
+      spl.reset();
+    },
+    async splReading() {
+      return spl.reading();
+    },
+    async splHistory(seconds) {
+      return spl.history(seconds);
+    },
+    async onSpl(cb) {
+      return spl.listen(cb);
     },
     ...recorder,
   };

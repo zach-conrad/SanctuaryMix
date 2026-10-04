@@ -4,6 +4,7 @@ import { useMixer } from "../store/mixer";
 import { ChannelActions, FaderChange, ModeWord } from "./AutoMix";
 import { InsightList, useInsights } from "./InsightList";
 import { MuteKey } from "./MuteKey";
+import { SplReadout } from "./SplMeter";
 
 /** Right panel: the selected channel's detail, then Assist. */
 export function Inspector() {
@@ -15,6 +16,9 @@ export function Inspector() {
   const resume = useAutoMix((s) => s.resumeChannel);
   return (
     <aside className="inspector" aria-label="Inspector">
+      <section className="inspector-section" aria-label="Room level">
+        <SplReadout />
+      </section>
       {strip && (
         <section className="inspector-section">
           <span className="text-label muted">Ch {strip.index + 1}</span>

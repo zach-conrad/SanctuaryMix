@@ -14,6 +14,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::control::ControlBus;
 use crate::playback::Playback;
 use crate::recording::Recordings;
+use crate::spl::Spl;
 
 pub struct AppState {
     pub metering: Mutex<Option<MeterHandle>>,
@@ -31,6 +32,8 @@ pub struct AppState {
     /// `None` only if the recordings folder couldn't be opened.
     pub recordings: Option<Recordings>,
     pub playback: Playback,
+    /// Room loudness from the measurement input.
+    pub spl: Spl,
 }
 
 impl AppState {
@@ -46,6 +49,7 @@ impl AppState {
                 None
             })
             .unwrap_or_default();
+        let spl = Spl::new(crate::spl::load_config(&store.lock().unwrap()));
         let targets = listen_targets(&config);
         let (automix, task) = automix::start(
             config,
@@ -70,6 +74,7 @@ impl AppState {
                 .inspect_err(|e| log::error!("recordings are off this run: {e}"))
                 .ok(),
             playback: Playback::default(),
+            spl,
         }
     }
 }

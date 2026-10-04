@@ -18,6 +18,7 @@ pub mod meter;
 pub mod permission;
 pub mod playback;
 pub mod record;
+pub mod spl;
 pub mod tap;
 
 pub use devices::{list_input_devices, AudioDeviceInfo};
@@ -25,6 +26,7 @@ pub use engine::{start_metering, MeterHandle};
 pub use permission::{microphone_access, request_microphone_access, MicAccess};
 pub use playback::{list_output_devices, OutputDeviceInfo, PlaybackPosition, Player};
 pub use record::{AudioRecordOptions, AudioRecorder, RecordStats, WrittenFile, WrittenFileKind};
+pub use spl::SplMeter;
 pub use tap::AudioBlock;
 
 #[derive(Debug, thiserror::Error)]

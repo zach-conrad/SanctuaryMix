@@ -38,7 +38,7 @@ export function faderToDb(pos: number): number | null {
   return Math.round(interp(FADER_CURVE, pos, 1, 0) * 10) / 10;
 }
 
-const MINUS = "−";
+export const MINUS = "−";
 
 /** "−4.5", "0.0", "+2.0", "−∞" (no unit). */
 export function formatDb(db: number | null): string {
