@@ -5,12 +5,16 @@ use auth::{AuthProvider, LocalGuest};
 use console::ConsoleAdapter;
 use tauri::async_runtime::JoinHandle;
 
+use crate::control::ControlBus;
+
 pub struct AppState {
     pub metering: Mutex<Option<MeterHandle>>,
     pub console: tokio::sync::Mutex<Option<Box<dyn ConsoleAdapter>>>,
     /// Forwards console events to the UI; replaced on every connect.
     pub console_forwarder: Mutex<Option<JoinHandle<()>>>,
     pub auth: Box<dyn AuthProvider>,
+    /// Every control change from every source; recordings listen here.
+    pub control: ControlBus,
 }
 
 impl Default for AppState {
@@ -20,6 +24,7 @@ impl Default for AppState {
             console: tokio::sync::Mutex::new(None),
             console_forwarder: Mutex::new(None),
             auth: Box::new(LocalGuest),
+            control: ControlBus::default(),
         }
     }
 }

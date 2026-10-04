@@ -5,6 +5,7 @@
 //! (a [`mix_core::ConsoleEvent`] whenever the desk changes).
 
 mod commands;
+mod control;
 mod state;
 
 use state::AppState;
