@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>SanctuaryMix listens to your console's channels over Dante to show levels and make mix suggestions.</string>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>SanctuaryMix connects to your mixing console on the local network.</string>
+</dict>
+</plist>
