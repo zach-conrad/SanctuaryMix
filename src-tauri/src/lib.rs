@@ -4,10 +4,14 @@
 //! events: `meters` (a [`mix_core::MeterFrame`] ~30x a second), `console`
 //! (a [`mix_core::ConsoleEvent`] whenever the desk changes), `automix` (an
 //! [`automix::AutoMixStatus`] a few times a second) and `automix-adjustment`
-//! (an [`automix::Adjustment`] for every auto-mix move or takeover).
+//! (an [`automix::Adjustment`] for every auto-mix move or takeover),
+//! `recording` (recorder status about once a second), `playback` (the
+//! transport about 10x a second) and `replay` (sending recorded moves).
 
 mod commands;
 mod control;
+mod playback;
+mod recording;
 mod state;
 
 use state::AppState;
@@ -49,6 +53,27 @@ pub fn run() {
             commands::automix_undo_all,
             commands::automix_status,
             commands::automix_log,
+            recording::get_recording_settings,
+            recording::set_recording_settings,
+            recording::start_recording,
+            recording::stop_recording,
+            recording::recorder_status,
+            recording::list_recordings,
+            recording::get_recording,
+            recording::recording_events,
+            recording::update_recording,
+            recording::delete_recording,
+            recording::disk_usage,
+            recording::delete_old_multitracks,
+            playback::list_output_devices,
+            playback::load_playback,
+            playback::play_recording,
+            playback::pause_recording,
+            playback::seek_recording,
+            playback::unload_playback,
+            playback::start_replay,
+            playback::stop_replay,
+            playback::restore_before_replay,
             commands::get_session,
             commands::begin_sign_in,
             commands::complete_sign_in,

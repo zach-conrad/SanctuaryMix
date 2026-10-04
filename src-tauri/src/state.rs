@@ -11,6 +11,8 @@ use tauri::async_runtime::JoinHandle;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::control::ControlBus;
+use crate::playback::Playback;
+use crate::recording::Recordings;
 
 pub struct AppState {
     pub metering: Mutex<Option<MeterHandle>>,
@@ -22,6 +24,9 @@ pub struct AppState {
     pub automix: AutoMixHandle,
     /// Every control change from every source; recordings listen here.
     pub control: ControlBus,
+    /// `None` only if the recordings folder couldn't be opened.
+    pub recordings: Option<Recordings>,
+    pub playback: Playback,
 }
 
 impl AppState {
@@ -54,6 +59,10 @@ impl AppState {
             store,
             automix,
             control: ControlBus::default(),
+            recordings: Recordings::open(app)
+                .inspect_err(|e| log::error!("recordings are off this run: {e}"))
+                .ok(),
+            playback: Playback::default(),
         }
     }
 }
