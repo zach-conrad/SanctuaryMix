@@ -2,6 +2,7 @@ use audio_engine::{AudioDeviceInfo, MicAccess};
 use auth::Session;
 use automix::{Adjustment, AutoMixConfig, AutoMixStatus, ChannelRole, Preset, RoomFeel};
 use console::{ConsoleConfig, ConsoleError};
+use mix_core::hearing::Sound;
 use mix_core::{ChannelId, ChannelKind};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -69,10 +70,19 @@ pub async fn start_metering(app: AppHandle, device: Option<String>) -> CmdResult
         slot.take();
         let emitter = app.clone();
         let automix = state.automix.clone();
-        let handle = audio_engine::start_metering(device, move |frame| {
-            automix.push_meters(frame.clone());
-            let _ = emitter.emit("meters", frame);
-        })
+        let listener = state.listener.clone();
+        let handle = audio_engine::start_metering(
+            device,
+            move |frame| {
+                automix.push_meters(frame.clone());
+                let _ = emitter.emit("meters", frame);
+            },
+            move |block| {
+                if let Some(listener) = &listener {
+                    listener.push_audio(block.channels, block.sample_rate, block.samples);
+                }
+            },
+        )
         .map_err(err)?;
         let info = MeteringInfo {
             device_name: handle.device_name.clone(),
@@ -258,6 +268,9 @@ pub async fn automix_set_config(app: AppHandle, config: AutoMixConfig) -> CmdRes
         .configure(config)
         .await
         .map_err(err)?;
+    if let Some(listener) = &app.state::<AppState>().listener {
+        listener.set_targets(crate::state::listen_targets(&applied));
+    }
     let saved = applied.clone();
     blocking(move || {
         app.state::<AppState>()
@@ -306,6 +319,59 @@ pub async fn automix_undo_all(state: State<'_, AppState>) -> CmdResult<()> {
 #[tauri::command]
 pub async fn automix_status(state: State<'_, AppState>) -> CmdResult<AutoMixStatus> {
     state.automix.status().await.map_err(err)
+}
+
+/// Listens to every input with signal for `seconds`, so roles can be suggested by ear.
+#[tauri::command]
+pub async fn automix_listen_scan(state: State<'_, AppState>, seconds: u32) -> CmdResult<()> {
+    let listener = state.listener.as_ref().ok_or(LISTENING_UNAVAILABLE)?;
+    listener.scan(std::time::Duration::from_secs(seconds.clamp(5, 120) as u64));
+    Ok(())
+}
+
+const LISTENING_UNAVAILABLE: &str =
+    "Listening isn't available on this computer, so roles can only be guessed from channel names.";
+
+/// What one input has mostly sounded like, and the role that would fit it.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HeardChannel {
+    channel: u16,
+    sound: Sound,
+    share: f32,
+    seconds: f32,
+    /// Set when what it hears doesn't fit the role it has (or would get from its name).
+    suggested_role: Option<ChannelRole>,
+}
+
+/// What each input has sounded like since the last scan or since auto-mix started listening.
+#[tauri::command]
+pub async fn automix_heard(
+    state: State<'_, AppState>,
+    names: Vec<String>,
+) -> CmdResult<Vec<HeardChannel>> {
+    let listener = state.listener.as_ref().ok_or(LISTENING_UNAVAILABLE)?;
+    let managed = state.automix.status().await.map_err(err)?.channels;
+    Ok(listener
+        .heard()
+        .into_iter()
+        .map(|h| {
+            let current = managed
+                .iter()
+                .find(|c| c.channel == h.channel)
+                .map(|c| c.role)
+                .unwrap_or_else(|| {
+                    automix::guess_role(names.get(h.channel as usize).map_or("", |n| n.as_str()))
+                });
+            HeardChannel {
+                channel: h.channel,
+                sound: h.sound,
+                share: h.share,
+                seconds: h.seconds,
+                suggested_role: automix::suggest_role(current, h.sound),
+            }
+        })
+        .collect())
 }
 
 /// The most recent auto-mix log entries, newest first.

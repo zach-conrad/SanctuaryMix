@@ -16,6 +16,11 @@
 //!   vocal is handed over at all, then the reference level stands in).
 //! - While a speech mic is talking, music steps back to sit well under it.
 //!
+//! - With listening on, a vocal or speech mic only counts as in use while the
+//!   on-device voice detector hears someone at it. A pastor's mic full of
+//!   band, or a vocal mic picking up the drums, is bleed: it isn't ridden, it
+//!   doesn't make the band step back, and it can't become the lead.
+//!
 //! Audio input N is assumed to carry console input N (the Dante patch the
 //! Setup screen asks for). Levels are estimated post-fader: input RMS plus
 //! the fader position.
@@ -23,6 +28,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 
+use mix_core::hearing::{Hearing, HearingFrame, Sound};
 use mix_core::level::SILENCE_DB;
 use mix_core::{ChannelKind, ConsoleEvent, MeterFrame};
 use serde::{Deserialize, Serialize};
@@ -50,6 +56,8 @@ const PEAK_DECAY_DB_PER_SEC: f32 = 10.0;
 const SETTLE_DB: f32 = 0.5;
 /// A console fader report this close to what we sent is our own move coming back.
 const ECHO_TOLERANCE_DB: f32 = 0.3;
+/// Listening results older than this are ignored (the models stopped or fell behind).
+const HEARING_STALE: Duration = Duration::from_millis(1500);
 /// Most input channels a console can have (dLive has 128).
 pub const MAX_CHANNELS: u16 = 128;
 
@@ -70,6 +78,8 @@ pub struct AutoMixConfig {
     pub nudges: Nudges,
     pub channels: Vec<ManagedChannel>,
     pub guardrails: Guardrails,
+    /// Use the on-device listening models to tell voices from bleed.
+    pub listen: bool,
 }
 
 impl Default for AutoMixConfig {
@@ -79,6 +89,7 @@ impl Default for AutoMixConfig {
             nudges: Nudges::default(),
             channels: Vec::new(),
             guardrails: Guardrails::default(),
+            listen: true,
         }
     }
 }
@@ -123,6 +134,9 @@ pub enum ChannelMode {
     Muted,
     /// The input is clipping. A fader can't fix that; the preamp gain needs to come down.
     Clipping,
+    /// A voice mic with sound on it but no one at it: the band or another
+    /// voice bleeding in. Held so bleed is never turned up.
+    Bleed,
     /// No audio is arriving from Dante.
     NoAudio,
     /// Nothing is coming through this mic, so it's never raised.
@@ -210,6 +224,10 @@ pub struct ChannelStatus {
     pub target_db: Option<f32>,
     /// Estimated post-fader level, once there's enough signal to tell.
     pub level_db: Option<f32>,
+    /// What the listening models hear on it, if they're running.
+    pub heard: Option<Sound>,
+    /// Whether someone is talking or singing into it, if listening.
+    pub voice: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -219,6 +237,8 @@ pub struct AutoMixStatus {
     pub frozen: bool,
     pub console_online: bool,
     pub audio_ok: bool,
+    /// The listening models are running and reporting on these channels.
+    pub listening: bool,
     pub feel: RoomFeel,
     /// The speech mic music is stepping back for, if someone is talking.
     pub speech_channel: Option<u16>,
@@ -247,6 +267,9 @@ struct Track {
     clip_until: Duration,
     active_since: Option<Duration>,
     last_active: Duration,
+    /// Last time the input was above the gate, voice or not.
+    last_signal: Option<Duration>,
+    hearing: Option<(Duration, Hearing)>,
     // Ride state, reset when auto-mix is engaged.
     baseline: Option<f32>,
     hold: Option<Hold>,
@@ -461,6 +484,32 @@ impl AutoMix {
         channels.into_iter().filter_map(|c| self.undo(c)).collect()
     }
 
+    /// Takes the latest listening results.
+    pub fn on_hearing(&mut self, frame: &HearingFrame, now: Duration) {
+        for h in &frame.channels {
+            self.tracks.entry(h.channel).or_default().hearing = Some((now, *h));
+        }
+    }
+
+    /// The listening result for a track, if listening is on and current.
+    fn heard<'a>(&self, t: &'a Track, now: Duration) -> Option<&'a Hearing> {
+        if !self.config.listen {
+            return None;
+        }
+        t.hearing
+            .as_ref()
+            .filter(|(at, _)| now.saturating_sub(*at) <= HEARING_STALE)
+            .map(|(_, h)| h)
+    }
+
+    /// A voice mic with sound on it but, by ear, nobody at it.
+    fn is_bleed(&self, t: &Track, role: ChannelRole, now: Duration) -> bool {
+        role.is_vocal()
+            && self.heard(t, now).is_some_and(|h| !h.voice)
+            && t.last_signal
+                .is_some_and(|at| now.saturating_sub(at) <= ACTIVE_HOLD)
+    }
+
     pub fn on_meter(&mut self, frame: &MeterFrame, now: Duration) {
         let dt = self
             .last_meter_at
@@ -471,7 +520,19 @@ impl AutoMix {
         let gate = self.config.guardrails.gate_dbfs;
         let keep = (-dt / LEVEL_WINDOW_SECS).exp();
         for m in &frame.channels {
+            let vocal = self
+                .config
+                .role_of(m.channel)
+                .is_some_and(ChannelRole::is_vocal);
+            let listen = self.config.listen;
             let t = self.tracks.entry(m.channel).or_default();
+            // On a voice mic, sound without a voice is bleed: it doesn't count
+            // as the mic being in use and doesn't feed its level.
+            let bleed = vocal
+                && listen
+                && t.hearing
+                    .as_ref()
+                    .is_some_and(|(at, h)| now.saturating_sub(*at) <= HEARING_STALE && !h.voice);
             t.peak_dbfs = m
                 .peak_db
                 .max(t.peak_dbfs - PEAK_DECAY_DB_PER_SEC * dt)
@@ -480,6 +541,9 @@ impl AutoMix {
                 t.clip_until = now + CLIP_HOLD;
             }
             if m.rms_db > gate {
+                t.last_signal = Some(now);
+            }
+            if m.rms_db > gate && !bleed {
                 t.active_since.get_or_insert(now);
                 t.last_active = now;
                 let p = 10f32.powf(m.rms_db / 10.0);
@@ -671,6 +735,8 @@ impl AutoMix {
             ChannelMode::NoAudio
         } else if now < t.clip_until {
             ChannelMode::Clipping
+        } else if self.is_bleed(t, role, now) && !t.in_use_for(now, WARM_UP) {
+            ChannelMode::Bleed
         } else if !t.in_use_for(now, WARM_UP) {
             ChannelMode::Idle
         } else if self.target_db(role, refs).is_none() {
@@ -804,6 +870,11 @@ impl AutoMix {
             frozen: self.frozen,
             console_online: self.console_online,
             audio_ok: self.audio_ok(now),
+            listening: self.config.channels.iter().any(|c| {
+                self.tracks
+                    .get(&c.channel)
+                    .is_some_and(|t| self.heard(t, now).is_some())
+            }),
             feel: self.config.feel,
             speech_channel: refs.speech.filter(|_| live).map(|(c, _)| c),
             lead_channel: refs.lead.filter(|_| live).map(|(c, _)| c),
@@ -813,6 +884,7 @@ impl AutoMix {
                 .iter()
                 .map(|c| {
                     let t = self.tracks.get(&c.channel).unwrap_or(&empty);
+                    let heard = self.heard(t, now);
                     ChannelStatus {
                         channel: c.channel,
                         name: t.name.clone(),
@@ -822,6 +894,8 @@ impl AutoMix {
                         baseline_db: t.baseline,
                         target_db: self.target_db(c.role, &refs),
                         level_db: t.post_fader_db().filter(|_| t.in_use_for(now, WARM_UP)),
+                        heard: heard.and_then(|h| h.sound),
+                        voice: heard.map(|h| h.voice),
                     }
                 })
                 .collect(),
@@ -854,6 +928,8 @@ mod tests {
         faders: BTreeMap<u16, f32>,
         /// Input RMS per channel, dBFS.
         rms: BTreeMap<u16, f32>,
+        /// What the listening models report per channel (voice, sound), sent every 100 ms.
+        hear: BTreeMap<u16, (bool, Option<Sound>)>,
         sent: Vec<FaderMove>,
     }
 
@@ -872,6 +948,7 @@ mod tests {
                 now: Duration::ZERO,
                 faders: BTreeMap::new(),
                 rms: BTreeMap::new(),
+                hear: BTreeMap::new(),
                 sent: Vec::new(),
             };
             for ch in 0..8 {
@@ -914,6 +991,22 @@ mod tests {
                         .collect(),
                 };
                 self.mix.on_meter(&frame, self.now);
+                if frame_no.is_multiple_of(3) && !self.hear.is_empty() {
+                    let hearing = HearingFrame {
+                        channels: self
+                            .hear
+                            .iter()
+                            .map(|(&channel, &(voice, sound))| Hearing {
+                                channel,
+                                voice,
+                                voice_prob: if voice { 0.9 } else { 0.05 },
+                                sound,
+                                confidence: 0.8,
+                            })
+                            .collect(),
+                    };
+                    self.mix.on_hearing(&hearing, self.now);
+                }
                 if frame_no.is_multiple_of(3) {
                     for mv in self.mix.tick(self.now) {
                         self.apply(mv);
@@ -1112,6 +1205,104 @@ mod tests {
             rig.sent[0].record.reason
         );
         assert_eq!(rig.mix.status(rig.now).speech_channel, Some(0));
+    }
+
+    #[test]
+    fn band_bleeding_into_the_pastor_mic_does_not_duck_the_band() {
+        let mut rig = Rig::new(
+            &[(0, ChannelRole::Speech), (1, ChannelRole::KeysPads)],
+            -10.0,
+        );
+        rig.mix.set_engaged(true);
+        rig.rms.insert(1, -18.0); // pad on its spot
+                                  // The pastor's mic is loud, but all it hears is the band.
+        rig.rms.insert(0, -10.0);
+        rig.hear.insert(0, (false, Some(Sound::Music)));
+        rig.run(15.0);
+        assert!(rig.sent.is_empty(), "{:?}", rig.sent);
+        assert_eq!(rig.mode(0), ChannelMode::Bleed);
+        assert_eq!(rig.mix.status(rig.now).speech_channel, None);
+        let status = rig.status(0);
+        assert_eq!(status.heard, Some(Sound::Music));
+        assert_eq!(status.voice, Some(false));
+        assert!(rig.mix.status(rig.now).listening);
+
+        // Now the pastor actually talks: music steps back as usual.
+        rig.hear.insert(0, (true, Some(Sound::Speech)));
+        rig.run(15.0);
+        assert_eq!(rig.fader(1), -17.0);
+        assert_eq!(rig.mix.status(rig.now).speech_channel, Some(0));
+    }
+
+    #[test]
+    fn bleed_on_a_vocal_mic_is_never_turned_up() {
+        let mut rig = Rig::new(&[(0, ChannelRole::LeadVocal)], -10.0);
+        rig.mix.set_engaged(true);
+        // Drums in the vocal mic between songs: quiet enough that riding
+        // on level alone would push the fader up.
+        rig.rms.insert(0, -30.0);
+        rig.hear.insert(0, (false, Some(Sound::Drums)));
+        rig.run(20.0);
+        assert!(rig.sent.is_empty());
+        assert_eq!(rig.mode(0), ChannelMode::Bleed);
+        assert_eq!(rig.status(0).level_db, None);
+    }
+
+    #[test]
+    fn bleed_does_not_count_as_the_lead_singing() {
+        let mut rig = Rig::new(
+            &[(0, ChannelRole::LeadVocal), (1, ChannelRole::KeysPads)],
+            -10.0,
+        );
+        rig.mix.set_engaged(true);
+        rig.rms.insert(0, -10.0); // loud with keys bleed
+        rig.hear.insert(0, (false, Some(Sound::Keys)));
+        rig.rms.insert(1, -6.0);
+        rig.run(10.0);
+        assert!(rig.sent.is_empty());
+        assert_eq!(rig.mode(1), ChannelMode::WaitingForLead);
+    }
+
+    #[test]
+    fn falls_back_to_levels_when_listening_stops_or_is_off() {
+        let mut rig = Rig::new(&[(0, ChannelRole::LeadVocal)], -10.0);
+        rig.mix.set_engaged(true);
+        rig.rms.insert(0, -30.0);
+        rig.hear.insert(0, (false, None));
+        rig.run(5.0);
+        assert!(rig.sent.is_empty());
+        // The models stop reporting: after a moment, level-only riding resumes.
+        rig.hear.clear();
+        rig.run(10.0);
+        assert!(!rig.sent.is_empty());
+        assert!(!rig.mix.status(rig.now).listening);
+
+        let mut rig = Rig::new(&[(0, ChannelRole::LeadVocal)], -10.0);
+        let mut c = rig.mix.config().clone();
+        c.listen = false;
+        rig.mix.configure(c);
+        rig.mix.set_engaged(true);
+        rig.rms.insert(0, -30.0);
+        rig.hear.insert(0, (false, Some(Sound::Drums)));
+        rig.run(10.0);
+        assert!(!rig.sent.is_empty());
+        assert_eq!(rig.status(0).heard, None);
+    }
+
+    #[test]
+    fn listening_only_gates_voice_mics() {
+        let mut rig = Rig::new(
+            &[(0, ChannelRole::LeadVocal), (1, ChannelRole::KeysPads)],
+            -10.0,
+        );
+        rig.mix.set_engaged(true);
+        rig.rms.insert(0, -10.0);
+        rig.hear.insert(0, (true, Some(Sound::Singing)));
+        rig.rms.insert(1, -6.0);
+        // Keys hear no voice, which is just what a keys mic should hear.
+        rig.hear.insert(1, (false, Some(Sound::Keys)));
+        rig.run(20.0);
+        assert_eq!(rig.fader(1), -22.0);
     }
 
     #[test]
@@ -1374,5 +1565,9 @@ mod tests {
         let partial: AutoMixConfig = serde_json::from_str(r#"{"feel":"deepLowEnd"}"#).unwrap();
         assert_eq!(partial.feel, RoomFeel::DeepLowEnd);
         assert_eq!(partial.guardrails, Guardrails::default());
+        assert!(
+            partial.listen,
+            "listening defaults on for saved configs from before it existed"
+        );
     }
 }

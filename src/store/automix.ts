@@ -6,13 +6,24 @@ import type {
   AutoMixStatus,
   ChannelRole,
   ChannelStatus,
+  HeardChannel,
   Nudges,
   Preset,
   RoomFeel,
+  Sound,
 } from "../lib/types";
 import { useMixer } from "./mixer";
 
 const LOG_KEEP = 200;
+/** How long "Listen and suggest roles" listens. */
+export const SCAN_SECONDS = 20;
+
+export interface RoleScan {
+  /** When the current listen ends (ms since epoch), or null when not listening. */
+  until: number | null;
+  /** What each input sounded like on the last listen. */
+  results: HeardChannel[];
+}
 
 interface AutoMixState {
   ready: boolean;
@@ -22,6 +33,7 @@ interface AutoMixState {
   /** Newest first. */
   log: Adjustment[];
   error: string | null;
+  scan: RoleScan;
 
   init(): Promise<void>;
   setFeel(feel: RoomFeel): Promise<void>;
@@ -29,6 +41,12 @@ interface AutoMixState {
   /** Hands channels to auto-mix (role guessed from the console name) or takes them back. */
   setManaged(channels: number[], on: boolean): Promise<void>;
   setRole(channel: number, role: ChannelRole): Promise<void>;
+  /** Turns the listening models on or off for auto-mix. */
+  setListen(on: boolean): Promise<void>;
+  /** Listens to every input for a while, then suggests roles from what each one sounds like. */
+  listenForRoles(): Promise<void>;
+  /** Applies a suggested role, handing the channel to auto-mix if it isn't already. */
+  applySuggestion(channel: number, role: ChannelRole): Promise<void>;
   engage(on: boolean): Promise<void>;
   freeze(): Promise<void>;
   resume(): Promise<void>;
@@ -72,6 +90,7 @@ export const useAutoMix = create<AutoMixState>((set, get) => {
     status: null,
     log: [],
     error: null,
+    scan: { until: null, results: [] },
 
     async init() {
       if (initialized) return;
@@ -121,6 +140,36 @@ export const useAutoMix = create<AutoMixState>((set, get) => {
       await save({ ...config, channels: config.channels.map((c) => (c.channel === channel ? { ...c, role } : c)) });
     },
 
+    async setListen(on) {
+      const config = get().config;
+      if (config) await save({ ...config, listen: on });
+    },
+
+    async listenForRoles() {
+      if (get().scan.until !== null) return;
+      try {
+        const backend = await getBackend();
+        await backend.automixListenScan(SCAN_SECONDS);
+        set({ scan: { until: Date.now() + SCAN_SECONDS * 1000, results: [] }, error: null });
+        await new Promise((r) => setTimeout(r, SCAN_SECONDS * 1000));
+        const names = useMixer.getState().strips.map((s) => s.name);
+        const results = await backend.automixHeard(names);
+        set({ scan: { until: null, results } });
+      } catch (e) {
+        set({ scan: { until: null, results: [] }, error: reportError(e) });
+      }
+    },
+
+    async applySuggestion(channel, role) {
+      const config = get().config;
+      if (!config) return;
+      const others = config.channels.filter((c) => c.channel !== channel);
+      await save({ ...config, channels: [...others, { channel, role }].sort((a, b) => a.channel - b.channel) });
+      set((s) => ({
+        scan: { ...s.scan, results: s.scan.results.map((r) => (r.channel === channel ? { ...r, suggestedRole: null } : r)) },
+      }));
+    },
+
     engage: (on) => run((b) => b.automixEngage(on)),
     freeze: () => run((b) => b.automixFreeze()),
     resume: () => run((b) => b.automixResume()),
@@ -157,6 +206,23 @@ export const ROLE_LABEL: Record<ChannelRole, string> = {
   other: "Other",
 };
 
+export const SOUND_LABEL: Record<Sound, string> = {
+  speech: "Speech",
+  singing: "Singing",
+  choir: "Choir",
+  drums: "Drums",
+  bass: "Bass",
+  electricGuitar: "Electric guitar",
+  acousticGuitar: "Acoustic guitar",
+  piano: "Piano",
+  organ: "Organ",
+  keys: "Keys",
+  brass: "Brass or wind",
+  strings: "Strings",
+  music: "Band",
+  other: "Other sound",
+};
+
 export const MODE_LABEL: Record<ChannelStatus["mode"], string> = {
   off: "Off",
   consoleOffline: "Console offline",
@@ -166,6 +232,7 @@ export const MODE_LABEL: Record<ChannelStatus["mode"], string> = {
   waitingForFader: "Needs a nudge",
   muted: "Muted",
   clipping: "Clipping",
+  bleed: "Bleed only",
   noAudio: "No audio",
   idle: "Not in use",
   waitingForLead: "Waiting for vocals",
@@ -184,6 +251,7 @@ export const MODE_DETAIL: Record<ChannelStatus["mode"], string> = {
   waitingForFader: "Auto-mix doesn't know where this fader is yet. Nudge it on the desk once.",
   muted: "Muted, or just unmuted. Auto-mix never mutes or unmutes and waits 5 seconds after an unmute.",
   clipping: "The input is clipping. A fader can't fix that; turn the preamp gain down on the console.",
+  bleed: "Nobody is at this mic. It only hears the band or another voice, so auto-mix holds it and never turns bleed up.",
   noAudio: "No Dante audio is arriving, so nothing moves.",
   idle: "Nothing is coming through this mic, so auto-mix won't raise it.",
   waitingForLead: "Holding the band where it is until a lead vocal is singing.",

@@ -1,6 +1,6 @@
 import type { Backend } from "./backend";
 import { createDemoAutomix, guessRole } from "./demoAutomix";
-import type { Adjustment, AutoMixStatus, ConsoleEvent, MeterFrame } from "./types";
+import type { Adjustment, AutoMixStatus, ChannelRole, ConsoleEvent, MeterFrame, Sound } from "./types";
 
 const NAMES = [
   "Pastor", "Worship Ld", "BGV 1", "BGV 2", "Kick", "Snare", "Hat", "Tom 1", "Tom 2",
@@ -8,6 +8,20 @@ const NAMES = [
   "Choir L", "Choir R", "Handheld 1", "Handheld 2", "Video L", "Video R", "Playback L",
   "Playback R", "Lapel 1", "Lapel 2", "Ambient L", "Ambient R", "Spare 1", "Spare 2",
 ];
+
+const SOUND_OF_ROLE: Record<ChannelRole, Sound | null> = {
+  speech: "speech", leadVocal: "singing", backingVocal: "singing", choir: "choir", kick: "drums", bass: "bass",
+  drums: "drums", keysPads: "keys", pianoOrgan: "piano", electricGuitar: "electricGuitar",
+  acousticGuitar: "acousticGuitar", playback: "music", other: "other",
+};
+
+/** What the pretend listening models hear. Two channels disagree with their names on purpose. */
+function demoSound(ch: number): Sound | null {
+  if (ch >= 30) return null;
+  if (ch === 21) return "acousticGuitar"; // "Handheld 2" is on a guitar amp today
+  if (ch === 26) return "music"; // "Lapel 1": nobody is wearing it, it only hears the band
+  return SOUND_OF_ROLE[guessRole(NAMES[ch] ?? "")];
+}
 
 /** Rough "typical level" per channel so the demo looks like a real service. */
 function baseLevel(ch: number): number {
@@ -36,6 +50,10 @@ export function createDemoBackend(): Backend {
     fader: (ch) => (connected ? (faders.get(ch) ?? null) : null),
     name: (ch) => NAMES[ch] ?? `Ch ${ch + 1}`,
     muted: (ch) => mutes.get(ch) ?? false,
+    hear: (ch) => {
+      const sound = demoSound(ch);
+      return { sound, voice: sound === "speech" || sound === "singing" || sound === "choir" };
+    },
     setFader: (ch, db) => moveFader(ch, db),
     status: (s) => automixListeners.forEach((cb) => cb(s)),
     adjustment: (a) => adjustmentListeners.forEach((cb) => cb(a)),
@@ -151,6 +169,10 @@ export function createDemoBackend(): Backend {
     },
     async automixLog(limit) {
       return automix.log(limit);
+    },
+    async automixListenScan() {},
+    async automixHeard(names) {
+      return automix.heard(names);
     },
     async onAutomix(cb) {
       automixListeners.add(cb);

@@ -4,6 +4,7 @@
 //! here so that adding a new console (or a Windows build) never touches the
 //! shared vocabulary. All types serialize to camelCase JSON for the frontend.
 
+pub mod hearing;
 pub mod level;
 
 use serde::{Deserialize, Serialize};

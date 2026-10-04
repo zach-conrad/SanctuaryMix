@@ -15,6 +15,7 @@ console = { path = "crates/console" }
 auth = { path = "crates/auth" }
 automix = { path = "crates/automix" }
 store = { path = "crates/store" }
+listen = { path = "crates/listen" }
 
 anyhow = "1"
 async-trait = "0.1"

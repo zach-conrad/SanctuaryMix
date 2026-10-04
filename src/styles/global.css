@@ -181,6 +181,13 @@ select.sm-input { appearance: auto; }
 .am-mode[data-mode="heldByOperator"], .am-mode[data-mode="waitingForFader"], .am-mode[data-mode="atLimit"], .am-mode[data-mode="noAudio"],
 .am-mode[data-mode="consoleOffline"] { color: var(--warning); }
 .am-change { color: var(--assist); }
+.am-mode[data-mode="bleed"] { color: var(--text-muted); }
+.am-heard { display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.am-heard-word { font: var(--text-caption); color: var(--assist); white-space: nowrap; }
+.am-suggest { border-color: var(--assist); background: var(--assist-subtle); color: var(--text); }
+.am-listen { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) 0; min-height: var(--hit-min); cursor: pointer; }
+.am-listen > span { display: flex; flex-direction: column; gap: var(--space-1); }
+.am-listen input[type="checkbox"] { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--accent); flex: none; }
 
 .activity { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); max-height: 560px; overflow-y: auto; }
 .activity-move { max-width: none; gap: var(--space-1); padding: var(--space-2) var(--space-3); }

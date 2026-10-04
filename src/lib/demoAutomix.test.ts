@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createDemoAutomix, DEFAULT_AUTOMIX_CONFIG, guessRole } from "./demoAutomix";
-import type { MeterFrame } from "./types";
+import { createDemoAutomix, DEFAULT_AUTOMIX_CONFIG, guessRole, suggestRole } from "./demoAutomix";
+import type { MeterFrame, Sound } from "./types";
 
 describe("guessRole", () => {
   it("matches the Rust guesses for the demo channel names", () => {
@@ -20,13 +20,14 @@ describe("demo auto-mix", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  function rig() {
+  function rig(heard: Record<number, { voice: boolean; sound: Sound | null }> = {}) {
     const faders = new Map<number, number>([[0, -10], [1, -10]]);
     const moves: [number, number][] = [];
     const mix = createDemoAutomix({
       fader: (ch) => faders.get(ch) ?? null,
       name: (ch) => `Ch ${ch + 1}`,
       muted: () => false,
+      hear: (ch) => heard[ch] ?? { voice: true, sound: null },
       setFader: (ch, db) => {
         moves.push([ch, db]);
         faders.set(ch, db);
@@ -64,5 +65,25 @@ describe("demo auto-mix", () => {
     feed([-30, -30], 5);
     expect(faders.get(0)).toBe(-12);
     expect(mix.status().channels[0].mode).toBe("heldByOperator");
+  });
+
+  it("holds a voice mic that only hears bleed", () => {
+    const { mix, faders, feed } = rig({ 0: { voice: false, sound: "music" } });
+    mix.setConfig({ ...DEFAULT_AUTOMIX_CONFIG, channels: [{ channel: 0, role: "speech" }] });
+    mix.engage(true);
+    feed([-30, -30], 10);
+    expect(faders.get(0)).toBe(-10);
+    expect(mix.status().channels[0].mode).toBe("bleed");
+    expect(mix.status().channels[0].heard).toBe("music");
+  });
+});
+
+describe("suggestRole", () => {
+  it("matches the Rust suggestions", () => {
+    expect(suggestRole("other", "speech")).toBe("speech");
+    expect(suggestRole("backingVocal", "singing")).toBeNull();
+    expect(suggestRole("leadVocal", "drums")).toBe("drums");
+    expect(suggestRole("keysPads", "organ")).toBeNull();
+    expect(suggestRole("bass", "music")).toBeNull();
   });
 });

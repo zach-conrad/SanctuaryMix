@@ -48,6 +48,8 @@ pub fn run() {
             commands::automix_undo_all,
             commands::automix_status,
             commands::automix_log,
+            commands::automix_listen_scan,
+            commands::automix_heard,
             commands::get_session,
             commands::begin_sign_in,
             commands::complete_sign_in,
