@@ -5,8 +5,10 @@ of your console over **Dante**, talks to the console over the network, and
 (soon) helps volunteers and engineers with gain staging, feedback, EQ and
 speech-to-music balance.
 
-**Status:** UI/UX shell. Metering, console connection and the screens are in
-place; the auto-mixing engine is the next phase.
+**Status:** UI/UX shell plus the first auto-mix: pick channels and a room
+feel on the Assist screen and SanctuaryMix rides those faders inside hard
+guardrails (see [docs/AUTOMIX.md](docs/AUTOMIX.md)). Not yet tried on a real
+dLive.
 
 - Mac first, packaged as a normal `SanctuaryMix.app` you drag into Applications.
 - Windows builds from the same code (CI already checks it).
@@ -19,7 +21,7 @@ place; the auto-mixing engine is the next phase.
 | --- | --- |
 | **Mixer** | One strip per input: live Dante meter, console fader and mute, channel name pulled from the desk. The inspector shows the selected channel and Assist notes (clipping, hot and silent channels). |
 | **Scenes** | Placeholder for scene recall. |
-| **Assist** | Live observations plus the auto-mix modes that are coming (gain staging, feedback watch, EQ suggestions, speech and music balance). |
+| **Assist** | Auto-mix: pick channels and how the room should feel, start, freeze, undo, and see every move with its reason. Plus live observations and what's coming (gain staging, feedback watch, EQ). |
 | **Setup** | Pick the audio input (Dante Virtual Soundcard is promoted to the top) and connect to the console. |
 | **Settings** | Account placeholder for future team sign-in, and the theme (Dark, Light, Match Mac). |
 
@@ -62,12 +64,15 @@ crates/
   mix-core/       Shared types: channels, meters, console events (serialized to the UI)
   audio-engine/   Device discovery and multichannel metering (cpal)
   console/        ConsoleAdapter trait, dLive adapter + protocol, simulated console
+  automix/        Auto-mix: room-feel presets, guardrails, the controller and its async loop
+  store/          Local SQLite: settings and the auto-mix activity log
   auth/           AuthProvider trait, roles, and a LocalGuest placeholder
 src-tauri/        The desktop app: Tauri commands and events that wire the crates to the UI
 assets/brand/      SanctuaryMix wordmark (light and dark SVGs); assets/icon.svg is the app icon source
 src/              React UI (views, components, Zustand store, backend bridge)
 .github/workflows CI, security scans, dev builds and releases (see docs/CI.md)
 docs/CI.md        How checks, git hooks, the dev channel and releases work
+docs/AUTOMIX.md   How auto-mix decides, its guardrails, and known gaps
 ```
 
 Platform-specific code is kept out of the crates, so a Windows build is the

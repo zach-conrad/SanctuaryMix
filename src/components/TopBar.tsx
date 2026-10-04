@@ -1,4 +1,6 @@
+import { Hand, Play } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useAutoMix } from "../store/automix";
 import { useMixer, type Theme } from "../store/mixer";
 import { StatusPill, type PillTone } from "./StatusPill";
 
@@ -60,9 +62,44 @@ export function TopBar() {
         {isDemo && <StatusPill tone="warn" subject="Demo" meta="Simulated audio and console" />}
       </div>
       <div className="topbar-spacer" data-tauri-drag-region />
-      <span className="sm-assist-badge" title="Assist only suggests changes. It never moves the console by itself.">
-        Assist · Suggest
-      </span>
+      <AssistMode />
     </header>
+  );
+}
+
+/** Assist mode at the right of the top bar. While auto-mix runs, Freeze is always one tap away. */
+function AssistMode() {
+  const engaged = useAutoMix((s) => s.status?.engaged ?? false);
+  const frozen = useAutoMix((s) => s.status?.frozen ?? false);
+  const { freeze, resume } = useAutoMix();
+  const setView = useMixer((s) => s.setView);
+  if (!engaged) {
+    return (
+      <button
+        className="sm-assist-badge pill-button"
+        title="Assist suggests changes. Auto-mix is off; turn it on in Assist."
+        onClick={() => setView("assist")}
+      >
+        Assist · Suggest
+      </button>
+    );
+  }
+  return (
+    <div className="assist-mode">
+      <button className="sm-assist-badge pill-button" onClick={() => setView("assist")}>
+        {frozen ? "Auto-mix · Frozen" : "Auto-mix · On"}
+      </button>
+      {frozen ? (
+        <button className="sm-btn topbar-freeze" onClick={() => void resume()}>
+          <Play />
+          Resume
+        </button>
+      ) : (
+        <button className="sm-btn topbar-freeze" onClick={() => void freeze()} title="Stops every auto-mix move now (Esc)">
+          <Hand />
+          Freeze
+        </button>
+      )}
+    </div>
   );
 }

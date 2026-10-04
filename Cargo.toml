@@ -13,6 +13,8 @@ mix-core = { path = "crates/mix-core" }
 audio-engine = { path = "crates/audio-engine" }
 console = { path = "crates/console" }
 auth = { path = "crates/auth" }
+automix = { path = "crates/automix" }
+store = { path = "crates/store" }
 
 anyhow = "1"
 async-trait = "0.1"

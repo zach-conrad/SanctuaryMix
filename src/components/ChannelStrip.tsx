@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { formatDb } from "../lib/levels";
+import { isAutoChanged, MODE_DETAIL, useChannelAuto } from "../store/automix";
 import { useMixer, type Strip } from "../store/mixer";
 import { Fader } from "./Fader";
 import { Meter } from "./Meter";
@@ -9,6 +10,8 @@ export const ChannelStrip = memo(function ChannelStrip({ strip, disabled }: { st
   const setFader = useMixer((s) => s.setFader);
   const select = useMixer((s) => s.select);
   const selected = useMixer((s) => s.selected === strip.index);
+  const auto = useChannelAuto(strip.index);
+  const autoOn = auto !== undefined && auto.mode !== "off";
   return (
     <div
       className="sm-strip"
@@ -25,8 +28,22 @@ export const ChannelStrip = memo(function ChannelStrip({ strip, disabled }: { st
       </div>
       <div className="sm-strip__bay">
         <Meter channel={strip.index} />
-        <Fader db={strip.faderDb} disabled={disabled} label={strip.name} onChange={(db) => setFader(strip.index, db)} />
+        <Fader
+          db={strip.faderDb}
+          disabled={disabled}
+          label={strip.name}
+          assist={isAutoChanged(auto)}
+          onChange={(db) => setFader(strip.index, db)}
+        />
       </div>
+      {autoOn && (
+        <span
+          className={auto.mode === "heldByOperator" || auto.mode === "undone" ? "strip-auto is-manual" : "sm-assist-badge strip-auto"}
+          title={MODE_DETAIL[auto.mode]}
+        >
+          {auto.mode === "heldByOperator" || auto.mode === "undone" ? "Manual" : "Auto"}
+        </span>
+      )}
       <div className="sm-strip__value">
         {formatDb(strip.faderDb)} <small>dB</small>
       </div>

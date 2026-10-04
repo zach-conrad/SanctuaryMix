@@ -3,7 +3,12 @@
 // so the UI can be designed and reviewed without a Mac build or a console.
 
 import type {
+  Adjustment,
   AudioDeviceInfo,
+  AutoMixConfig,
+  AutoMixStatus,
+  ChannelRole,
+  Preset,
   ChannelId,
   ConsoleConfig,
   ConsoleEvent,
@@ -30,6 +35,26 @@ export interface Backend {
   setFader(id: ChannelId, db: number | null): Promise<void>;
   setMute(id: ChannelId, muted: boolean): Promise<void>;
   getSession(): Promise<Session>;
+
+  // Auto-mix. The guardrails are enforced in the Rust core; these only ask.
+  automixPresets(): Promise<Preset[]>;
+  automixGuessRoles(names: string[]): Promise<ChannelRole[]>;
+  automixGetConfig(): Promise<AutoMixConfig>;
+  /** Returns the settings as the core will use them (clamped to its limits). */
+  automixSetConfig(config: AutoMixConfig): Promise<AutoMixConfig>;
+  automixEngage(on: boolean): Promise<void>;
+  /** Stops every automatic move immediately. */
+  automixFreeze(): Promise<void>;
+  automixResume(): Promise<void>;
+  automixResumeChannel(channel: number): Promise<void>;
+  automixUndo(channel: number): Promise<void>;
+  automixUndoAll(): Promise<void>;
+  automixStatus(): Promise<AutoMixStatus>;
+  /** Newest first. */
+  automixLog(limit?: number): Promise<Adjustment[]>;
+  onAutomix(cb: (status: AutoMixStatus) => void): Promise<Unlisten>;
+  onAutomixAdjustment(cb: (adjustment: Adjustment) => void): Promise<Unlisten>;
+
   onMeters(cb: (frame: MeterFrame) => void): Promise<Unlisten>;
   onConsole(cb: (event: ConsoleEvent) => void): Promise<Unlisten>;
 }
@@ -54,6 +79,20 @@ async function createTauriBackend(): Promise<Backend> {
     setFader: (id, db) => invoke("set_fader", { id, db }),
     setMute: (id, muted) => invoke("set_mute", { id, muted }),
     getSession: () => invoke("get_session"),
+    automixPresets: () => invoke("automix_presets"),
+    automixGuessRoles: (names) => invoke("automix_guess_roles", { names }),
+    automixGetConfig: () => invoke("automix_get_config"),
+    automixSetConfig: (config) => invoke("automix_set_config", { config }),
+    automixEngage: (on) => invoke("automix_engage", { on }),
+    automixFreeze: () => invoke("automix_freeze"),
+    automixResume: () => invoke("automix_resume"),
+    automixResumeChannel: (channel) => invoke("automix_resume_channel", { channel }),
+    automixUndo: (channel) => invoke("automix_undo", { channel }),
+    automixUndoAll: () => invoke("automix_undo_all"),
+    automixStatus: () => invoke("automix_status"),
+    automixLog: (limit) => invoke("automix_log", { limit: limit ?? null }),
+    onAutomix: (cb) => listen<AutoMixStatus>("automix", (e) => cb(e.payload)),
+    onAutomixAdjustment: (cb) => listen<Adjustment>("automix-adjustment", (e) => cb(e.payload)),
     onMeters: (cb) => listen<MeterFrame>("meters", (e) => cb(e.payload)),
     onConsole: (cb) => listen<ConsoleEvent>("console", (e) => cb(e.payload)),
   };
