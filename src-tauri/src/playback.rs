@@ -246,7 +246,24 @@ pub async fn load_playback(
     let has_mix =
         detail.summary.audio_mode != AudioMode::None && mix.as_ref().is_some_and(|p| p.exists());
 
+    // Reloading the same service (a new output device) keeps the playhead.
+    let resume = state
+        .playback
+        .position()
+        .filter(|(loaded, _, _)| *loaded == id)
+        .map(|(_, pos, playing)| (pos, playing));
     state.playback.halt_replay();
+    if matches!(
+        state.playback.replay.lock().unwrap().state,
+        ReplayState::Running
+    ) {
+        state.playback.set_replay(&app, |s| {
+            s.state = ReplayState::Stopped;
+            s.message = Some(
+                "Replay stopped because playback changed. Press Send moves to continue.".into(),
+            );
+        });
+    }
     // Close the old player before opening the device again.
     state.playback.loaded.lock().unwrap().take();
 
@@ -264,12 +281,19 @@ pub async fn load_playback(
         .map(Player::duration_ms)
         .unwrap_or(0)
         .max(detail.summary.duration_ms);
-    *state.playback.loaded.lock().unwrap() = Some(Loaded {
+    let mut loaded = Loaded {
         recording_id: id,
         duration_ms,
         player,
         clock: Clock::default(),
-    });
+    };
+    if let Some((pos, playing)) = resume {
+        loaded.seek(pos);
+        if playing {
+            loaded.play();
+        }
+    }
+    *state.playback.loaded.lock().unwrap() = Some(loaded);
 
     let mut ticker = state.playback.ticker.lock().unwrap();
     if ticker.is_none() {
