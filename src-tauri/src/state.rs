@@ -6,10 +6,14 @@ use auth::{AuthProvider, LocalGuest};
 use automix::{Adjustment, AutoMixConfig, AutoMixHandle, AutoMixStatus, FaderSink, Observer};
 use console::{ConsoleAdapter, ConsoleError};
 use listen::{ListenTarget, Listener, Models};
-use mix_core::ChannelId;
+use mix_core::{ChangeSource, ChannelId, ConsoleEvent};
 use store::Store;
 use tauri::async_runtime::JoinHandle;
 use tauri::{AppHandle, Emitter, Manager};
+
+use crate::control::ControlBus;
+use crate::playback::Playback;
+use crate::recording::Recordings;
 
 pub struct AppState {
     pub metering: Mutex<Option<MeterHandle>>,
@@ -22,6 +26,11 @@ pub struct AppState {
     /// On-device listening models; `None` if they couldn't load (auto-mix
     /// then works from levels alone).
     pub listener: Option<Arc<Listener>>,
+    /// Every control change from every source; recordings listen here.
+    pub control: ControlBus,
+    /// `None` only if the recordings folder couldn't be opened.
+    pub recordings: Option<Recordings>,
+    pub playback: Playback,
 }
 
 impl AppState {
@@ -56,6 +65,11 @@ impl AppState {
             store,
             automix,
             listener,
+            control: ControlBus::default(),
+            recordings: Recordings::open(app)
+                .inspect_err(|e| log::error!("recordings are off this run: {e}"))
+                .ok(),
+            playback: Playback::default(),
         }
     }
 }
@@ -119,7 +133,15 @@ impl FaderSink for ConsoleSink {
             .map_err(|e| e.to_string())?
             .set_fader(ChannelId::input(channel), Some(db))
             .await
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.to_string())?;
+        state.control.publish(
+            ChangeSource::Assist,
+            ConsoleEvent::Fader {
+                id: ChannelId::input(channel),
+                db: Some(db),
+            },
+        );
+        Ok(())
     }
 }
 

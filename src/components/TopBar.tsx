@@ -2,6 +2,7 @@ import { Hand, Play } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAutoMix } from "../store/automix";
 import { useMixer, type Theme } from "../store/mixer";
+import { RecordControl } from "./RecordControl";
 import { StatusPill, type PillTone } from "./StatusPill";
 
 const tone = (s: "off" | "connecting" | "on" | "error"): PillTone =>
@@ -62,6 +63,7 @@ export function TopBar() {
         {isDemo && <StatusPill tone="warn" subject="Demo" meta="Simulated audio and console" />}
       </div>
       <div className="topbar-spacer" data-tauri-drag-region />
+      <RecordControl />
       <AssistMode />
     </header>
   );

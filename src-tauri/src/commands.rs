@@ -3,7 +3,7 @@ use auth::Session;
 use automix::{Adjustment, AutoMixConfig, AutoMixStatus, ChannelRole, Preset, RoomFeel};
 use console::{ConsoleConfig, ConsoleError};
 use mix_core::hearing::Sound;
-use mix_core::{ChannelId, ChannelKind};
+use mix_core::{ChangeSource, ChannelId, ChannelKind, ConsoleEvent};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -125,7 +125,10 @@ pub async fn connect_console(
             match events.recv().await {
                 Ok(event) => {
                     automix.push_console(event.clone());
-                    let _ = app.emit("console", event);
+                    let _ = app.emit("console", &event);
+                    app.state::<AppState>()
+                        .control
+                        .publish(ChangeSource::Console, event);
                 }
                 Err(RecvError::Lagged(n)) => log::warn!("UI missed {n} console events"),
                 Err(RecvError::Closed) => break,
@@ -169,7 +172,11 @@ pub async fn set_fader(
         .as_ref()
         .ok_or(ConsoleError::NotConnected)
         .map_err(err)?;
-    adapter.set_fader(id, db).await.map_err(err)
+    adapter.set_fader(id, db).await.map_err(err)?;
+    state
+        .control
+        .publish(ChangeSource::Operator, ConsoleEvent::Fader { id, db });
+    Ok(())
 }
 
 #[tauri::command]
@@ -179,7 +186,11 @@ pub async fn set_mute(state: State<'_, AppState>, id: ChannelId, muted: bool) ->
         .as_ref()
         .ok_or(ConsoleError::NotConnected)
         .map_err(err)?;
-    adapter.set_mute(id, muted).await.map_err(err)
+    adapter.set_mute(id, muted).await.map_err(err)?;
+    state
+        .control
+        .publish(ChangeSource::Operator, ConsoleEvent::Mute { id, muted });
+    Ok(())
 }
 
 #[tauri::command]

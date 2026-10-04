@@ -9,6 +9,7 @@ use mix_core::MeterFrame;
 
 use crate::devices::find_input_device;
 use crate::meter::MeterBank;
+use crate::record::RecordTap;
 use crate::tap::{AudioBlock, AudioTap};
 use crate::{AudioError, Result};
 
@@ -28,6 +29,8 @@ pub struct MeterHandle {
     pub device_name: String,
     pub channels: u16,
     pub sample_rate: u32,
+    /// Recording rides this stream; see [`crate::record`].
+    pub(crate) tap: Arc<RecordTap>,
 }
 
 impl Drop for MeterHandle {
@@ -36,6 +39,8 @@ impl Drop for MeterHandle {
         if let Some(t) = self.thread.take() {
             let _ = t.join();
         }
+        // The stream is gone, so finalize any recording's files now.
+        self.tap.close();
     }
 }
 
@@ -52,13 +57,15 @@ pub fn start_metering(
     let stop = Arc::new(AtomicBool::new(false));
     let (ready_tx, ready_rx) = mpsc::channel::<Result<Opened>>();
     let thread_stop = stop.clone();
+    let tap = Arc::new(RecordTap::default());
+    let thread_tap = tap.clone();
 
     // cpal streams are not Send on every platform, so one thread owns the stream for its whole life.
     let thread = std::thread::Builder::new()
         .name("sanctuarymix-audio".into())
         .spawn(move || {
-            let opened = open_stream(device_name.as_deref());
-            let (stream, bank, tap, info) = match opened {
+            let opened = open_stream(device_name.as_deref(), thread_tap);
+            let (stream, bank, listen_tap, info) = match opened {
                 Ok(v) => v,
                 Err(e) => {
                     let _ = ready_tx.send(Err(e));
@@ -71,7 +78,7 @@ pub fn start_metering(
             let mut audio = Vec::new();
             while !thread_stop.load(Ordering::SeqCst) {
                 std::thread::sleep(FRAME_INTERVAL);
-                tap.take(&mut audio);
+                listen_tap.take(&mut audio);
                 if !audio.is_empty() {
                     on_audio(AudioBlock {
                         channels,
@@ -98,6 +105,7 @@ pub fn start_metering(
                 device_name,
                 channels,
                 sample_rate,
+                tap,
             })
         }
         Ok(Err(e)) => {
@@ -110,7 +118,7 @@ pub fn start_metering(
 
 type OpenedStream = (cpal::Stream, Arc<MeterBank>, Arc<AudioTap>, Opened);
 
-fn open_stream(device_name: Option<&str>) -> Result<OpenedStream> {
+fn open_stream(device_name: Option<&str>, tap: Arc<RecordTap>) -> Result<OpenedStream> {
     let device = find_input_device(device_name)?;
     let name = device.name()?;
     let default = device.default_input_config()?;
@@ -127,38 +135,38 @@ fn open_stream(device_name: Option<&str>) -> Result<OpenedStream> {
     let format = best.sample_format();
     let config: StreamConfig = best.into();
     let bank = Arc::new(MeterBank::new(config.channels as usize));
-    let tap = Arc::new(AudioTap::new(
+    let listen_tap = Arc::new(AudioTap::new(
         config.channels as usize,
         config.sample_rate.0,
     ));
+    let taps = Taps {
+        record: tap,
+        listen: listen_tap.clone(),
+    };
     let err_fn = |e| log::error!("audio stream error: {e}");
 
     let stream = match format {
         SampleFormat::F32 => {
-            let (bank, tap) = (bank.clone(), tap.clone());
+            let bank = bank.clone();
             device.build_input_stream(
                 &config,
                 move |d: &[f32], _| {
                     bank.push_interleaved(d);
-                    tap.push_interleaved(d);
+                    taps.push(d);
                 },
                 err_fn,
                 None,
             )?
         }
-        SampleFormat::I16 => {
-            build_converting::<i16>(&device, &config, bank.clone(), tap.clone(), err_fn)?
-        }
-        SampleFormat::I32 => {
-            build_converting::<i32>(&device, &config, bank.clone(), tap.clone(), err_fn)?
-        }
+        SampleFormat::I16 => build_converting::<i16>(&device, &config, bank.clone(), taps, err_fn)?,
+        SampleFormat::I32 => build_converting::<i32>(&device, &config, bank.clone(), taps, err_fn)?,
         other => return Err(AudioError::UnsupportedFormat(format!("{other:?}"))),
     };
     stream.play()?;
     Ok((
         stream,
         bank,
-        tap,
+        listen_tap,
         Opened {
             device_name: name,
             channels: config.channels,
@@ -167,11 +175,24 @@ fn open_stream(device_name: Option<&str>) -> Result<OpenedStream> {
     ))
 }
 
+/// Everything besides metering that reads the real-time callback's audio.
+struct Taps {
+    record: Arc<RecordTap>,
+    listen: Arc<AudioTap>,
+}
+
+impl Taps {
+    fn push(&self, data: &[f32]) {
+        self.record.push(data);
+        self.listen.push_interleaved(data);
+    }
+}
+
 fn build_converting<T>(
     device: &cpal::Device,
     config: &StreamConfig,
     bank: Arc<MeterBank>,
-    tap: Arc<AudioTap>,
+    taps: Taps,
     err_fn: impl FnMut(cpal::StreamError) + Send + 'static,
 ) -> Result<cpal::Stream>
 where
@@ -189,7 +210,7 @@ where
                     .map(|&s| <f32 as cpal::FromSample<T>>::from_sample_(s)),
             );
             bank.push_interleaved(&scratch);
-            tap.push_interleaved(&scratch);
+            taps.push(&scratch);
         },
         err_fn,
         None,

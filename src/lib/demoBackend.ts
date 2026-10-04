@@ -1,5 +1,6 @@
 import type { Backend } from "./backend";
 import { createDemoAutomix, guessRole } from "./demoAutomix";
+import { createDemoRecorder } from "./demoRecorder";
 import type { Adjustment, AutoMixStatus, ChannelRole, ConsoleEvent, MeterFrame, Sound } from "./types";
 
 const NAMES = [
@@ -54,9 +55,29 @@ export function createDemoBackend(): Backend {
       const sound = demoSound(ch);
       return { sound, voice: sound === "speech" || sound === "singing" || sound === "choir" };
     },
-    setFader: (ch, db) => moveFader(ch, db),
+    setFader: (ch, db) => {
+      moveFader(ch, db);
+      recorder.noteChange("assist", { kind: "input", index: ch }, { db });
+    },
     status: (s) => automixListeners.forEach((cb) => cb(s)),
     adjustment: (a) => adjustmentListeners.forEach((cb) => cb(a)),
+  });
+  // Service recordings, playback and replay (docs/RECORDINGS.md).
+  const recorder = createDemoRecorder({
+    channelCount: () => (connected ? faders.size : 0),
+    name: (ch) => NAMES[ch] ?? `Ch ${ch + 1}`,
+    fader: (ch) => faders.get(ch) ?? 0,
+    muted: (ch) => mutes.get(ch) ?? false,
+    setFader: (ch, db) => moveFader(ch, db),
+    setMute: (ch, muted) => {
+      mutes.set(ch, muted);
+      emit({ type: "mute", id: { kind: "input", index: ch }, muted });
+    },
+    automixOff: () => {
+      const on = automix.status().engaged;
+      if (on) automix.engage(false);
+      return on;
+    },
   });
   let timer: ReturnType<typeof setInterval> | null = null;
   let channels = 0;
@@ -119,10 +140,12 @@ export function createDemoBackend(): Backend {
       emit({ type: "disconnected", reason: null });
     },
     async setFader(id, db) {
+      recorder.noteChange("operator", id, { db });
       if (id.kind === "input") moveFader(id.index, db);
       else emit({ type: "fader", id, db });
     },
     async setMute(id, muted) {
+      recorder.noteChange("operator", id, { muted });
       if (id.kind === "input") mutes.set(id.index, muted);
       emit({ type: "mute", id, muted });
     },
@@ -190,5 +213,6 @@ export function createDemoBackend(): Backend {
       consoleListeners.add(cb);
       return () => consoleListeners.delete(cb);
     },
+    ...recorder,
   };
 }

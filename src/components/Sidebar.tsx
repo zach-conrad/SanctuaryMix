@@ -1,9 +1,10 @@
-import { Cable, Layers, Settings, SlidersVertical, Sparkles } from "lucide-react";
+import { Cable, History, Layers, Settings, SlidersVertical, Sparkles } from "lucide-react";
 import { useMixer, type View } from "../store/mixer";
 
 const ITEMS: { view: View; label: string; icon: typeof Cable }[] = [
   { view: "mixer", label: "Mixer", icon: SlidersVertical },
   { view: "scenes", label: "Scenes", icon: Layers },
+  { view: "recordings", label: "Services", icon: History },
   { view: "assist", label: "Assist", icon: Sparkles },
   { view: "setup", label: "Setup", icon: Cable },
 ];

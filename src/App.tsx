@@ -3,8 +3,10 @@ import { Sidebar } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
 import { useAutoMix } from "./store/automix";
 import { useMixer } from "./store/mixer";
+import { useRecordings } from "./store/recordings";
 import { AssistView } from "./views/AssistView";
 import { MixerView } from "./views/MixerView";
+import { RecordingsView } from "./views/RecordingsView";
 import { ScenesView } from "./views/ScenesView";
 import { SettingsView } from "./views/SettingsView";
 import { SetupView } from "./views/SetupView";
@@ -13,7 +15,9 @@ export default function App() {
   const view = useMixer((s) => s.view);
   const init = useMixer((s) => s.init);
   useEffect(() => {
-    void init().then(() => useAutoMix.getState().init());
+    void init()
+      .then(() => useAutoMix.getState().init())
+      .then(() => useRecordings.getState().init());
   }, [init]);
 
   // Esc freezes auto-mix from anywhere: the quickest way for a person to take over.
@@ -34,6 +38,7 @@ export default function App() {
         <main>
           {view === "mixer" && <MixerView />}
           {view === "scenes" && <ScenesView />}
+          {view === "recordings" && <RecordingsView />}
           {view === "assist" && <AssistView />}
           {view === "setup" && <SetupView />}
           {view === "settings" && <SettingsView />}

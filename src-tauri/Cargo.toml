@@ -18,6 +18,7 @@ mix-core.workspace = true
 audio-engine.workspace = true
 console.workspace = true
 auth.workspace = true
+recorder.workspace = true
 automix.workspace = true
 store.workspace = true
 listen.workspace = true
@@ -28,5 +29,7 @@ log.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
+# Local time for service titles and dates.
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 tauri = { version = "2", features = [] }
 tauri-plugin-log = "2"
