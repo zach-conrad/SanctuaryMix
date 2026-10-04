@@ -88,10 +88,13 @@ points at a separate dev Supabase project (see section 6).
      are set, see below);
    - builds the Mac universal `.dmg` (signed and notarized once Apple secrets
      exist) and Windows `.exe`/`.msi`;
-   - publishes a GitHub release with generated notes and `SHA256SUMS.txt`.
+   - asks for approval again before publishing, so you can check the builds;
+   - publishes a GitHub release (private, like the repo) with generated notes
+     and `SHA256SUMS.txt`, and uploads to private download storage when
+     configured (see "Private downloads" below).
 
-Assets use fixed names, so this link always serves the newest release:
-`https://github.com/<repo>/releases/latest/download/SanctuaryMix-mac-universal.dmg`
+Assets use fixed names (`SanctuaryMix-mac-universal.dmg`,
+`SanctuaryMix-windows-x64-setup.exe`) so "latest" paths never change.
 
 ## 5. One-time setup for Zach
 
@@ -143,17 +146,25 @@ Put these on the **production** environment, not the repo:
 
 Signing needs an Apple Developer Program membership ($99/year).
 
-Public downloads: the repo is private, so its release links need a GitHub
-login. To give the website a public download link, create an empty public
-repo (e.g. `zach-conrad/sanctuarymix-releases`), then set:
+### Private downloads
+
+Downloads are never public. Today, release and dev-build files live on this
+private repo's GitHub releases, so only people with access to the repo (signed
+in to GitHub) can download them.
+
+Once Supabase is set up, the release and dev workflows also upload the
+installers to a **private** Supabase Storage bucket (`releases`), under
+`stable/<version>/`, `stable/latest/`, `dev/<sha>/` and `dev/latest/`. The
+website then gives a signed-in user a short-lived signed URL (for example from
+a small Supabase Edge Function that checks the user's church membership), so
+a link that gets shared stops working within minutes. To turn it on:
 
 | Name | Where | Value |
 | --- | --- | --- |
-| `RELEASES_REPO` | repo variable | `zach-conrad/sanctuarymix-releases` |
-| `RELEASES_REPO_TOKEN` | production environment secret | fine-grained token with Contents read/write on that repo only |
+| `SUPABASE_URL` | variable on each environment | that environment's project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | secret on each environment | service-role key, used only by CI to upload, never shipped in the app or site |
 
-Releases are then mirrored there, and the site links to
-`https://github.com/zach-conrad/sanctuarymix-releases/releases/latest/download/SanctuaryMix-mac-universal.dmg`.
+Create the `releases` bucket as private (not public) in each Supabase project.
 
 ## 6. Backend environments (later)
 
@@ -166,7 +177,7 @@ environment:
 | `SUPABASE_URL` | dev project URL | prod project URL |
 | `SUPABASE_ANON_KEY` | dev anon key | prod anon key |
 
-The dev and release workflows already pass these to the build as
+The dev and release workflows already pass the URL and anon key to the build as
 `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`, plus `VITE_APP_CHANNEL`
 (`dev` or `stable`). The anon key is public by design; never put the
 Supabase service-role key in the app or in these workflows. Database

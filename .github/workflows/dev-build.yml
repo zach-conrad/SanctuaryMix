@@ -84,6 +84,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.BUILD_SHA }}
+          sparse-checkout: scripts
       - uses: actions/download-artifact@v8
         with:
           path: dist-release
@@ -100,3 +104,8 @@ jobs:
             --target "$BUILD_SHA" \
             --title "Dev build ${BUILD_SHA::7}" \
             --notes "Latest build of main ($BUILD_SHA). For testing only: not signed, may be unstable."
+      - name: Upload to private download storage (when configured)
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: scripts/upload-to-storage.sh dev "${BUILD_SHA::7}" dist-release/*
