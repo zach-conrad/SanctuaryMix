@@ -26,6 +26,7 @@ import type {
   RecordingSettings,
   RecordingSummary,
   ReplayStatus,
+  CalibrationStatus,
   SplConfig,
   SplPoint,
   SplReading,
@@ -112,8 +113,13 @@ export interface Backend {
   splGetConfig(): Promise<SplConfig>;
   /** Returns the settings as the core will use them. A new source starts over. */
   splSetConfig(config: SplConfig): Promise<SplConfig>;
-  /** Sets the offset so the current slow level reads `referenceDb`. */
-  splCalibrate(weighting: Weighting, referenceDb: number): Promise<SplConfig>;
+  /**
+   * Starts a guided calibration: listens until the level holds steady, then sets
+   * the offset so it reads `referenceDb`. Progress arrives through `onSplCalibration`.
+   */
+  splCalibrate(weighting: Weighting, referenceDb: number): Promise<void>;
+  splCancelCalibration(): Promise<void>;
+  onSplCalibration(cb: (status: CalibrationStatus) => void): Promise<Unlisten>;
   /** Clears history, Leq, maximum and peak. */
   splReset(): Promise<void>;
   splReading(): Promise<SplReading | null>;
@@ -191,6 +197,8 @@ async function createTauriBackend(): Promise<Backend> {
     splGetConfig: () => invoke("spl_get_config"),
     splSetConfig: (config) => invoke("spl_set_config", { config }),
     splCalibrate: (weighting, referenceDb) => invoke("spl_calibrate", { weighting, referenceDb }),
+    splCancelCalibration: () => invoke("spl_cancel_calibration"),
+    onSplCalibration: (cb) => listen<CalibrationStatus>("spl-calibration", (e) => cb(e.payload)),
     splReset: () => invoke("spl_reset"),
     splReading: () => invoke("spl_reading"),
     splHistory: (seconds) => invoke("spl_history", { seconds }),

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { getBackend } from "../lib/backend";
-import type { SplConfig, SplPoint, SplReading, Weighting } from "../lib/types";
+import type { CalibrationStatus, SplConfig, SplPoint, SplReading, Weighting } from "../lib/types";
 
 /** Graph spans the popup offers, in minutes. */
 export const SPANS = [5, 15, 60] as const;
@@ -13,12 +13,17 @@ interface SplState {
   history: SplPoint[];
   span: Span;
   error: string | null;
+  /** The guided calibration running now, or how the last one ended. */
+  calibration: CalibrationStatus | null;
 
   /** Loads settings and starts listening for readings. Safe to call more than once. */
   init(): Promise<void>;
   setSource(source: number | null): Promise<void>;
   setOffset(offsetDb: number): Promise<void>;
-  calibrate(weighting: Weighting, referenceDb: number): Promise<boolean>;
+  /** Starts a guided calibration; progress lands in `calibration`. */
+  calibrate(weighting: Weighting, referenceDb: number): Promise<void>;
+  cancelCalibration(): Promise<void>;
+  dismissCalibration(): void;
   reset(): Promise<void>;
   setSpan(span: Span): void;
   /** Re-reads the graph history for the current span. */
@@ -51,6 +56,7 @@ export const useSpl = create<SplState>((set, get) => {
     history: [],
     span: 15,
     error: null,
+    calibration: null,
 
     init() {
       started ??= (async () => {
@@ -58,6 +64,10 @@ export const useSpl = create<SplState>((set, get) => {
         const [config, reading] = await Promise.all([backend.splGetConfig(), backend.splReading()]);
         set({ config, reading, ready: true });
         await backend.onSpl((r) => set({ reading: r }));
+        await backend.onSplCalibration((calibration) => {
+          set({ calibration, ...(calibration.state === "done" ? { config: calibration.config } : {}) });
+          if (calibration.state === "done") void get().loadHistory();
+        });
       })().catch((e: unknown) => {
         started = null;
         set({ error: reportError(e) });
@@ -79,14 +89,20 @@ export const useSpl = create<SplState>((set, get) => {
     async calibrate(weighting, referenceDb) {
       try {
         const backend = await getBackend();
-        const config = await backend.splCalibrate(weighting, referenceDb);
-        set({ config, error: null });
-        await get().loadHistory();
-        return true;
+        set({ error: null, calibration: { state: "listening", levelDbfs: -140, steadySecs: 0, neededSecs: 5, elapsedSecs: 0, hold: null } });
+        await backend.splCalibrate(weighting, referenceDb);
       } catch (e) {
-        set({ error: reportError(e) });
-        return false;
+        set({ calibration: null, error: reportError(e) });
       }
+    },
+
+    async cancelCalibration() {
+      await (await getBackend()).splCancelCalibration();
+      set({ calibration: null });
+    },
+
+    dismissCalibration() {
+      set({ calibration: null });
     },
 
     async reset() {

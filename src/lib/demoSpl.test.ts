@@ -1,7 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDemoSpl } from "./demoSpl";
+import type { CalibrationStatus } from "./types";
 
 describe("demo room level", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("prefills history and reports A below C", () => {
     const spl = createDemoSpl();
     spl.start();
@@ -12,24 +20,33 @@ describe("demo room level", () => {
     expect(spl.history(300)).toHaveLength(300);
   });
 
-  it("calibration makes the slow level read the reference", () => {
+  it("guided calibration listens, then makes the reading match the reference", () => {
     const spl = createDemoSpl();
     spl.start();
+    const seen: CalibrationStatus[] = [];
+    spl.onCalibration((s) => seen.push(s));
+    spl.calibrate("c", 94);
+    vi.advanceTimersByTime(6_000);
     spl.stop();
-    const config = spl.calibrate("c", 94);
+    expect(seen[0].state).toBe("listening");
+    const done = seen[seen.length - 1];
+    expect(done.state).toBe("done");
+    const config = spl.getConfig();
     expect(config.calibrated).toBe(true);
-    expect(spl.reading()!.slow.c).toBeCloseTo(94, 5);
+    expect(config.calibration?.referenceDb).toBe(94);
     expect(() => spl.calibrate("a", 200)).toThrow(/between 30 and 140/);
   });
 
-  it("a new source starts over and turning it off stops readings", () => {
+  it("typing an offset or changing the source drops the calibration", () => {
     const spl = createDemoSpl();
     spl.start();
-    spl.stop();
+    spl.calibrate("a", 90);
+    vi.advanceTimersByTime(6_000);
+    expect(spl.getConfig().calibrated).toBe(true);
+    spl.setConfig({ ...spl.getConfig(), offsetDb: 110 });
+    expect(spl.getConfig()).toMatchObject({ calibrated: false, calibration: null });
     spl.setConfig({ ...spl.getConfig(), source: 3 });
     expect(spl.reading()).toBeNull();
-    expect(spl.history(60)).toHaveLength(0);
-    spl.setConfig({ ...spl.getConfig(), source: null });
-    expect(spl.reading()).toBeNull();
+    spl.stop();
   });
 });

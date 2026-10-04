@@ -1,14 +1,18 @@
 //! Room loudness in the app: feeds one input of the metering stream to an
-//! [`SplMeter`], pushes `spl` readings to the UI ~10 times a second, and
-//! keeps the source and calibration in the app database.
+//! [`SplMeter`], pushes `spl` readings to the UI ~10 times a second, runs the
+//! guided calibration (`spl-calibration` events), and keeps the source and
+//! calibration in the app database.
 //!
 //! Other parts of the app (auto-mix loudness targets, later) read
 //! [`Spl::latest`] rather than the audio.
 
 use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use audio_engine::SplMeter;
-use mix_core::spl::{SplConfig, SplPoint, SplReading, Weighting};
+use audio_engine::{CalibrationProgress, Calibrator, SplMeter};
+use mix_core::spl::{
+    CalibrationRecord, CalibrationStatus, SplConfig, SplPoint, SplReading, Weighting,
+};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::state::AppState;
@@ -31,9 +35,96 @@ pub struct Spl {
 #[derive(Default)]
 struct Inner {
     config: SplConfig,
+    /// The audio device and sample rate currently metering, once known.
+    device: Option<(String, u32)>,
     meter: Option<SplMeter>,
     latest: Option<SplReading>,
+    calibration: Option<Run>,
     blocks: u32,
+}
+
+/// A guided calibration in progress.
+struct Run {
+    calibrator: Calibrator,
+    weighting: Weighting,
+    reference_db: f32,
+}
+
+impl Inner {
+    /// Calibrated only while the saved calibration matches what's in use now.
+    fn recheck(&mut self) -> bool {
+        let Some((device, rate)) = &self.device else {
+            return false;
+        };
+        let still = self
+            .config
+            .calibration
+            .as_ref()
+            .is_some_and(|r| r.matches(self.config.source, device, *rate));
+        let changed = still != self.config.calibrated;
+        self.config.calibrated = still;
+        changed
+    }
+
+    /// Turns a finished run into the new settings, or the reason it failed.
+    fn finish(&mut self, run: &Run, measured_dbfs: f32) -> CalibrationStatus {
+        let offset = run.reference_db - measured_dbfs;
+        let (Some(source), Some((device, sample_rate))) = (self.config.source, &self.device) else {
+            return failed(
+                "The measurement input went away during calibration. Start audio and try again.",
+            );
+        };
+        if !SplConfig::OFFSET_RANGE.contains(&offset) {
+            return failed(
+                "That reading is too far from what this input hears. Check you picked the measurement mic and typed the right number.",
+            );
+        }
+        self.config = SplConfig {
+            source: Some(source),
+            offset_db: offset,
+            calibrated: true,
+            calibration: Some(CalibrationRecord {
+                source,
+                device: device.clone(),
+                sample_rate: *sample_rate,
+                weighting: run.weighting,
+                reference_db: run.reference_db,
+                at_ms: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map_or(0, |d| d.as_millis() as u64),
+            }),
+        };
+        CalibrationStatus::Done {
+            offset_db: offset,
+            config: self.config.clone(),
+        }
+    }
+}
+
+fn failed(reason: &str) -> CalibrationStatus {
+    CalibrationStatus::Failed {
+        reason: reason.into(),
+    }
+}
+
+fn status_of(progress: CalibrationProgress) -> CalibrationStatus {
+    match progress {
+        CalibrationProgress::Listening {
+            level_dbfs,
+            steady_secs,
+            elapsed_secs,
+            hold,
+        } => CalibrationStatus::Listening {
+            level_dbfs,
+            steady_secs,
+            needed_secs: audio_engine::spl::calibrate::STEADY_SECS,
+            elapsed_secs,
+            hold: hold.map(str::to_owned),
+        },
+        CalibrationProgress::Failed { reason } => CalibrationStatus::Failed { reason },
+        // Done is turned into settings by `Inner::finish`.
+        CalibrationProgress::Done { .. } => failed("Calibration finished unexpectedly."),
+    }
 }
 
 impl Spl {
@@ -46,10 +137,25 @@ impl Spl {
         }
     }
 
+    /// Records which device is metering. If the calibration was made on
+    /// another one, readings go back to uncalibrated (and that is saved).
+    pub fn set_device(&self, app: &AppHandle, device: &str, sample_rate: u32) {
+        let changed = {
+            let mut inner = self.inner.lock().unwrap();
+            inner.device = Some((device.to_owned(), sample_rate));
+            inner.recheck().then(|| inner.config.clone())
+        };
+        if let Some(config) = changed {
+            save_in_background(app, config);
+        }
+    }
+
     /// Measures the source input out of one block of captured audio. Called
     /// on the metering thread, never the real-time callback.
     pub fn push_audio(&self, app: &AppHandle, channels: u16, sample_rate: u32, samples: &[f32]) {
-        let reading = {
+        let mut events: (Option<SplReading>, Option<CalibrationStatus>) = (None, None);
+        let mut save = None;
+        {
             let mut inner = self.inner.lock().unwrap();
             let Some(source) = inner.config.source else {
                 return;
@@ -63,18 +169,48 @@ impl Spl {
             };
             meter.process_interleaved(samples, channels as usize, source as usize);
             inner.blocks = inner.blocks.wrapping_add(1);
-            if !inner.blocks.is_multiple_of(EMIT_EVERY) {
-                return;
+            let emit = inner.blocks.is_multiple_of(EMIT_EVERY);
+
+            if let Some(mut run) = inner.calibration.take() {
+                run.calibrator
+                    .feed_interleaved(samples, channels as usize, source as usize);
+                match run.calibrator.progress() {
+                    CalibrationProgress::Done { measured_dbfs } => {
+                        let status = inner.finish(&run, measured_dbfs);
+                        if matches!(status, CalibrationStatus::Done { .. }) {
+                            save = Some(inner.config.clone());
+                        }
+                        events.1 = Some(status);
+                    }
+                    progress @ CalibrationProgress::Failed { .. } => {
+                        events.1 = Some(status_of(progress))
+                    }
+                    progress => {
+                        if emit {
+                            events.1 = Some(status_of(progress));
+                        }
+                        inner.calibration = Some(run);
+                    }
+                }
             }
-            let config = inner.config;
-            let reading = inner
-                .meter
-                .as_ref()
-                .and_then(|m| m.reading(&config, source));
-            inner.latest = reading;
-            reading
-        };
-        if let Some(reading) = reading {
+
+            if emit || save.is_some() {
+                let config = inner.config.clone();
+                let reading = inner
+                    .meter
+                    .as_ref()
+                    .and_then(|m| m.reading(&config, source));
+                inner.latest = reading;
+                events.0 = reading;
+            }
+        }
+        if let Some(config) = save {
+            save_in_background(app, config);
+        }
+        if let Some(status) = events.1 {
+            let _ = app.emit("spl-calibration", status);
+        }
+        if let Some(reading) = events.0 {
             let _ = app.emit("spl", reading);
         }
     }
@@ -85,19 +221,27 @@ impl Spl {
     }
 
     fn config(&self) -> SplConfig {
-        self.inner.lock().unwrap().config
+        self.inner.lock().unwrap().config.clone()
     }
 
-    /// Applies new settings. A new source starts the measurement over.
-    fn set_config(&self, config: SplConfig) -> SplConfig {
-        let config = config.sanitized();
+    /// Applies the operator's source and offset. Only a calibration can mark
+    /// readings calibrated; typing an offset clears it. A new source starts
+    /// the measurement over.
+    fn set_config(&self, requested: SplConfig) -> SplConfig {
+        let requested = requested.sanitized();
         let mut inner = self.inner.lock().unwrap();
-        if inner.config.source != config.source {
+        if inner.config.source != requested.source {
             inner.meter = None;
             inner.latest = None;
+            inner.calibration = None;
         }
-        inner.config = config;
-        config
+        if (inner.config.offset_db - requested.offset_db).abs() >= 0.05 {
+            inner.config.offset_db = requested.offset_db;
+            inner.config.calibration = None;
+        }
+        inner.config.source = requested.source;
+        inner.recheck();
+        inner.config.clone()
     }
 }
 
@@ -112,17 +256,28 @@ pub fn load_config(store: &store::Store) -> SplConfig {
         .unwrap_or_default()
 }
 
-async fn save(app: AppHandle, config: SplConfig) -> CmdResult<()> {
+fn write(app: &AppHandle, config: &SplConfig) -> CmdResult<()> {
+    app.state::<AppState>()
+        .store
+        .lock()
+        .unwrap()
+        .set_setting(SETTINGS_KEY, config)
+        .map_err(err)
+}
+
+fn save_in_background(app: &AppHandle, config: SplConfig) {
+    let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        app.state::<AppState>()
-            .store
-            .lock()
-            .unwrap()
-            .set_setting(SETTINGS_KEY, &config)
-            .map_err(err)
-    })
-    .await
-    .map_err(err)?
+        if let Err(e) = write(&app, &config) {
+            log::error!("couldn't save SPL settings: {e}");
+        }
+    });
+}
+
+async fn save(app: AppHandle, config: SplConfig) -> CmdResult<()> {
+    tauri::async_runtime::spawn_blocking(move || write(&app, &config))
+        .await
+        .map_err(err)?
 }
 
 #[tauri::command]
@@ -134,45 +289,40 @@ pub async fn spl_get_config(state: State<'_, AppState>) -> CmdResult<SplConfig> 
 #[tauri::command]
 pub async fn spl_set_config(app: AppHandle, config: SplConfig) -> CmdResult<SplConfig> {
     let applied = app.state::<AppState>().spl.set_config(config);
-    save(app, applied).await?;
+    save(app, applied.clone()).await?;
     Ok(applied)
 }
 
-/// Sets the offset so the current slow reading matches a reference meter
-/// (or a 94 dB calibrator) held next to the measurement mic.
+/// Starts a guided calibration against a reference meter (set to slow) or a
+/// calibrator. Progress and the result arrive as `spl-calibration` events.
 #[tauri::command]
 pub async fn spl_calibrate(
-    app: AppHandle,
+    state: State<'_, AppState>,
     weighting: Weighting,
     reference_db: f32,
-) -> CmdResult<SplConfig> {
+) -> CmdResult<()> {
     if !(30.0..=140.0).contains(&reference_db) {
         return Err("Enter the reference meter's reading, between 30 and 140 dB.".into());
     }
-    let applied = {
-        let spl = &app.state::<AppState>().spl;
-        let mut inner = spl.inner.lock().unwrap();
-        let offset = inner
-            .meter
-            .as_ref()
-            .and_then(|m| m.calibration_offset(weighting, reference_db))
-            .ok_or(
-                "The measurement input is too quiet to calibrate. Check the source and play pink noise or a calibrator, then try again.",
-            )?;
-        let next = SplConfig {
-            offset_db: offset,
-            calibrated: true,
-            ..inner.config
-        }
-        .sanitized();
-        if next.offset_db != offset {
-            return Err("That reading is too far from what this input hears. Check you picked the measurement mic.".into());
-        }
-        inner.config = next;
-        next
+    let mut inner = state.spl.inner.lock().unwrap();
+    if inner.config.source.is_none() {
+        return Err("Choose the measurement input first.".into());
+    }
+    let Some((_, sample_rate)) = inner.device else {
+        return Err("Start Dante audio in Setup first, so there's something to measure.".into());
     };
-    save(app, applied).await?;
-    Ok(applied)
+    inner.calibration = Some(Run {
+        calibrator: Calibrator::new(weighting, sample_rate),
+        weighting,
+        reference_db,
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn spl_cancel_calibration(state: State<'_, AppState>) -> CmdResult<()> {
+    state.spl.inner.lock().unwrap().calibration = None;
+    Ok(())
 }
 
 /// Clears history, Leq, maximum and peak, e.g. at the start of a service.

@@ -92,6 +92,9 @@ pub async fn start_metering(app: AppHandle, device: Option<String>) -> CmdResult
             },
         )
         .map_err(err)?;
+        state
+            .spl
+            .set_device(&app, &handle.device_name, handle.sample_rate);
         let info = MeteringInfo {
             device_name: handle.device_name.clone(),
             channels: handle.channels,

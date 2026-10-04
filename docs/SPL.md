@@ -18,12 +18,29 @@ moments. To calibrate:
 
 1. Hold a sound level meter (set to slow) next to the measurement mic, or put a
    94 dB calibrator on it.
-2. Play pink noise through the system (skip this with a calibrator).
+2. Play steady pink noise through the system (skip this with a calibrator).
 3. Enter the meter's reading, pick dBA or dBC to match it, and press Calibrate.
 
-The offset is saved in the app database (`spl.config`). Changing the preamp
-gain on the measurement mic's input invalidates it. Typing an offset by hand
-marks readings uncalibrated again.
+The guided calibration (`crates/audio-engine/src/spl/calibrate.rs`) then:
+
+- lets the weighting filter settle for half a second;
+- measures the weighted level in quarter-second steps and waits for **5 seconds
+  that stay within 1.5 dB**, restarting the count if the level jumps;
+- refuses input that is **clipping** (raw peaks at or over −0.2 dBFS) or
+  **too quiet** (under −65 dBFS, where noise and hum start to count);
+- averages the steady stretch's energy and sets the offset so it reads the
+  reference;
+- gives up after 30 seconds with the reason.
+
+The result is saved in the app database (`spl.config`) with the input, audio
+device, sample rate, weighting, reference and time. If the input, device or
+sample rate in use stops matching, readings go back to *uncalibrated* until you
+calibrate again. Typing an offset by hand also clears the calibration.
+
+Not detected yet: a change to the measurement mic's **preamp gain** on the
+console (the dLive adapter doesn't report gain), so recalibrate after changing
+it. Correcting for the measurement mic's own frequency response (its
+manufacturer calibration file) is a possible follow-up.
 
 ## What it reports
 

@@ -22,15 +22,39 @@ pub enum Weighting {
 }
 
 /// Which input to measure and how to turn its dBFS into dB SPL.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SplConfig {
     /// 0-based input on the audio device; `None` turns the meter off.
     pub source: Option<u16>,
     /// dB SPL = dBFS (RMS) + this.
     pub offset_db: f32,
-    /// True once the offset came from a reference meter or calibrator.
+    /// True while the offset came from a calibration that still matches the
+    /// source, device and sample rate in use.
     pub calibrated: bool,
+    /// What the last calibration was made against. Readings go back to
+    /// uncalibrated when the source, device or sample rate stops matching.
+    #[serde(default)]
+    pub calibration: Option<CalibrationRecord>,
+}
+
+/// Where and when a calibration was made.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CalibrationRecord {
+    pub source: u16,
+    pub device: String,
+    pub sample_rate: u32,
+    pub weighting: Weighting,
+    pub reference_db: f32,
+    /// Unix time in milliseconds.
+    pub at_ms: u64,
+}
+
+impl CalibrationRecord {
+    pub fn matches(&self, source: Option<u16>, device: &str, sample_rate: u32) -> bool {
+        source == Some(self.source) && device == self.device && sample_rate == self.sample_rate
+    }
 }
 
 impl SplConfig {
@@ -58,6 +82,7 @@ impl Default for SplConfig {
             source: None,
             offset_db: Self::DEFAULT_OFFSET_DB,
             calibrated: false,
+            calibration: None,
         }
     }
 }
@@ -103,4 +128,24 @@ pub struct SplPoint {
     pub t: f64,
     pub a: f32,
     pub c: f32,
+}
+
+/// Progress of a guided calibration, pushed to the UI as it listens.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "camelCase")]
+pub enum CalibrationStatus {
+    /// Waiting for a steady signal. `steady_secs` counts toward `needed_secs`.
+    #[serde(rename_all = "camelCase")]
+    Listening {
+        level_dbfs: f32,
+        steady_secs: f32,
+        needed_secs: f32,
+        elapsed_secs: f32,
+        /// Why it isn't counting yet, in plain words, if it isn't.
+        hold: Option<String>,
+    },
+    #[serde(rename_all = "camelCase")]
+    Done { offset_db: f32, config: SplConfig },
+    #[serde(rename_all = "camelCase")]
+    Failed { reason: String },
 }

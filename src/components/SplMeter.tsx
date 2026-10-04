@@ -332,13 +332,13 @@ function SplTable({ reading }: { reading: SplReading }) {
 
 /** Source, calibration and reset. */
 function SplSettings() {
-  const { config, error, setSource, setOffset, calibrate, reset, clearError } = useSpl();
+  const { config, error, setSource, setOffset, calibrate, reset, clearError, dismissCalibration } = useSpl();
+  const listening = useSpl((s) => s.calibration?.state === "listening");
   const strips = useMixer((s) => s.strips);
   const audio = useMixer((s) => s.audio);
   const [reference, setReference] = useState("");
   const [weighting, setWeighting] = useState<Weighting>("c");
   const [offset, setOffsetText] = useState("");
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (config) setOffsetText(config.offsetDb.toFixed(1));
@@ -375,8 +375,14 @@ function SplSettings() {
         </span>
       </label>
 
-      <fieldset className="spl-calibrate" disabled={config.source === null || busy}>
+      <fieldset className="spl-calibrate" disabled={config.source === null || listening}>
         <legend className="sm-field__label">Calibrate</legend>
+        <CalibrationSummary />
+        <ol className="spl-steps text-caption muted">
+          <li>Hold an SPL meter set to slow next to the measurement mic, or fit a 94 dB calibrator on it.</li>
+          <li>Play steady pink noise through the system (not needed with a calibrator) and keep the room quiet.</li>
+          <li>Enter what the meter reads and press Calibrate. SanctuaryMix waits for 5 seconds of steady level and averages it.</li>
+        </ol>
         <div className="spl-calibrate__row">
           <label className="sm-field spl-calibrate__ref">
             <span className="sm-field__label">Reference meter reads</span>
@@ -388,6 +394,7 @@ function SplSettings() {
               onChange={(e) => {
                 setReference(e.target.value);
                 clearError();
+                dismissCalibration();
               }}
             />
           </label>
@@ -401,21 +408,13 @@ function SplSettings() {
           <button
             className="sm-btn"
             disabled={reference.trim() === ""}
-            onClick={() => {
-              setBusy(true);
-              void calibrate(weighting, Number(reference)).then((ok) => {
-                setBusy(false);
-                if (ok) setReference("");
-              });
-            }}
+            onClick={() => void calibrate(weighting, Number(reference.replace(MINUS, "-")))}
           >
             Calibrate
           </button>
         </div>
-        <span className="sm-field__help">
-          Hold an SPL meter set to slow next to the measurement mic, play pink noise, and enter what it reads.
-        </span>
       </fieldset>
+      <CalibrationProgress />
 
       <label className="sm-field">
         <span className="sm-field__label">Offset (dB)</span>
@@ -427,7 +426,10 @@ function SplSettings() {
           onBlur={commitOffset}
           onKeyDown={(e) => e.key === "Enter" && commitOffset()}
         />
-        <span className="sm-field__help">Added to the input's dBFS level. Typing one marks readings uncalibrated.</span>
+        <span className="sm-field__help">
+          Added to the input's dBFS level. Typing one marks readings uncalibrated. Recalibrate after changing this
+          input's gain on the console.
+        </span>
       </label>
 
       {error && (
@@ -442,6 +444,78 @@ function SplSettings() {
         </button>
         <span className="text-caption muted">Clears the graph, Leq, loudest and peak. Do it before the service starts.</span>
       </div>
+    </div>
+  );
+}
+
+const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+
+/** What the saved calibration was made against, and whether it still applies. */
+function CalibrationSummary() {
+  const config = useSpl((s) => s.config);
+  if (!config) return null;
+  const record = config.calibration;
+  if (!record) {
+    return <p className="text-caption spl-uncal">Not calibrated. Readings are estimates.</p>;
+  }
+  const what = `${formatSpl(record.referenceDb)} dB${record.weighting.toUpperCase()} on Input ${record.source + 1}, ${record.device}`;
+  return config.calibrated ? (
+    <p className="text-caption muted">
+      Calibrated {dateTime.format(record.atMs)} to {what}.
+    </p>
+  ) : (
+    <p className="text-caption spl-uncal">
+      The last calibration was for {what} at {record.sampleRate / 1000} kHz. Something has changed since, so calibrate
+      again.
+    </p>
+  );
+}
+
+/** Live progress while calibrating, then how it went. */
+function CalibrationProgress() {
+  const calibration = useSpl((s) => s.calibration);
+  const cancel = useSpl((s) => s.cancelCalibration);
+  if (!calibration) return null;
+  if (calibration.state === "done") {
+    return (
+      <p className="spl-cal-result text-caption" role="status">
+        Calibrated. Offset is now {formatSpl(calibration.offsetDb)} dB.
+      </p>
+    );
+  }
+  if (calibration.state === "failed") {
+    return (
+      <p className="error" role="alert">
+        {calibration.reason}
+      </p>
+    );
+  }
+  const { steadySecs, neededSecs, levelDbfs, hold } = calibration;
+  return (
+    <div className="spl-cal-progress" role="status">
+      <div className="spl-cal-progress__head">
+        <span className="text-body-strong">Listening</span>
+        <span className="text-readout">
+          {levelDbfs <= -139 ? "—" : `${formatSpl(levelDbfs)} dBFS`}
+        </span>
+        <span className="spl-spacer" />
+        <button className="sm-btn sm-btn--sm" onClick={() => void cancel()}>
+          Cancel
+        </button>
+      </div>
+      <div
+        className="spl-cal-bar"
+        role="progressbar"
+        aria-label="Steady signal"
+        aria-valuemin={0}
+        aria-valuemax={neededSecs}
+        aria-valuenow={Math.min(steadySecs, neededSecs)}
+      >
+        <span style={{ width: `${Math.min(100, (steadySecs / neededSecs) * 100)}%` }} />
+      </div>
+      <span className="text-caption muted">
+        {hold ?? `Steady for ${steadySecs.toFixed(1)} of ${neededSecs.toFixed(0)} seconds`}
+      </span>
     </div>
   );
 }

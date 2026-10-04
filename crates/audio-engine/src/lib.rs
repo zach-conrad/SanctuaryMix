@@ -26,7 +26,7 @@ pub use engine::{start_metering, MeterHandle};
 pub use permission::{microphone_access, request_microphone_access, MicAccess};
 pub use playback::{list_output_devices, OutputDeviceInfo, PlaybackPosition, Player};
 pub use record::{AudioRecordOptions, AudioRecorder, RecordStats, WrittenFile, WrittenFileKind};
-pub use spl::SplMeter;
+pub use spl::{CalibrationProgress, Calibrator, SplMeter};
 pub use tap::AudioBlock;
 
 #[derive(Debug, thiserror::Error)]

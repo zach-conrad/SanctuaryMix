@@ -80,6 +80,7 @@ pub fn run() {
             spl::spl_get_config,
             spl::spl_set_config,
             spl::spl_calibrate,
+            spl::spl_cancel_calibration,
             spl::spl_reset,
             spl::spl_reading,
             spl::spl_history,

@@ -7,6 +7,10 @@
 //! read, so recalibrating shifts the whole history at once.
 
 use std::collections::VecDeque;
+
+pub use calibrate::{CalibrationProgress, Calibrator};
+
+pub mod calibrate;
 use std::f64::consts::PI;
 
 use mix_core::spl::{AcLevel, SplConfig, SplPoint, SplReading, Weighting};
@@ -18,8 +22,6 @@ const FAST_SECS: f64 = 0.125;
 const SLOW_SECS: f64 = 1.0;
 /// Mean squares below this read as silence (−140 dBFS) rather than −∞.
 const FLOOR_MS: f64 = 1e-14;
-/// Calibration needs a real signal; anything quieter is almost certainly the wrong input.
-const CALIBRATION_MIN_DBFS: f32 = -80.0;
 
 // Analog pole frequencies from IEC 61672-1, in Hz.
 const F1: f64 = 20.598_997;
@@ -130,6 +132,12 @@ impl WeightingFilter {
         };
         filter.gain = 1.0 / filter.magnitude(1_000.0);
         filter
+    }
+
+    pub fn reset(&mut self) {
+        for s in &mut self.sections {
+            s.z = [0.0; 2];
+        }
     }
 
     #[inline]
@@ -303,13 +311,6 @@ impl SplMeter {
         ms_to_db(if slow { ch.slow } else { ch.fast }, 0.0)
     }
 
-    /// The offset that makes the current slow level read `reference_db`, or
-    /// `None` if the input is too quiet to calibrate against.
-    pub fn calibration_offset(&self, weighting: Weighting, reference_db: f32) -> Option<f32> {
-        let measured = self.level_dbfs(weighting, true);
-        (measured >= CALIBRATION_MIN_DBFS).then_some(reference_db - measured)
-    }
-
     /// Everything measured so far, in dB SPL per `config`. `None` before any audio.
     pub fn reading(&self, config: &SplConfig, source: u16) -> Option<SplReading> {
         if self.total_count == 0 {
@@ -421,6 +422,7 @@ mod tests {
             source: Some(0),
             offset_db: 100.0,
             calibrated: true,
+            calibration: None,
         };
         let r = m.reading(&config, 0).unwrap();
         for v in [
@@ -455,23 +457,6 @@ mod tests {
         assert!((r.leq_1m.a - (loud - 3.01)).abs() < 0.2, "{r:?}");
         assert!((r.a_max - loud).abs() < 0.2, "{r:?}");
         assert!(r.fast.a < loud - 60.0, "{r:?}");
-    }
-
-    #[test]
-    fn calibration_offset_makes_slow_level_read_the_reference() {
-        let mut m = SplMeter::new(48_000);
-        m.process(&sine(1_000.0, 0.1, 48_000, 4.0));
-        let off = m.calibration_offset(Weighting::C, 94.0).unwrap();
-        let config = SplConfig {
-            source: Some(3),
-            offset_db: off,
-            calibrated: true,
-        };
-        let r = m.reading(&config, 3).unwrap();
-        assert!((r.slow.c - 94.0).abs() < 0.01, "{r:?}");
-
-        let quiet = SplMeter::new(48_000);
-        assert_eq!(quiet.calibration_offset(Weighting::A, 94.0), None);
     }
 
     #[test]

@@ -340,9 +340,35 @@ export interface SplConfig {
   source: number | null;
   /** dB SPL = dBFS (RMS) + this. */
   offsetDb: number;
-  /** True once the offset came from a reference meter or calibrator. */
+  /** True while the offset came from a calibration that still matches the source, device and sample rate. */
   calibrated: boolean;
+  /** What the last calibration was made against. */
+  calibration: CalibrationRecord | null;
 }
+
+export interface CalibrationRecord {
+  source: number;
+  device: string;
+  sampleRate: number;
+  weighting: Weighting;
+  referenceDb: number;
+  /** Unix time in ms. */
+  atMs: number;
+}
+
+/** Progress of a guided calibration (`spl-calibration` events). */
+export type CalibrationStatus =
+  | {
+      state: "listening";
+      levelDbfs: number;
+      steadySecs: number;
+      neededSecs: number;
+      elapsedSecs: number;
+      /** Why the steady count isn't growing, if it isn't. */
+      hold: string | null;
+    }
+  | { state: "done"; offsetDb: number; config: SplConfig }
+  | { state: "failed"; reason: string };
 
 /** One A/C pair of levels in dB SPL. */
 export interface AcLevel {

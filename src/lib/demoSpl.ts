@@ -2,7 +2,7 @@
 // speaking and worship sets, measured the way crates/audio-engine/src/spl.rs
 // does it (energy averages, offset applied when read).
 
-import type { SplConfig, SplPoint, SplReading, Weighting } from "./types";
+import type { CalibrationStatus, SplConfig, SplPoint, SplReading, Weighting } from "./types";
 
 const DEFAULT_OFFSET_DB = 120;
 const HISTORY_SECS = 2 * 60 * 60;
@@ -32,7 +32,10 @@ export interface DemoSpl {
   stop(): void;
   getConfig(): SplConfig;
   setConfig(config: SplConfig): SplConfig;
-  calibrate(weighting: Weighting, referenceDb: number): SplConfig;
+  /** Pretends pink noise is playing: steady for five seconds, then done. */
+  calibrate(weighting: Weighting, referenceDb: number): void;
+  cancelCalibration(): void;
+  onCalibration(cb: (s: CalibrationStatus) => void): () => void;
   reset(): void;
   reading(): SplReading | null;
   history(seconds: number): SplPoint[];
@@ -41,8 +44,15 @@ export interface DemoSpl {
 
 export function createDemoSpl(): DemoSpl {
   // The demo room has an ambience mic on input 29 ("Ambient L").
-  let config: SplConfig = { source: 28, offsetDb: DEFAULT_OFFSET_DB, calibrated: false };
+  let config: SplConfig = { source: 28, offsetDb: DEFAULT_OFFSET_DB, calibrated: false, calibration: null };
   const listeners = new Set<(r: SplReading) => void>();
+  const calListeners = new Set<(s: CalibrationStatus) => void>();
+  let calTimer: ReturnType<typeof setInterval> | null = null;
+  const emitCal = (s: CalibrationStatus) => calListeners.forEach((cb) => cb(s));
+  const cancelCal = () => {
+    if (calTimer) clearInterval(calTimer);
+    calTimer = null;
+  };
   let timer: ReturnType<typeof setInterval> | null = null;
   // Raw mean squares (dBFS terms), one per second.
   let points: { t: number; a: number; c: number }[] = [];
@@ -127,26 +137,66 @@ export function createDemoSpl(): DemoSpl {
     stop() {
       if (timer) clearInterval(timer);
       timer = null;
+      cancelCal();
     },
     getConfig: () => config,
     setConfig(next) {
       const offsetDb = Number.isFinite(next.offsetDb) ? Math.min(180, Math.max(60, next.offsetDb)) : DEFAULT_OFFSET_DB;
-      if (next.source !== config.source) clear();
-      config = { ...next, offsetDb };
+      if (next.source !== config.source) {
+        clear();
+        cancelCal();
+      }
+      // Only a calibration marks readings calibrated; typing an offset clears it.
+      const typed = Math.abs(offsetDb - config.offsetDb) >= 0.05;
+      const calibration = typed ? null : config.calibration;
+      config = {
+        source: next.source,
+        offsetDb,
+        calibration,
+        calibrated: calibration !== null && calibration.source === next.source,
+      };
       return config;
     },
     calibrate(weighting, referenceDb) {
       if (!(referenceDb >= 30 && referenceDb <= 140)) {
         throw new Error("Enter the reference meter's reading, between 30 and 140 dB.");
       }
-      const measured = toDb(weighting === "a" ? slow.a : slow.c);
-      if (elapsed === 0 || measured < -80) {
-        throw new Error(
-          "The measurement input is too quiet to calibrate. Check the source and play pink noise or a calibrator, then try again.",
-        );
-      }
-      config = { ...config, offsetDb: referenceDb - measured, calibrated: true };
-      return config;
+      if (config.source === null) throw new Error("Choose the measurement input first.");
+      if (!timer) throw new Error("Start Dante audio in Setup first, so there's something to measure.");
+      cancelCal();
+      let ticks = 0;
+      const neededSecs = 5;
+      calTimer = setInterval(() => {
+        ticks++;
+        const levelDbfs = toDb(weighting === "a" ? slow.a : slow.c);
+        // The first half second lets the filters settle, like the real one.
+        const steadySecs = Math.max(0, (ticks - 2) * 0.25);
+        if (steadySecs < neededSecs) {
+          emitCal({ state: "listening", levelDbfs, steadySecs, neededSecs, elapsedSecs: ticks * 0.25, hold: null });
+          return;
+        }
+        cancelCal();
+        const source = config.source!;
+        config = {
+          source,
+          offsetDb: referenceDb - levelDbfs,
+          calibrated: true,
+          calibration: {
+            source,
+            device: "Dante Virtual Soundcard",
+            sampleRate: 48000,
+            weighting,
+            referenceDb,
+            atMs: Date.now(),
+          },
+        };
+        emitCal({ state: "done", offsetDb: config.offsetDb, config });
+      }, 250);
+    },
+    cancelCalibration: cancelCal,
+    onCalibration(cb) {
+      calListeners.add(cb);
+      return () => calListeners.delete(cb);
     },
     reset: clear,
     reading,

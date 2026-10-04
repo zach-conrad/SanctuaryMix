@@ -224,7 +224,13 @@ export function createDemoBackend(): Backend {
       return spl.setConfig(config);
     },
     async splCalibrate(weighting, referenceDb) {
-      return spl.calibrate(weighting, referenceDb);
+      spl.calibrate(weighting, referenceDb);
+    },
+    async splCancelCalibration() {
+      spl.cancelCalibration();
+    },
+    async onSplCalibration(cb) {
+      return spl.onCalibration(cb);
     },
     async splReset() {
       spl.reset();
