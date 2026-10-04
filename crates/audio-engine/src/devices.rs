@@ -1,6 +1,7 @@
 use cpal::traits::{DeviceTrait, HostTrait};
 use serde::Serialize;
 
+use crate::permission::ensure_input_access;
 use crate::{AudioError, Result};
 
 #[derive(Debug, Clone, Serialize)]
@@ -14,7 +15,10 @@ pub struct AudioDeviceInfo {
     pub is_dante: bool,
 }
 
+/// Fails with [`AudioError::PermissionDenied`] rather than touching inputs the
+/// user hasn't allowed, which on macOS would show the prompt again.
 pub fn list_input_devices() -> Result<Vec<AudioDeviceInfo>> {
+    ensure_input_access()?;
     let host = cpal::default_host();
     let default_name = host.default_input_device().and_then(|d| d.name().ok());
     let mut out = Vec::new();
@@ -46,6 +50,7 @@ pub fn list_input_devices() -> Result<Vec<AudioDeviceInfo>> {
 }
 
 pub(crate) fn find_input_device(name: Option<&str>) -> Result<cpal::Device> {
+    ensure_input_access()?;
     let host = cpal::default_host();
     match name {
         None => host
