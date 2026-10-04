@@ -26,6 +26,13 @@ export function createDemoBackend(): Backend {
 
   return {
     isDemo: true,
+    async microphoneAccess() {
+      return "granted";
+    },
+    async requestMicrophoneAccess() {
+      return "granted";
+    },
+    async openMicrophoneSettings() {},
     async listAudioDevices() {
       return [
         { name: "Dante Virtual Soundcard", maxInputChannels: 64, defaultSampleRate: 48000, isDefault: false, isDante: true },

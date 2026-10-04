@@ -48,6 +48,17 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run app:build:mac
+      # macOS ties the microphone grant to the app's signature. An unsealed
+      # bundle or a missing audio-input entitlement brings the prompt back.
+      - name: Check signature and microphone entitlement
+        run: |
+          app=target/universal-apple-darwin/release/bundle/macos/SanctuaryMix.app
+          codesign --verify --deep --strict "$app"
+          codesign -dv "$app" 2>&1 | tee sig.txt
+          grep -q "^Identifier=app.sanctuarymix.desktop$" sig.txt
+          grep -q "Info.plist entries=" sig.txt
+          codesign -d --entitlements - --xml "$app" | grep -q "com.apple.security.device.audio-input"
+          plutil -extract NSMicrophoneUsageDescription raw "$app/Contents/Info.plist"
       - uses: actions/upload-artifact@v4
         with:
           name: sanctuarymix-macos

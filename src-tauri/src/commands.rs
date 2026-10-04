@@ -1,9 +1,9 @@
-use audio_engine::AudioDeviceInfo;
+use audio_engine::{AudioDeviceInfo, MicAccess};
 use auth::Session;
 use console::{ConsoleConfig, ConsoleError};
 use mix_core::{ChannelId, ChannelKind};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::state::AppState;
 
@@ -14,9 +14,41 @@ fn err(e: impl std::fmt::Display) -> String {
     e.to_string()
 }
 
+// Audio commands are async and do their CoreAudio work on a blocking thread.
+// Plain `fn` commands run on the main thread, and a device call that waits on
+// the macOS microphone prompt there freezes the whole window.
+
+async fn blocking<T: Send + 'static>(
+    f: impl FnOnce() -> CmdResult<T> + Send + 'static,
+) -> CmdResult<T> {
+    tauri::async_runtime::spawn_blocking(f).await.map_err(err)?
+}
+
 #[tauri::command]
-pub fn list_audio_devices() -> CmdResult<Vec<AudioDeviceInfo>> {
-    audio_engine::list_input_devices().map_err(err)
+pub fn microphone_access() -> MicAccess {
+    audio_engine::microphone_access()
+}
+
+/// Shows the macOS prompt if the user hasn't answered yet, once.
+#[tauri::command]
+pub async fn request_microphone_access() -> CmdResult<MicAccess> {
+    blocking(|| Ok(audio_engine::request_microphone_access())).await
+}
+
+/// Opens System Settings at Privacy & Security › Microphone.
+#[tauri::command]
+pub fn open_microphone_settings() -> CmdResult<()> {
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open")
+        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
+        .spawn()
+        .map_err(err)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn list_audio_devices() -> CmdResult<Vec<AudioDeviceInfo>> {
+    blocking(|| audio_engine::list_input_devices().map_err(err)).await
 }
 
 #[derive(Serialize)]
@@ -28,30 +60,35 @@ pub struct MeteringInfo {
 }
 
 #[tauri::command]
-pub fn start_metering(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    device: Option<String>,
-) -> CmdResult<MeteringInfo> {
-    let mut slot = state.metering.lock().unwrap();
-    // Stop the old stream before opening the device again.
-    slot.take();
-    let handle = audio_engine::start_metering(device, move |frame| {
-        let _ = app.emit("meters", frame);
+pub async fn start_metering(app: AppHandle, device: Option<String>) -> CmdResult<MeteringInfo> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        let mut slot = state.metering.lock().unwrap();
+        // Stop the old stream before opening the device again.
+        slot.take();
+        let emitter = app.clone();
+        let handle = audio_engine::start_metering(device, move |frame| {
+            let _ = emitter.emit("meters", frame);
+        })
+        .map_err(err)?;
+        let info = MeteringInfo {
+            device_name: handle.device_name.clone(),
+            channels: handle.channels,
+            sample_rate: handle.sample_rate,
+        };
+        *slot = Some(handle);
+        Ok(info)
     })
-    .map_err(err)?;
-    let info = MeteringInfo {
-        device_name: handle.device_name.clone(),
-        channels: handle.channels,
-        sample_rate: handle.sample_rate,
-    };
-    *slot = Some(handle);
-    Ok(info)
+    .await
 }
 
 #[tauri::command]
-pub fn stop_metering(state: State<'_, AppState>) {
-    state.metering.lock().unwrap().take();
+pub async fn stop_metering(app: AppHandle) -> CmdResult<()> {
+    blocking(move || {
+        app.state::<AppState>().metering.lock().unwrap().take();
+        Ok(())
+    })
+    .await
 }
 
 #[tauri::command]

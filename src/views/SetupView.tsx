@@ -1,7 +1,7 @@
 import { AudioLines, RefreshCw, Router } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getBackend } from "../lib/backend";
-import type { AudioDeviceInfo, ConsoleConfig } from "../lib/types";
+import type { AudioDeviceInfo, ConsoleConfig, MicAccess } from "../lib/types";
 import { useMixer } from "../store/mixer";
 
 export function SetupView() {
@@ -13,25 +13,62 @@ export function SetupView() {
   );
 }
 
+/**
+ * Lists inputs only once microphone access is settled. On macOS, touching
+ * audio inputs before the user answers (or after they say no) brings the
+ * permission prompt back, so this asks once and shares the answer. The shared
+ * promise also covers React running the mount effect twice in development.
+ */
+let pendingLoad: Promise<AudioLoad> | null = null;
+
+type AudioLoad = { access: MicAccess; devices: AudioDeviceInfo[] };
+
+function loadAudioInputs(): Promise<AudioLoad> {
+  pendingLoad ??= (async () => {
+    const backend = await getBackend();
+    let access = await backend.microphoneAccess();
+    if (access === "undetermined") access = await backend.requestMicrophoneAccess();
+    const devices = access === "granted" ? await backend.listAudioDevices() : [];
+    return { access, devices };
+  })().finally(() => {
+    pendingLoad = null;
+  });
+  return pendingLoad;
+}
+
 function AudioPanel() {
   const { audioStatus, audio, audioError, startAudio, stopAudio } = useMixer();
+  const [access, setAccess] = useState<MicAccess | null>(null);
   const [devices, setDevices] = useState<AudioDeviceInfo[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const refresh = async () => {
+    setLoading(true);
     try {
-      const list = await (await getBackend()).listAudioDevices();
-      setDevices(list);
-      setSelected((cur) => cur ?? list[0]?.name ?? null);
+      const result = await loadAudioInputs();
+      setAccess(result.access);
+      setDevices(result.devices);
+      setSelected((cur) => cur ?? result.devices[0]?.name ?? null);
       setListError(null);
     } catch (e) {
       setListError(`Couldn't list audio inputs. ${String(e)}`);
+    } finally {
+      setLoading(false);
     }
   };
   useEffect(() => {
     void refresh();
   }, []);
+
+  const openSettings = async () => {
+    try {
+      await (await getBackend()).openMicrophoneSettings();
+    } catch (e) {
+      setListError(String(e));
+    }
+  };
 
   const running = audioStatus === "on";
   return (
@@ -39,7 +76,7 @@ function AudioPanel() {
       <div className="panel-head">
         <AudioLines size={20} strokeWidth={1.75} />
         <h2 className="text-heading">Dante audio</h2>
-        <button className="sm-btn sm-btn--ghost sm-btn--sm" onClick={refresh} aria-label="Refresh audio inputs" title="Refresh">
+        <button className="sm-btn sm-btn--ghost sm-btn--sm" onClick={refresh} disabled={loading} aria-label="Refresh audio inputs" title="Refresh">
           <RefreshCw />
         </button>
       </div>
@@ -48,22 +85,43 @@ function AudioPanel() {
         1 to input 1, and so on.
       </p>
       {listError && <p className="error">{listError}</p>}
-      <div className="device-list" role="radiogroup" aria-label="Audio input">
-        {devices.map((d) => (
-          <label key={d.name} className="device" data-selected={selected === d.name}>
-            <input type="radio" name="device" checked={selected === d.name} onChange={() => setSelected(d.name)} />
-            <span className="device-text">
-              <span className="text-body-strong">{d.name}</span>
-              <span className="text-caption muted">
-                {d.maxInputChannels} {d.maxInputChannels === 1 ? "input" : "inputs"} · {d.defaultSampleRate / 1000} kHz
+      {access === "denied" ? (
+        <div className="permission-off" role="status">
+          <p className="text-body-strong">Microphone access is off</p>
+          <p className="muted">
+            SanctuaryMix needs it to hear the Dante channels. In System Settings, open Privacy &amp; Security ›
+            Microphone and turn on SanctuaryMix, then check again.
+          </p>
+          <div className="actions">
+            <button className="sm-btn sm-btn--lg sm-btn--ghost" onClick={refresh} disabled={loading}>
+              Check again
+            </button>
+            <button className="sm-btn sm-btn--lg" onClick={openSettings}>
+              Open System Settings
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="device-list" role="radiogroup" aria-label="Audio input">
+          {devices.map((d) => (
+            <label key={d.name} className="device" data-selected={selected === d.name}>
+              <input type="radio" name="device" checked={selected === d.name} onChange={() => setSelected(d.name)} />
+              <span className="device-text">
+                <span className="text-body-strong">{d.name}</span>
+                <span className="text-caption muted">
+                  {d.maxInputChannels} {d.maxInputChannels === 1 ? "input" : "inputs"} · {d.defaultSampleRate / 1000} kHz
+                </span>
               </span>
-            </span>
-            {d.isDante && <span className="text-label muted">Dante</span>}
-            {d.isDefault && !d.isDante && <span className="text-label muted">System default</span>}
-          </label>
-        ))}
-        {devices.length === 0 && !listError && <p className="empty">No audio inputs found. Is Dante Virtual Soundcard running?</p>}
-      </div>
+              {d.isDante && <span className="text-label muted">Dante</span>}
+              {d.isDefault && !d.isDante && <span className="text-label muted">System default</span>}
+            </label>
+          ))}
+          {access === null && <p className="empty">Checking audio inputs…</p>}
+          {access === "granted" && devices.length === 0 && !listError && (
+            <p className="empty">No audio inputs found. Is Dante Virtual Soundcard running?</p>
+          )}
+        </div>
+      )}
       {audioError && <p className="error">{audioError}</p>}
       <div className="actions">
         {running && audio && (
@@ -78,7 +136,7 @@ function AudioPanel() {
         ) : (
           <button
             className="sm-btn sm-btn--lg sm-btn--primary"
-            disabled={!selected || audioStatus === "connecting"}
+            disabled={!selected || access !== "granted" || audioStatus === "connecting"}
             onClick={() => startAudio(selected)}
           >
             {audioStatus === "connecting" ? "Starting…" : "Start listening"}
