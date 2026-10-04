@@ -27,6 +27,8 @@ export function TopBar() {
 
   return (
     <header className="topbar" data-tauri-drag-region>
+      <img className="wordmark" src="/brand/wordmark-dark.svg" alt="SanctuaryMix" data-tauri-drag-region />
+      <span className="topbar-divider" />
       <h1 data-tauri-drag-region>{titles[view]}</h1>
       {isDemo && <span className="demo-badge" title="Running in a browser with simulated audio and console">Demo mode</span>}
       <div className="topbar-spacer" data-tauri-drag-region />

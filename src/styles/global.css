@@ -1,13 +1,17 @@
 :root {
-  --bg: #0d0f17;
-  --bg-raised: #151826;
-  --bg-strip: #191c2b;
-  --bg-input: #0f1220;
-  --border: #262a3d;
-  --text: #e7e9f3;
-  --text-muted: #8b90a8;
-  --accent: #6366f1;
-  --accent-soft: rgba(99, 102, 241, 0.16);
+  --bg: #111317;
+  --bg-raised: #171a20;
+  --bg-strip: #1c1f26;
+  --bg-input: #0e1014;
+  --border: #2a2e37;
+  --text: #f3f2ee;
+  --text-muted: #8e929c;
+  /* Brand teal from the SanctuaryMix wordmark ("mix"). */
+  --accent: #3fc1be;
+  --accent-strong: #0e7c7b;
+  --accent-text: #9fe3e1;
+  --on-accent: #0b1d1d;
+  --accent-soft: rgba(63, 193, 190, 0.15);
   --ok: #22c55e;
   --warn: #f59e0b;
   --bad: #ef4444;
@@ -58,7 +62,7 @@ main { flex: 1; min-height: 0; overflow: auto; }
   color: var(--text-muted); font-size: 11px; font-weight: 500;
 }
 .nav-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
-.nav-item.active { background: var(--accent-soft); color: #c7c9ff; }
+.nav-item.active { background: var(--accent-soft); color: var(--accent-text); }
 
 /* Top bar */
 .topbar {
@@ -66,7 +70,9 @@ main { flex: 1; min-height: 0; overflow: auto; }
   display: flex; align-items: center; gap: 10px; padding: 0 16px 0 20px;
   border-bottom: 1px solid var(--border);
 }
-.topbar h1 { font-size: 17px; }
+.topbar h1 { font-size: 15px; font-weight: 500; color: var(--text-muted); }
+.wordmark { height: 22px; width: auto; display: block; }
+.topbar-divider { width: 1px; height: 18px; background: var(--border); }
 .topbar-spacer { flex: 1; align-self: stretch; }
 .demo-badge {
   font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px;
@@ -95,9 +101,9 @@ main { flex: 1; min-height: 0; overflow: auto; }
 .mix-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .banner {
   display: flex; align-items: center; gap: 10px; margin: 12px 16px 0; padding: 10px 14px;
-  border-radius: var(--radius); background: var(--accent-soft); color: #c7c9ff; font-size: 13px;
+  border-radius: var(--radius); background: var(--accent-soft); color: var(--accent-text); font-size: 13px;
 }
-.link { border: 0; background: none; color: #a5b4fc; font-weight: 600; padding: 0; }
+.link { border: 0; background: none; color: var(--accent); font-weight: 600; padding: 0; }
 .link:hover { text-decoration: underline; }
 .strips {
   flex: 1; min-height: 0; display: flex; gap: 6px; padding: 14px 16px 16px;
@@ -129,7 +135,7 @@ main { flex: 1; min-height: 0; overflow: auto; }
 .meter { width: 10px; display: flex; flex-direction: column; gap: 3px; }
 .meter-clip { height: 5px; border-radius: 2px; background: #3a1d24; }
 .meter-clip.on { background: var(--meter-red); box-shadow: 0 0 6px var(--meter-red); }
-.meter-track { position: relative; flex: 1; background: #0a0c14; border-radius: 3px; overflow: hidden; }
+.meter-track { position: relative; flex: 1; background: #0a0b0e; border-radius: 3px; overflow: hidden; }
 .meter-rms {
   /* Full-height gradient revealed from the bottom, so colors map to fixed dBFS zones. */
   position: absolute; inset: 0;
@@ -144,7 +150,7 @@ main { flex: 1; min-height: 0; overflow: auto; }
 .fader-scale { position: relative; width: 18px; font-size: 9px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .fader-scale span { position: absolute; right: 0; transform: translateY(50%); }
 .fader-track { position: relative; flex: 1; touch-action: none; cursor: ns-resize; border-radius: 6px; }
-.fader-groove { position: absolute; left: 50%; top: 0; bottom: 0; width: 4px; transform: translateX(-50%); background: #0a0c14; border-radius: 2px; }
+.fader-groove { position: absolute; left: 50%; top: 0; bottom: 0; width: 4px; transform: translateX(-50%); background: #0a0b0e; border-radius: 2px; }
 .fader-unity { position: absolute; left: 4px; right: 4px; height: 1px; background: var(--text-muted); opacity: 0.6; }
 .fader-cap {
   position: absolute; left: 50%; width: 28px; height: 40px; transform: translate(-50%, 50%);
@@ -197,9 +203,9 @@ main { flex: 1; min-height: 0; overflow: auto; }
 .error { color: #fca5a5; font-size: 13px; }
 .mode-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
 .mode p { color: var(--text-muted); font-size: 13px; }
-.mode-head { display: flex; align-items: center; gap: 10px; color: #a5b4fc; }
+.mode-head { display: flex; align-items: center; gap: 10px; color: var(--accent); }
 .mode-head h3 { flex: 1; color: var(--text); }
-.soon { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: #c7c9ff; }
+.soon { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-text); }
 .switch { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .switch.disabled { opacity: 0.5; }
 
@@ -224,8 +230,8 @@ main { flex: 1; min-height: 0; overflow: auto; }
 .actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
 .actions .muted { flex: 1; font-size: 13px; }
 .primary, .secondary, .ghost { height: 36px; padding: 0 16px; border-radius: 8px; font-weight: 600; }
-.primary { border: 0; background: var(--accent); color: white; }
-.primary:hover:not(:disabled) { background: #5558e6; }
+.primary { border: 0; background: var(--accent); color: var(--on-accent); }
+.primary:hover:not(:disabled) { background: #5fd0cd; }
 .secondary { border: 1px solid var(--border); background: var(--bg-input); }
 .ghost { border: 0; background: none; color: var(--text-muted); height: 28px; padding: 0 8px; }
 .ghost:hover { color: var(--text); }
@@ -233,6 +239,6 @@ main { flex: 1; min-height: 0; overflow: auto; }
 .account { display: flex; align-items: center; gap: 12px; }
 .account > div:last-child { display: flex; flex-direction: column; gap: 2px; }
 .avatar {
-  width: 40px; height: 40px; border-radius: 50%; background: var(--accent-soft); color: #c7c9ff;
+  width: 40px; height: 40px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-text);
   display: grid; place-items: center; font-weight: 700;
 }

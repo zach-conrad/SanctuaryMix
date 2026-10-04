@@ -62,6 +62,7 @@ crates/
   console/        ConsoleAdapter trait, dLive adapter + protocol, simulated console
   auth/           AuthProvider trait, roles, and a LocalGuest placeholder
 src-tauri/        The desktop app: Tauri commands and events that wire the crates to the UI
+assets/brand/      SanctuaryMix wordmark (light and dark SVGs); assets/icon.svg is the app icon source
 src/              React UI (views, components, Zustand store, backend bridge)
 .github/workflows CI: lint + tests, macOS universal .app/.dmg, Windows build check
 ```
