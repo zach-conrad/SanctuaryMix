@@ -1,4 +1,4 @@
-import { AudioLines, Router } from "lucide-react";
+import { AudioLines, RefreshCw, Router } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getBackend } from "../lib/backend";
 import type { AudioDeviceInfo, ConsoleConfig } from "../lib/types";
@@ -7,13 +7,13 @@ import { useMixer } from "../store/mixer";
 export function SetupView() {
   return (
     <div className="page setup">
-      <AudioCard />
-      <ConsoleCard />
+      <AudioPanel />
+      <ConsolePanel />
     </div>
   );
 }
 
-function AudioCard() {
+function AudioPanel() {
   const { audioStatus, audio, audioError, startAudio, stopAudio } = useMixer();
   const [devices, setDevices] = useState<AudioDeviceInfo[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -26,7 +26,7 @@ function AudioCard() {
       setSelected((cur) => cur ?? list[0]?.name ?? null);
       setListError(null);
     } catch (e) {
-      setListError(String(e));
+      setListError(`Couldn't list audio inputs. ${String(e)}`);
     }
   };
   useEffect(() => {
@@ -35,34 +35,34 @@ function AudioCard() {
 
   const running = audioStatus === "on";
   return (
-    <section className="card">
-      <div className="card-head">
-        <AudioLines size={20} />
-        <h2>Audio input</h2>
-        <button className="ghost" onClick={refresh}>
-          Refresh
+    <section className="panel">
+      <div className="panel-head">
+        <AudioLines size={20} strokeWidth={1.75} />
+        <h2 className="text-heading">Dante audio</h2>
+        <button className="sm-btn sm-btn--ghost sm-btn--sm" onClick={refresh} aria-label="Refresh audio inputs" title="Refresh">
+          <RefreshCw />
         </button>
       </div>
       <p className="muted">
-        Choose <strong>Dante Virtual Soundcard</strong> and patch the dLive's input channels to it in Dante Controller,
-        one to one (console input 1 to DVS input 1).
+        Choose Dante Virtual Soundcard. In Dante Controller, route the dLive's channels to it one to one: console input
+        1 to input 1, and so on.
       </p>
       {listError && <p className="error">{listError}</p>}
-      <div className="device-list" role="radiogroup">
+      <div className="device-list" role="radiogroup" aria-label="Audio input">
         {devices.map((d) => (
-          <label key={d.name} className={`device ${selected === d.name ? "selected" : ""}`}>
+          <label key={d.name} className="device" data-selected={selected === d.name}>
             <input type="radio" name="device" checked={selected === d.name} onChange={() => setSelected(d.name)} />
-            <div>
-              <strong>{d.name}</strong>
-              <span>
-                {d.maxInputChannels} inputs · {d.defaultSampleRate / 1000} kHz
+            <span className="device-text">
+              <span className="text-body-strong">{d.name}</span>
+              <span className="text-caption muted">
+                {d.maxInputChannels} {d.maxInputChannels === 1 ? "input" : "inputs"} · {d.defaultSampleRate / 1000} kHz
               </span>
-            </div>
-            {d.isDante && <span className="tag">Dante</span>}
-            {d.isDefault && <span className="tag tag-quiet">System default</span>}
+            </span>
+            {d.isDante && <span className="text-label muted">Dante</span>}
+            {d.isDefault && !d.isDante && <span className="text-label muted">System default</span>}
           </label>
         ))}
-        {devices.length === 0 && !listError && <p className="empty">No audio inputs found.</p>}
+        {devices.length === 0 && !listError && <p className="empty">No audio inputs found. Is Dante Virtual Soundcard running?</p>}
       </div>
       {audioError && <p className="error">{audioError}</p>}
       <div className="actions">
@@ -72,11 +72,15 @@ function AudioCard() {
           </span>
         )}
         {running ? (
-          <button className="secondary" onClick={stopAudio}>
-            Stop
+          <button className="sm-btn sm-btn--lg" onClick={stopAudio}>
+            Stop listening
           </button>
         ) : (
-          <button className="primary" disabled={!selected || audioStatus === "connecting"} onClick={() => startAudio(selected)}>
+          <button
+            className="sm-btn sm-btn--lg sm-btn--primary"
+            disabled={!selected || audioStatus === "connecting"}
+            onClick={() => startAudio(selected)}
+          >
             {audioStatus === "connecting" ? "Starting…" : "Start listening"}
           </button>
         )}
@@ -85,47 +89,78 @@ function AudioCard() {
   );
 }
 
-function ConsoleCard() {
+const IPV4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+
+function ipError(host: string): string | null {
+  const m = IPV4.exec(host);
+  if (!m) return "Enter the console's IP address, like 192.168.1.70.";
+  if (m.slice(1).some((n) => Number(n) > 255)) return "Each number must be 0 to 255.";
+  return null;
+}
+
+function ConsolePanel() {
   const { consoleStatus, consoleModel, consoleError, consoleConfig, connectConsole, disconnectConsole } = useMixer();
   const [form, setForm] = useState<ConsoleConfig>(consoleConfig);
+  const [hostTouched, setHostTouched] = useState(false);
   const update = (patch: Partial<ConsoleConfig>) => setForm((f) => ({ ...f, ...patch }));
   const connected = consoleStatus === "on";
+  const hostProblem = form.model === "dlive" ? ipError(form.host) : null;
 
   return (
-    <section className="card">
-      <div className="card-head">
-        <Router size={20} />
-        <h2>Console</h2>
+    <section className="panel">
+      <div className="panel-head">
+        <Router size={20} strokeWidth={1.75} />
+        <h2 className="text-heading">Console</h2>
       </div>
       <div className="form">
-        <label>
-          <span>Console</span>
-          <select value={form.model} onChange={(e) => update({ model: e.target.value as ConsoleConfig["model"] })}>
+        <label className="sm-field">
+          <span className="sm-field__label">Console</span>
+          <select
+            className="sm-input"
+            value={form.model}
+            onChange={(e) => update({ model: e.target.value as ConsoleConfig["model"] })}
+          >
             <option value="dlive">Allen &amp; Heath dLive</option>
-            <option value="simulated">Simulated console (no hardware)</option>
+            <option value="simulated">Practice console (no hardware)</option>
           </select>
         </label>
         {form.model === "dlive" && (
           <>
-            <label>
-              <span>MixRack or Surface IP</span>
-              <input value={form.host} onChange={(e) => update({ host: e.target.value.trim() })} placeholder="192.168.1.70" />
+            <label className="sm-field" data-invalid={hostTouched && !!hostProblem}>
+              <span className="sm-field__label">MixRack or Surface IP address</span>
+              <input
+                className="sm-input"
+                value={form.host}
+                inputMode="decimal"
+                placeholder="192.168.1.70"
+                onChange={(e) => update({ host: e.target.value.trim() })}
+                onBlur={() => setHostTouched(true)}
+              />
+              <span className="sm-field__help">
+                {hostTouched && hostProblem ? hostProblem : "Shown on the dLive under Utility › Control › Network."}
+              </span>
             </label>
-            <label>
-              <span>MIDI channel</span>
-              <select value={form.midiChannel} onChange={(e) => update({ midiChannel: Number(e.target.value) })}>
+            <label className="sm-field">
+              <span className="sm-field__label">MIDI channel</span>
+              <select
+                className="sm-input"
+                value={form.midiChannel}
+                onChange={(e) => update({ midiChannel: Number(e.target.value) })}
+              >
                 {Array.from({ length: 12 }, (_, i) => (
                   <option key={i} value={i}>
                     {i + 1}
                   </option>
                 ))}
               </select>
+              <span className="sm-field__help">Match Utility › Control › MIDI on the console.</span>
             </label>
           </>
         )}
-        <label>
-          <span>Input channels to show</span>
+        <label className="sm-field">
+          <span className="sm-field__label">Inputs to show</span>
           <input
+            className="sm-input"
             type="number"
             min={1}
             max={128}
@@ -134,23 +169,17 @@ function ConsoleCard() {
           />
         </label>
       </div>
-      {form.model === "dlive" && (
-        <p className="muted small">
-          On the dLive, the MIDI channel is set under Utility › Control › MIDI. SanctuaryMix connects to TCP port 51328 on
-          the same network as the console's network port.
-        </p>
-      )}
       {consoleError && <p className="error">{consoleError}</p>}
       <div className="actions">
         {connected && <span className="muted">Connected to {consoleModel}</span>}
         {connected ? (
-          <button className="secondary" onClick={disconnectConsole}>
+          <button className="sm-btn sm-btn--lg sm-btn--danger" onClick={disconnectConsole}>
             Disconnect
           </button>
         ) : (
           <button
-            className="primary"
-            disabled={consoleStatus === "connecting" || (form.model === "dlive" && !form.host)}
+            className="sm-btn sm-btn--lg sm-btn--primary"
+            disabled={consoleStatus === "connecting" || !!hostProblem}
             onClick={() => connectConsole(form)}
           >
             {consoleStatus === "connecting" ? "Connecting…" : "Connect"}

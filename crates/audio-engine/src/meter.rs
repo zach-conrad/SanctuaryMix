@@ -55,11 +55,20 @@ impl MeterBank {
                 sum_sq += (s as f64) * (s as f64);
             }
             acc.peak.fetch_max(peak.to_bits(), Ordering::Relaxed);
-            let _ = acc
-                .sum_sq
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |bits| {
-                    Some((f64::from_bits(bits) + sum_sq).to_bits())
-                });
+            // CAS loop rather than fetch_update, which newer Rust renames.
+            let mut bits = acc.sum_sq.load(Ordering::Relaxed);
+            loop {
+                let next = (f64::from_bits(bits) + sum_sq).to_bits();
+                match acc.sum_sq.compare_exchange_weak(
+                    bits,
+                    next,
+                    Ordering::Relaxed,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => break,
+                    Err(current) => bits = current,
+                }
+            }
             acc.count.fetch_add(frames as u64, Ordering::Relaxed);
             if peak >= CLIP_THRESHOLD {
                 acc.clipped.store(true, Ordering::Relaxed);

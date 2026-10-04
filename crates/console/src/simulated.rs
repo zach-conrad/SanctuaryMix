@@ -87,7 +87,7 @@ impl ConsoleAdapter for SimulatedConsole {
     async fn connect(&mut self) -> Result<()> {
         self.connected = true;
         self.emit(ConsoleEvent::Connected {
-            model: "Simulated console".into(),
+            model: "Practice console".into(),
         });
         Ok(())
     }

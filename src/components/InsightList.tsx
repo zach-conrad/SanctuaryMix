@@ -1,9 +1,6 @@
-import { AlertTriangle, Info, OctagonAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { computeInsights, type Insight } from "../lib/insights";
 import { useMeters, useMixer } from "../store/mixer";
-
-const ICONS = { alert: OctagonAlert, warn: AlertTriangle, info: Info };
 
 /** Re-evaluated twice a second so cards don't flicker with every meter frame. */
 export function useInsights(): Insight[] {
@@ -18,24 +15,30 @@ export function useInsights(): Insight[] {
   return insights;
 }
 
+const SEVERITY_WORD = { alert: "Clipping", warn: "Hot", info: "No signal" };
+
+/** Assist observations. Read-only today; Apply/Undo arrive with auto-mixing. */
 export function InsightList({ insights, limit }: { insights: Insight[]; limit?: number }) {
+  const select = useMixer((s) => s.select);
   if (insights.length === 0) {
-    return <p className="empty">Everything looks healthy. Observations will appear here during the service.</p>;
+    return <p className="empty">Everything sounds healthy. Assist will note anything that needs a look.</p>;
   }
   return (
     <ul className="insights">
-      {insights.slice(0, limit).map((i) => {
-        const Icon = ICONS[i.severity];
-        return (
-          <li key={i.id} className={`insight insight-${i.severity}`}>
-            <Icon size={16} />
-            <div>
-              <strong>{i.title}</strong>
-              <p>{i.detail}</p>
-            </div>
-          </li>
-        );
-      })}
+      {insights.slice(0, limit).map((i) => (
+        <li key={i.id}>
+          <button className="sm-assist insight" onClick={() => select(i.channel)}>
+            <span className="sm-assist__head">
+              <span className="sm-assist-badge">Assist</span>
+              <span className="sm-assist__time">
+                Ch {i.channel + 1} · {SEVERITY_WORD[i.severity]}
+              </span>
+            </span>
+            <span className="sm-assist__title">{i.title}</span>
+            <span className="sm-assist__why">{i.detail}</span>
+          </button>
+        </li>
+      ))}
     </ul>
   );
 }

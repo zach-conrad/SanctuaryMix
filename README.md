@@ -17,10 +17,11 @@ place; the auto-mixing engine is the next phase.
 
 | Screen | What it does |
 | --- | --- |
-| **Mix** | One strip per input: live Dante meter, console fader and mute, channel name pulled from the desk. The Assistant panel flags clipping, hot and silent channels. |
-| **Assistant** | Live observations plus the auto-mix modes that are coming (gain staging, feedback watch, EQ suggestions, speech-to-music balance). |
+| **Mixer** | One strip per input: live Dante meter, console fader and mute, channel name pulled from the desk. The inspector shows the selected channel and Assist notes (clipping, hot and silent channels). |
+| **Scenes** | Placeholder for scene recall. |
+| **Assist** | Live observations plus the auto-mix modes that are coming (gain staging, feedback watch, EQ suggestions, speech and music balance). |
 | **Setup** | Pick the audio input (Dante Virtual Soundcard is promoted to the top) and connect to the console. |
-| **Settings** | Account placeholder for future team sign-in. |
+| **Settings** | Account placeholder for future team sign-in, and the theme (Dark, Light, Match Mac). |
 
 Run `npm run dev` and open http://localhost:1420 to see the whole UI in a
 browser with simulated audio and a simulated console.
@@ -48,7 +49,8 @@ browser with simulated audio and a simulated console.
 | App shell | [Tauri 2](https://tauri.app) | Real `.app`/`.dmg` on macOS and `.msi`/`.exe` on Windows from one codebase. ~10 MB instead of Electron's ~150 MB, and the native core is Rust. |
 | Audio + DSP | Rust with [`cpal`](https://github.com/RustAudio/cpal) | No garbage collector, so no dropouts. CoreAudio on Mac and WASAPI/ASIO on Windows behind one API. The same crates can later run ML models (ONNX/Core ML) for the AI features. |
 | UI | React + TypeScript + Vite | The most common, best-supported way to build a polished UI quickly. Hot reload while designing. |
-| UI state | [Zustand](https://github.com/pmndrs/zustand) | Tiny and simple. Meters live in their own store so 30 fps updates don't re-render the app. |
+| UI state | [Zustand](https://github.com/pmndrs/zustand) | Tiny and simple. Meters write CSS variables per animation frame, so 30 fps updates don't re-render the app. |
+| Design | SanctuaryMix design system | `src/styles/tokens.css` and `components.css` are copies of the project's design tokens and `sm-` component styles. Figtree and IBM Plex Mono are bundled with `@fontsource`, so the app needs no internet. Dark theme by default. |
 
 Native Swift was the alternative. It would give a slightly more "Mac" feel but
 means writing the Windows app a second time, so it lost.

@@ -59,7 +59,7 @@ export function createDemoBackend(): Backend {
     },
     async connectConsole(config) {
       await new Promise((r) => setTimeout(r, 400));
-      emit({ type: "connected", model: config.model === "dlive" ? "Allen & Heath dLive (demo)" : "Simulated console" });
+      emit({ type: "connected", model: config.model === "dlive" ? "Allen & Heath dLive (demo)" : "Practice console" });
       for (let i = 0; i < config.inputCount; i++) {
         emit({ type: "name", id: { kind: "input", index: i }, name: NAMES[i] ?? `Ch ${i + 1}` });
       }

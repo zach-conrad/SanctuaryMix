@@ -129,15 +129,25 @@ impl ConsoleAdapter for DliveAdapter {
         self.connected.load(Ordering::SeqCst)
     }
 
+    // The console doesn't necessarily echo MIDI back to the client that sent
+    // it, so a completed TCP write is reported as the confirmed state (fader
+    // values snapped to what the desk can represent). Changes made on the
+    // surface still arrive through the reader task.
+
     async fn set_fader(&self, id: ChannelId, db: Option<f32>) -> Result<()> {
         let msg = protocol::fader(self.base, id, db).ok_or(ConsoleError::UnsupportedChannel(id))?;
-        self.send(&msg).await
+        self.send(&msg).await?;
+        let db = protocol::level_to_db(protocol::db_to_level(db));
+        let _ = self.events.send(ConsoleEvent::Fader { id, db });
+        Ok(())
     }
 
     async fn set_mute(&self, id: ChannelId, muted: bool) -> Result<()> {
         let msg =
             protocol::mute(self.base, id, muted).ok_or(ConsoleError::UnsupportedChannel(id))?;
-        self.send(&msg).await
+        self.send(&msg).await?;
+        let _ = self.events.send(ConsoleEvent::Mute { id, muted });
+        Ok(())
     }
 
     async fn request_name(&self, id: ChannelId) -> Result<()> {
@@ -190,13 +200,15 @@ mod tests {
             rx.recv().await.unwrap(),
             ConsoleEvent::Connected { .. }
         ));
-        assert_eq!(
-            rx.recv().await.unwrap(),
-            ConsoleEvent::Mute {
-                id: ChannelId::input(2),
-                muted: true
-            }
-        );
+        // Our own change (confirmed once written) and the one made on the
+        // console can arrive in either order.
+        let events = [rx.recv().await.unwrap(), rx.recv().await.unwrap()];
+        for id in [ChannelId::input(0), ChannelId::input(2)] {
+            assert!(
+                events.contains(&ConsoleEvent::Mute { id, muted: true }),
+                "{events:?}"
+            );
+        }
     }
 
     #[tokio::test]

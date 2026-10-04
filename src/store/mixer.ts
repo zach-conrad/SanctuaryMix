@@ -2,7 +2,8 @@ import { create } from "zustand";
 import { getBackend } from "../lib/backend";
 import type { ChannelId, ConsoleConfig, ConsoleEvent, MeterFrame, MeteringInfo, Session } from "../lib/types";
 
-export type View = "mix" | "assistant" | "setup" | "settings";
+export type View = "mixer" | "scenes" | "assist" | "setup" | "settings";
+export type Theme = "dark" | "light" | "system";
 type LinkStatus = "off" | "connecting" | "on" | "error";
 
 export interface Strip {
@@ -27,8 +28,16 @@ interface MixerState {
   consoleConfig: ConsoleConfig;
 
   strips: Strip[];
+  selected: number;
+  /** Mute changes sent but not yet confirmed by the console: index → requested state. */
+  pendingMutes: Record<number, boolean>;
+  /** Set when the console hasn't confirmed a change within 2 seconds. */
+  unconfirmed: boolean;
+  theme: Theme;
 
   setView(view: View): void;
+  select(index: number): void;
+  setTheme(theme: Theme): void;
   init(): Promise<void>;
   startAudio(device: string | null): Promise<void>;
   stopAudio(): Promise<void>;
@@ -67,8 +76,26 @@ export const useMeters = create<{ frame: MeterFrame | null }>(() => ({ frame: nu
 
 let initialized = false;
 
+const THEME_KEY = "sanctuarymix.theme";
+
+function loadTheme(): Theme {
+  let theme: Theme = "dark";
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === "light" || saved === "system" || saved === "dark") theme = saved;
+  } catch {
+    // Fall back to the default dark theme.
+  }
+  applyTheme(theme);
+  return theme;
+}
+
+function applyTheme(theme: Theme) {
+  document.documentElement.dataset.theme = theme;
+}
+
 export const useMixer = create<MixerState>((set, get) => ({
-  view: "mix",
+  view: "mixer",
   isDemo: false,
   session: null,
   audioStatus: "off",
@@ -79,8 +106,22 @@ export const useMixer = create<MixerState>((set, get) => ({
   consoleError: null,
   consoleConfig: DEFAULT_CONFIG,
   strips: makeStrips(DEFAULT_CONFIG.inputCount),
+  selected: 0,
+  pendingMutes: {},
+  unconfirmed: false,
+  theme: loadTheme(),
 
   setView: (view) => set({ view }),
+  select: (selected) => set({ selected }),
+  setTheme(theme) {
+    applyTheme(theme);
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch {
+      // Storage can be unavailable; the theme still applies for this run.
+    }
+    set({ theme });
+  },
 
   async init() {
     if (initialized) return;
@@ -123,7 +164,14 @@ export const useMixer = create<MixerState>((set, get) => ({
       await (await getBackend()).connectConsole(config);
       set({ consoleStatus: "on" });
     } catch (e) {
-      set({ consoleStatus: "error", consoleError: reportError(e) });
+      const detail = reportError(e);
+      set({
+        consoleStatus: "error",
+        consoleError:
+          config.model === "dlive"
+            ? `Can't reach the dLive at ${config.host}. Check the network cable and the IP address, then try again. (${detail})`
+            : detail,
+      });
     }
   },
 
@@ -140,15 +188,31 @@ export const useMixer = create<MixerState>((set, get) => ({
   },
 
   toggleMute(index) {
-    const muted = !get().strips[index]?.muted;
-    updateStrip(set, index, { muted });
+    // The key keeps showing the console's state until the console confirms.
+    const { strips, pendingMutes } = get();
+    const muted = !(pendingMutes[index] ?? strips[index]?.muted);
+    set({ pendingMutes: { ...pendingMutes, [index]: muted } });
+    setTimeout(() => {
+      if (get().pendingMutes[index] !== undefined) set({ unconfirmed: true });
+    }, 2000);
     void getBackend()
       .then((b) => b.setMute(input(index), muted))
-      .catch((e) => set({ consoleError: reportError(e) }));
+      .catch((e) => {
+        clearPending(set, index);
+        set({ consoleError: reportError(e) });
+      });
   },
 }));
 
 type Set = (partial: Partial<MixerState> | ((s: MixerState) => Partial<MixerState>)) => void;
+
+function clearPending(set: Set, index: number) {
+  set((s) => {
+    const pendingMutes = { ...s.pendingMutes };
+    delete pendingMutes[index];
+    return { pendingMutes, unconfirmed: Object.keys(pendingMutes).length > 0 && s.unconfirmed };
+  });
+}
 
 function updateStrip(set: Set, index: number, patch: Partial<Strip>) {
   set((s) => ({ strips: s.strips.map((st) => (st.index === index ? { ...st, ...patch } : st)) }));
@@ -162,15 +226,20 @@ function applyConsoleEvent(event: ConsoleEvent, set: Set, get: () => MixerState)
     case "disconnected":
       set({
         consoleStatus: event.reason ? "error" : "off",
-        consoleError: event.reason,
+        consoleError: event.reason ? `Lost the console: ${event.reason}. Check the network, then connect again.` : null,
         consoleModel: null,
+        pendingMutes: {},
+        unconfirmed: false,
       });
       break;
     case "fader":
       if (event.id.kind === "input") updateStrip(set, event.id.index, { faderDb: event.db });
       break;
     case "mute":
-      if (event.id.kind === "input") updateStrip(set, event.id.index, { muted: event.muted });
+      if (event.id.kind === "input") {
+        updateStrip(set, event.id.index, { muted: event.muted });
+        clearPending(set, event.id.index);
+      }
       break;
     case "name":
       if (event.id.kind === "input" && event.id.index < get().strips.length) {

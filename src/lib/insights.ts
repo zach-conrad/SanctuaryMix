@@ -2,6 +2,7 @@
 // seam where the AI mixing engine plugs in later: it will produce the same
 // Insight shape, with an optional action the operator can accept.
 
+import { formatDb } from "./levels";
 import type { MeterFrame } from "./types";
 import type { Strip } from "../store/mixer";
 
@@ -28,7 +29,7 @@ export function computeInsights(frame: MeterFrame | null, strips: Strip[]): Insi
         severity: "alert",
         channel: m.channel,
         title: `${name} is clipping`,
-        detail: "Lower the preamp gain on the console until peaks sit around -6 dBFS.",
+        detail: "Turn its preamp gain down on the console until peaks sit around \u22126 dBFS.",
       });
     } else if (m.peakDb > -6) {
       out.push({
@@ -36,7 +37,7 @@ export function computeInsights(frame: MeterFrame | null, strips: Strip[]): Insi
         severity: "warn",
         channel: m.channel,
         title: `${name} is running hot`,
-        detail: `Peaks near ${m.peakDb.toFixed(0)} dBFS leave little headroom for a loud moment.`,
+        detail: `Peaks reach ${formatDb(m.peakDb)} dBFS, which leaves little room for a loud moment.`,
       });
     } else if (!strip.muted && m.peakDb < -70 && !/spare/i.test(name)) {
       out.push({

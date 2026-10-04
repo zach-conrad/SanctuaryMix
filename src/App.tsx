@@ -2,8 +2,9 @@ import { useEffect } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
 import { useMixer } from "./store/mixer";
-import { AssistantView } from "./views/AssistantView";
-import { MixView } from "./views/MixView";
+import { AssistView } from "./views/AssistView";
+import { MixerView } from "./views/MixerView";
+import { ScenesView } from "./views/ScenesView";
 import { SettingsView } from "./views/SettingsView";
 import { SetupView } from "./views/SetupView";
 
@@ -16,12 +17,13 @@ export default function App() {
 
   return (
     <div className="app">
-      <Sidebar />
-      <div className="content">
-        <TopBar />
+      <TopBar />
+      <div className="app-body">
+        <Sidebar />
         <main>
-          {view === "mix" && <MixView />}
-          {view === "assistant" && <AssistantView />}
+          {view === "mixer" && <MixerView />}
+          {view === "scenes" && <ScenesView />}
+          {view === "assist" && <AssistView />}
           {view === "setup" && <SetupView />}
           {view === "settings" && <SettingsView />}
         </main>

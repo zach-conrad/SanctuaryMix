@@ -1,43 +1,68 @@
-import { AudioLines, CircleUser, Router } from "lucide-react";
-import { useMixer } from "../store/mixer";
+import { useEffect, useState } from "react";
+import { useMixer, type Theme } from "../store/mixer";
+import { StatusPill, type PillTone } from "./StatusPill";
 
-type Tone = "ok" | "busy" | "bad" | "idle";
+const tone = (s: "off" | "connecting" | "on" | "error"): PillTone =>
+  s === "on" ? "ok" : s === "connecting" ? "warn" : s === "error" ? "error" : "neutral";
 
-function Pill({ tone, icon, label, onClick }: { tone: Tone; icon: React.ReactNode; label: string; onClick?: () => void }) {
-  return (
-    <button className={`pill pill-${tone}`} onClick={onClick}>
-      <span className="pill-dot" />
-      {icon}
-      <span>{label}</span>
-    </button>
-  );
+/** Which wordmark to show: the dark-ground file on dark themes. */
+function useResolvedTheme(theme: Theme): "dark" | "light" {
+  const query = "(prefers-color-scheme: light)";
+  const [osLight, setOsLight] = useState(() => window.matchMedia?.(query).matches ?? false);
+  useEffect(() => {
+    const mq = window.matchMedia?.(query);
+    const on = (e: MediaQueryListEvent) => setOsLight(e.matches);
+    mq?.addEventListener("change", on);
+    return () => mq?.removeEventListener("change", on);
+  }, []);
+  return theme === "system" ? (osLight ? "light" : "dark") : theme;
 }
 
-const toneOf = (s: "off" | "connecting" | "on" | "error"): Tone =>
-  s === "on" ? "ok" : s === "connecting" ? "busy" : s === "error" ? "bad" : "idle";
-
 export function TopBar() {
-  const { view, audioStatus, audio, consoleStatus, consoleModel, session, isDemo, setView } = useMixer();
-  const titles = { mix: "Mix", assistant: "Assistant", setup: "Setup", settings: "Settings" };
+  const { audioStatus, audio, consoleStatus, consoleModel, consoleConfig, isDemo, unconfirmed, theme, setView } =
+    useMixer();
+  const resolved = useResolvedTheme(theme);
 
-  const audioLabel =
-    audioStatus === "on" && audio ? `${audio.deviceName} · ${audio.channels} ch` : audioStatus === "connecting" ? "Opening audio…" : "No audio input";
-  const consoleLabel =
-    consoleStatus === "on" ? consoleModel ?? "Console connected" : consoleStatus === "connecting" ? "Connecting…" : consoleStatus === "error" ? "Console offline" : "No console";
+  const consoleMeta =
+    consoleStatus === "on"
+      ? "Connected"
+      : consoleStatus === "connecting"
+        ? "Connecting"
+        : consoleStatus === "error"
+          ? "Can't reach it"
+          : "Not connected";
+  const danteMeta =
+    audioStatus === "on" && audio
+      ? `${audio.channels} ch · ${audio.sampleRate / 1000} kHz`
+      : audioStatus === "connecting"
+        ? "Opening"
+        : audioStatus === "error"
+          ? "No audio"
+          : "Not listening";
 
   return (
     <header className="topbar" data-tauri-drag-region>
-      <img className="wordmark" src="/brand/wordmark-dark.svg" alt="SanctuaryMix" data-tauri-drag-region />
-      <span className="topbar-divider" />
-      <h1 data-tauri-drag-region>{titles[view]}</h1>
-      {isDemo && <span className="demo-badge" title="Running in a browser with simulated audio and console">Demo mode</span>}
+      <img
+        className="wordmark"
+        src={`/brand/wordmark-${resolved}.svg`}
+        alt="SanctuaryMix"
+        data-tauri-drag-region
+      />
+      <div className="topbar-pills">
+        <StatusPill
+          tone={tone(consoleStatus)}
+          subject={consoleModel ?? (consoleConfig.model === "dlive" ? "dLive" : "Console")}
+          meta={consoleMeta}
+          onClick={() => setView("setup")}
+        />
+        <StatusPill tone={tone(audioStatus)} subject="Dante" meta={danteMeta} onClick={() => setView("setup")} />
+        {unconfirmed && <StatusPill tone="warn" subject="Console" meta="Hasn't confirmed a change" />}
+        {isDemo && <StatusPill tone="warn" subject="Demo" meta="Simulated audio and console" />}
+      </div>
       <div className="topbar-spacer" data-tauri-drag-region />
-      <Pill tone={toneOf(audioStatus)} icon={<AudioLines size={14} />} label={audioLabel} onClick={() => setView("setup")} />
-      <Pill tone={toneOf(consoleStatus)} icon={<Router size={14} />} label={consoleLabel} onClick={() => setView("setup")} />
-      <button className="user-chip" onClick={() => setView("settings")}>
-        <CircleUser size={18} strokeWidth={1.75} />
-        <span>{session?.user.displayName ?? "…"}</span>
-      </button>
+      <span className="sm-assist-badge" title="Assist only suggests changes. It never moves the console by itself.">
+        Assist · Suggest
+      </span>
     </header>
   );
 }
