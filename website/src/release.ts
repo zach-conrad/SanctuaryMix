@@ -1,68 +1,64 @@
-// Where the Download button points. The CI/CD release workflow publishes each
-// tagged release as a GitHub Release on this repo and uploads the installers
-// under these stable, unversioned asset names.
-// GitHub's /releases/latest/download/<name> URL always redirects to the newest published (non-prerelease) release, so
-// the site never needs a rebuild when a new build ships.
+// Where the Download button points. Downloads are served by the website
+// itself, not GitHub, so visitors never need a GitHub account.
 //
-// Downloads are private: the repo is private, so the link only works for
-// people signed in to GitHub with access to it. When real accounts exist,
-// this should hand out a short-lived signed link instead. Change only this file.
+// Contract with the CI/CD release workflow: on each tagged release it copies
+// the installers into the built site under downloads/ and writes
+// downloads/latest.json, then deploys the site:
+//
+//   downloads/SanctuaryMix-mac-universal.dmg
+//   downloads/latest.json
+//     {
+//       "version": "0.2.0",
+//       "publishedAt": "2026-10-04T19:00:00Z",
+//       "mac": { "file": "SanctuaryMix-mac-universal.dmg", "size": 48213504 }
+//     }
+//
+// A "windows" entry with the same shape is added once a Windows build ships.
+// Until the first release is deployed there is no latest.json, and the page
+// shows the button as coming soon.
 
-export const RELEASE_REPO = "zach-conrad/SanctuaryMix";
+export const DOWNLOADS_DIR = "downloads/";
+export const MANIFEST_FILE = "latest.json";
 
-// The GitHub API can't see a private repo's releases without a token, so the
-// version lookup below only runs when the releases are public.
-export const RELEASES_ARE_PUBLIC = false;
-
-export const ASSETS = {
-  mac: "SanctuaryMix-mac-universal.dmg",
-  windows: "SanctuaryMix-windows-x64-setup.exe",
-} as const;
-
-export const downloadUrl = (asset: string) =>
-  `https://github.com/${RELEASE_REPO}/releases/latest/download/${asset}`;
-
-export const releasesPageUrl = `https://github.com/${RELEASE_REPO}/releases`;
+export interface DownloadFile {
+  file: string;
+  size?: number;
+}
 
 export interface LatestRelease {
   version: string;
-  publishedAt: Date;
-  sizeBytes?: number;
+  publishedAt?: Date;
+  mac: DownloadFile;
 }
 
 export type ReleaseLookup =
+  | { status: "loading" }
   | { status: "ok"; release: LatestRelease }
-  // The releases repo or its first release doesn't exist yet.
-  | { status: "none" }
-  // Couldn't reach the API (offline, rate limited). The button still works
-  // through the stable redirect URL above.
-  | { status: "unknown" };
+  // No release has been deployed to the site yet.
+  | { status: "none" };
 
-// Best-effort lookup of the version, date and size to show next to the button.
-export async function fetchLatestRelease(signal?: AbortSignal): Promise<ReleaseLookup> {
-  if (!RELEASES_ARE_PUBLIC) return { status: "unknown" };
+/** URL of a file in downloads/, given the relative path to the site root. */
+export const downloadUrl = (root: string, file: string) => `${root}${DOWNLOADS_DIR}${encodeURIComponent(file)}`;
+
+export async function fetchLatestRelease(root: string, signal?: AbortSignal): Promise<ReleaseLookup> {
   try {
-    const res = await fetch(`https://api.github.com/repos/${RELEASE_REPO}/releases/latest`, {
-      headers: { Accept: "application/vnd.github+json" },
-      signal,
-    });
-    if (res.status === 404) return { status: "none" };
-    if (!res.ok) return { status: "unknown" };
+    const res = await fetch(`${root}${DOWNLOADS_DIR}${MANIFEST_FILE}`, { cache: "no-store", signal });
+    if (!res.ok) return { status: "none" };
     const data = (await res.json()) as {
-      tag_name: string;
-      published_at: string;
-      assets?: { name: string; size: number }[];
+      version?: string;
+      publishedAt?: string;
+      mac?: DownloadFile;
     };
-    const mac = data.assets?.find((a) => a.name === ASSETS.mac);
+    if (!data.version || !data.mac?.file) return { status: "none" };
     return {
       status: "ok",
       release: {
-        version: data.tag_name.replace(/^v/, ""),
-        publishedAt: new Date(data.published_at),
-        sizeBytes: mac?.size,
+        version: data.version.replace(/^v/, ""),
+        publishedAt: data.publishedAt ? new Date(data.publishedAt) : undefined,
+        mac: data.mac,
       },
     };
   } catch {
-    return { status: "unknown" };
+    return { status: "none" };
   }
 }

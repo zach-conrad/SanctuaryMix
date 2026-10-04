@@ -11,17 +11,21 @@ npm run build    # static output in website/dist
 
 ## Download link
 
-The Download button is fed by CI, and downloads stay private. Each tagged release, the CI/CD workflow publishes a GitHub Release on this private repo with the Mac installer under a stable asset name, `SanctuaryMix-mac-universal.dmg` (Windows later: `SanctuaryMix-windows-x64-setup.exe`). The site links to
+Downloads are served by the website itself, so visitors never need a GitHub account. The CI/CD release workflow keeps them current: on each tagged release it copies the installer into the built site and writes a small manifest, then deploys the site.
 
 ```
-https://github.com/zach-conrad/SanctuaryMix/releases/latest/download/SanctuaryMix-mac-universal.dmg
+dist/downloads/SanctuaryMix-mac-universal.dmg
+dist/downloads/latest.json
+  { "version": "0.2.0",
+    "publishedAt": "2026-10-04T19:00:00Z",
+    "mac": { "file": "SanctuaryMix-mac-universal.dmg", "size": 48213504 } }
 ```
 
-which GitHub redirects to the newest published release, so the site doesn't need a rebuild when a new build ships. Because the repo is private, the link only works for people signed in to GitHub with access to it; everyone else gets a 404. That is intended for now. When real sign-in exists, the account page should hand out a short-lived signed download link instead (for example from a private Supabase Storage bucket that CI uploads to).
+The account page reads `downloads/latest.json` and points the Download button at the file it names. Until a release has been deployed there's no manifest, and the button shows as coming soon. A `windows` entry with the same shape is added once a Windows build ships. The contract lives in `src/release.ts`.
 
-The version, date and size lookup through the GitHub API is switched off (`RELEASES_ARE_PUBLIC = false`) because the API can't see private releases without a token.
+To try it locally, drop any file and a matching `latest.json` into `public/downloads/` (git-ignored) and run `npm run dev`.
 
-To change where downloads come from, edit `src/release.ts` only.
+Note: there's no real sign-in yet, so anyone who has the site's address can reach the account page and download. Hosting must allow files the size of the dmg (GitHub Pages caps files at 100 MB; Cloudflare Pages at 25 MB).
 
 ## Design
 

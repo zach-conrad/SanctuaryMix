@@ -2,7 +2,7 @@ import { Download, Info, Laptop, Monitor } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
-import { ASSETS, downloadUrl, fetchLatestRelease, releasesPageUrl, type ReleaseLookup } from "./release";
+import { downloadUrl, fetchLatestRelease, type ReleaseLookup } from "./release";
 
 const ROOT = "../";
 
@@ -13,13 +13,13 @@ function formatSize(bytes: number) {
 }
 
 export function Account() {
-  const [lookup, setLookup] = useState<ReleaseLookup>({ status: "unknown" });
+  const [lookup, setLookup] = useState<ReleaseLookup>({ status: "loading" });
   const release = lookup.status === "ok" ? lookup.release : null;
   const notYet = lookup.status === "none";
 
   useEffect(() => {
     const ctrl = new AbortController();
-    fetchLatestRelease(ctrl.signal).then((r) => {
+    fetchLatestRelease(ROOT, ctrl.signal).then((r) => {
       if (!ctrl.signal.aborted) setLookup(r);
     });
     return () => ctrl.abort();
@@ -48,44 +48,43 @@ export function Account() {
               <dl className="release-meta">
                 <div>
                   <dt className="text-label">Version</dt>
-                  <dd className={release ? "text-readout" : undefined}>{release ? release.version : notYet ? "Coming soon" : "Latest build"}</dd>
+                  <dd className={release ? "text-readout" : undefined}>{release ? release.version : notYet ? "Coming soon" : "Checking"}</dd>
                 </div>
-                <div>
-                  <dt className="text-label">Released</dt>
-                  <dd className={release ? "text-readout" : undefined}>{release ? dateFormat.format(release.publishedAt) : notYet ? "Not yet" : "With each new build"}</dd>
-                </div>
-                {release?.sizeBytes ? (
+                {release?.publishedAt ? (
+                  <div>
+                    <dt className="text-label">Released</dt>
+                    <dd className="text-readout">{dateFormat.format(release.publishedAt)}</dd>
+                  </div>
+                ) : null}
+                {release?.mac.size ? (
                   <div>
                     <dt className="text-label">Size</dt>
-                    <dd className="text-readout">{formatSize(release.sizeBytes)}</dd>
+                    <dd className="text-readout">{formatSize(release.mac.size)}</dd>
                   </div>
                 ) : null}
               </dl>
-              {notYet ? (
+              {release ? (
                 <>
-                  <button className="sm-btn sm-btn--primary sm-btn--lg" disabled>
-                    <Download aria-hidden="true" />
-                    Download for Mac
-                  </button>
-                  <p className="text-caption panel__foot">
-                    The first public build is on its way. This button turns on as soon as it's published.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <a className="sm-btn sm-btn--primary sm-btn--lg" href={downloadUrl(ASSETS.mac)}>
+                  <a className="sm-btn sm-btn--primary sm-btn--lg" href={downloadUrl(ROOT, release.mac.file)} download>
                     <Download aria-hidden="true" />
                     Download for Mac
                   </a>
                   <p className="text-caption panel__foot">
                     Open the .dmg and drag SanctuaryMix to Applications. Early builds aren't signed yet: the first
-                    time, Control-click the app and choose Open.{" "}
-                    <a href={releasesPageUrl}>All releases</a>
+                    time, Control-click the app and choose Open.
                   </p>
-                  <p className="text-caption panel__foot">
-                    Downloads are private during early access. Sign in to GitHub with an account that has access to
-                    the SanctuaryMix repository first.
-                  </p>
+                </>
+              ) : (
+                <>
+                  <button className="sm-btn sm-btn--primary sm-btn--lg" disabled>
+                    <Download aria-hidden="true" />
+                    Download for Mac
+                  </button>
+                  {notYet ? (
+                    <p className="text-caption panel__foot">
+                      The first build is on its way. This button turns on as soon as it's published.
+                    </p>
+                  ) : null}
                 </>
               )}
             </section>
