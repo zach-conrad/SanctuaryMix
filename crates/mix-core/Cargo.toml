@@ -1,0 +1,9 @@
+[package]
+name = "mix-core"
+description = "Shared mixer domain types used by every SanctuaryMix crate and the UI."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
