@@ -54,6 +54,8 @@ export interface MeteringInfo {
 export type Role = "admin" | "engineer" | "volunteer";
 
 export interface Session {
-  user: { id: string; displayName: string; email: string | null; role: Role };
+  user: { id: string; displayName: string; email: string | null };
+  activeOrg: { id: string; name: string } | null;
+  role: Role;
   authenticated: boolean;
 }

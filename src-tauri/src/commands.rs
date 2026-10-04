@@ -1,5 +1,5 @@
 use audio_engine::AudioDeviceInfo;
-use auth::{Credentials, Session};
+use auth::Session;
 use console::{ConsoleConfig, ConsoleError};
 use mix_core::{ChannelId, ChannelKind};
 use serde::Serialize;
@@ -152,8 +152,16 @@ pub async fn get_session(state: State<'_, AppState>) -> CmdResult<Session> {
 }
 
 #[tauri::command]
-pub async fn sign_in(state: State<'_, AppState>, credentials: Credentials) -> CmdResult<Session> {
-    state.auth.sign_in(credentials).await.map_err(err)
+pub async fn begin_sign_in(state: State<'_, AppState>) -> CmdResult<String> {
+    state.auth.begin_sign_in().await.map_err(err)
+}
+
+#[tauri::command]
+pub async fn complete_sign_in(
+    state: State<'_, AppState>,
+    callback_url: String,
+) -> CmdResult<Session> {
+    state.auth.complete_sign_in(callback_url).await.map_err(err)
 }
 
 #[tauri::command]

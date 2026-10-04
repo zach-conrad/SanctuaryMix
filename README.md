@@ -78,11 +78,18 @@ same `npm run app:build` on a Windows machine.
 
 ### Auth
 
-`crates/auth` defines `AuthProvider` (`current_session`, `sign_in`,
-`sign_out`), users and roles (Admin, Engineer, Volunteer). The app currently
-uses `LocalGuest`, which always signs in a local admin so the desk is never
-locked on a Sunday morning. A hosted provider (OAuth/OIDC with team accounts)
-replaces it in `src-tauri/src/state.rs` without touching the UI.
+`crates/auth` defines `AuthProvider` (`current_session`, `begin_sign_in`,
+`complete_sign_in`, `sign_out`). A session carries the user, the active church
+(organization) and the user's role there (Admin, Engineer, Volunteer), since
+one engineer may serve several churches. The app currently uses `LocalGuest`,
+which always signs in a local admin so the desk is never locked on a Sunday
+morning.
+
+Approved plan: local SQLite on each computer (works fully offline), Supabase
+Postgres + Auth in the cloud for accounts and sync, sign-in in the system
+browser (OAuth + PKCE) returning via a `sanctuarymix://` deep link, and tokens
+stored in the macOS Keychain / Windows Credential Manager. A Supabase provider
+replaces `LocalGuest` in `src-tauri/src/state.rs` without touching the UI.
 
 ## Building
 

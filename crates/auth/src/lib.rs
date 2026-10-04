@@ -2,9 +2,10 @@
 //!
 //! The app depends only on [`AuthProvider`]. Today that is [`LocalGuest`],
 //! which signs everyone in as a local operator so the console is never locked
-//! out on a Sunday morning. A hosted provider (e.g. OAuth/OIDC with church
-//! team accounts and saved show files) implements the same trait later
-//! without touching the UI or commands.
+//! out on a Sunday morning. The approved plan is Supabase Auth: sign-in runs
+//! in the system browser (OAuth + PKCE), returns through a `sanctuarymix://`
+//! deep link, and tokens live in the OS keychain. That provider implements the
+//! same trait without touching the UI or commands.
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -13,13 +14,14 @@ use serde::{Deserialize, Serialize};
 pub enum AuthError {
     #[error("sign-in is not available yet")]
     NotImplemented,
-    #[error("invalid credentials")]
-    InvalidCredentials,
+    #[error("sign-in failed: {0}")]
+    Failed(String),
 }
 
 pub type Result<T> = std::result::Result<T, AuthError>;
 
-/// What a person may do at the console.
+/// What a person may do at a church's console. Roles belong to a membership,
+/// not a user, because one engineer may serve several churches.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Role {
@@ -37,28 +39,35 @@ pub struct User {
     pub id: String,
     pub display_name: String,
     pub email: Option<String>,
-    pub role: Role,
+}
+
+/// A church (or campus) whose team shares scenes and settings.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Organization {
+    pub id: String,
+    pub name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Session {
     pub user: User,
+    /// The church this session is working for; `None` when offline/local.
+    pub active_org: Option<Organization>,
+    /// The user's role in `active_org` (or locally).
+    pub role: Role,
     /// False for the built-in local session.
     pub authenticated: bool,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Credentials {
-    pub email: String,
-    pub password: String,
 }
 
 #[async_trait]
 pub trait AuthProvider: Send + Sync {
     async fn current_session(&self) -> Session;
-    async fn sign_in(&self, credentials: Credentials) -> Result<Session>;
+    /// Starts a browser sign-in and returns the URL to open.
+    async fn begin_sign_in(&self) -> Result<String>;
+    /// Finishes sign-in from the deep-link callback URL.
+    async fn complete_sign_in(&self, callback_url: String) -> Result<Session>;
     async fn sign_out(&self) -> Session;
 }
 
@@ -73,8 +82,9 @@ impl LocalGuest {
                 id: "local".into(),
                 display_name: "Local operator".into(),
                 email: None,
-                role: Role::Admin,
             },
+            active_org: None,
+            role: Role::Admin,
             authenticated: false,
         }
     }
@@ -86,7 +96,11 @@ impl AuthProvider for LocalGuest {
         Self::session()
     }
 
-    async fn sign_in(&self, _credentials: Credentials) -> Result<Session> {
+    async fn begin_sign_in(&self) -> Result<String> {
+        Err(AuthError::NotImplemented)
+    }
+
+    async fn complete_sign_in(&self, _callback_url: String) -> Result<Session> {
         Err(AuthError::NotImplemented)
     }
 
@@ -103,14 +117,11 @@ mod tests {
     async fn local_guest_is_an_unauthenticated_admin() {
         let auth = LocalGuest;
         let s = auth.current_session().await;
-        assert_eq!(s.user.role, Role::Admin);
+        assert_eq!(s.role, Role::Admin);
+        assert!(s.active_org.is_none());
         assert!(!s.authenticated);
-        let creds = Credentials {
-            email: "a@b.c".into(),
-            password: "x".into(),
-        };
         assert!(matches!(
-            auth.sign_in(creds).await,
+            auth.begin_sign_in().await,
             Err(AuthError::NotImplemented)
         ));
     }

@@ -27,7 +27,8 @@ pub fn run() {
             commands::set_mute,
             commands::request_channel_names,
             commands::get_session,
-            commands::sign_in,
+            commands::begin_sign_in,
+            commands::complete_sign_in,
             commands::sign_out,
         ])
         .run(tauri::generate_context!())

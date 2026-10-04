@@ -75,7 +75,9 @@ export function createDemoBackend(): Backend {
     },
     async getSession() {
       return {
-        user: { id: "local", displayName: "Local operator", email: null, role: "admin" },
+        user: { id: "local", displayName: "Local operator", email: null },
+        activeOrg: null,
+        role: "admin",
         authenticated: false,
       };
     },

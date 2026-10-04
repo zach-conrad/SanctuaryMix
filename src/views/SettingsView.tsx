@@ -18,7 +18,8 @@ export function SettingsView() {
             <div>
               <strong>{session.user.displayName}</strong>
               <span className="muted">
-                {ROLE_LABEL[session.user.role]} · {session.authenticated ? session.user.email : "Not signed in"}
+                {ROLE_LABEL[session.role]} · {session.activeOrg?.name ?? "This computer"} ·{" "}
+                {session.authenticated ? session.user.email : "Not signed in"}
               </span>
             </div>
           </div>
