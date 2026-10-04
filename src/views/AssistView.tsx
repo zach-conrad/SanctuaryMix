@@ -1,46 +1,65 @@
 import { Ear, Gauge, Waves } from "lucide-react";
 import { ActivityLog, AutoMixControls, ChannelPicker, RoomFeelPicker, RulesList } from "../components/AutoMix";
 import { InsightList, useInsights } from "../components/InsightList";
+import { PageHeader } from "../components/PageHeader";
 
 const MODES = [
-  { icon: Gauge, title: "Gain staging", body: "Listens during soundcheck and recommends preamp gain for every input so nothing clips and nothing hides in the noise." },
-  { icon: Ear, title: "Feedback watch", body: "Spots ringing frequencies on open mics before the room hears them and suggests a narrow notch." },
-  { icon: Waves, title: "EQ suggestions", body: "Compares each voice and instrument to a reference and proposes gentle EQ moves you apply with one tap." },
+  {
+    icon: Gauge,
+    title: "Gain staging",
+    body: "Recommends preamp gain for every input during soundcheck.",
+  },
+  {
+    icon: Ear,
+    title: "Feedback watch",
+    body: "Spots ringing on open mics and suggests a narrow notch.",
+  },
+  {
+    icon: Waves,
+    title: "EQ suggestions",
+    body: "Proposes gentle EQ moves you apply with one tap.",
+  },
 ];
 
 export function AssistView() {
   const insights = useInsights();
   return (
     <div className="page">
+      <PageHeader title="Assist">Suggestions while you mix, and auto-mix for the channels you pick.</PageHeader>
       <AutoMixControls />
-      <div className="assist-columns">
-        <RoomFeelPicker />
-        <ActivityLog />
-      </div>
-      <ChannelPicker />
-      <div className="assist-columns">
-        <RulesList />
-        <section className="panel">
-          <h2 className="text-heading">Right now</h2>
-          <p className="muted">Assist checks every input while you mix. Select a note to jump to that channel.</p>
-          <InsightList insights={insights} />
-        </section>
-      </div>
-      <section>
-        <h2 className="text-heading section-title">Coming next</h2>
-        <div className="mode-grid">
-          {MODES.map(({ icon: Icon, title, body }) => (
-            <div key={title} className="panel">
-              <div className="panel-head">
-                <Icon size={20} strokeWidth={1.75} />
-                <h3 className="text-body-strong">{title}</h3>
-                <span className="text-label muted">Coming soon</span>
-              </div>
-              <p className="muted">{body}</p>
-            </div>
-          ))}
+      <div className="page-split">
+        <div className="page-main">
+          <ChannelPicker />
         </div>
-      </section>
+        <aside className="page-side">
+          <RoomFeelPicker />
+          <section className="panel">
+            <h2 className="text-heading">Right now</h2>
+            <p className="text-caption muted">
+              Assist checks every input while you mix. Select a note to jump to that channel.
+            </p>
+            <InsightList insights={insights} />
+          </section>
+          <ActivityLog />
+          <RulesList />
+          <section className="panel">
+            <div className="panel-head">
+              <h2 className="text-heading">Coming next</h2>
+            </div>
+            <ul className="coming-list">
+              {MODES.map(({ icon: Icon, title, body }) => (
+                <li key={title}>
+                  <Icon size={20} strokeWidth={1.75} aria-hidden />
+                  <span>
+                    <span className="text-body-strong">{title}</span>
+                    <span className="text-caption muted">{body}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }

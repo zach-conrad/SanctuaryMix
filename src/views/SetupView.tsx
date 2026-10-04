@@ -2,13 +2,15 @@ import { AudioLines, RefreshCw, Router } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getBackend } from "../lib/backend";
 import type { AudioDeviceInfo, ConsoleConfig, MicAccess } from "../lib/types";
+import { PageHeader } from "../components/PageHeader";
 import { useMixer } from "../store/mixer";
 
 export function SetupView() {
   return (
-    <div className="page setup">
-      <AudioPanel />
+    <div className="page page--narrow">
+      <PageHeader title="Setup">Connect to your console, then pick where its audio comes in.</PageHeader>
       <ConsolePanel />
+      <AudioPanel />
     </div>
   );
 }
@@ -76,7 +78,13 @@ function AudioPanel() {
       <div className="panel-head">
         <AudioLines size={20} strokeWidth={1.75} />
         <h2 className="text-heading">Dante audio</h2>
-        <button className="sm-btn sm-btn--ghost sm-btn--sm" onClick={refresh} disabled={loading} aria-label="Refresh audio inputs" title="Refresh">
+        <button
+          className="sm-btn sm-btn--ghost sm-btn--sm"
+          onClick={refresh}
+          disabled={loading}
+          aria-label="Refresh audio inputs"
+          title="Refresh"
+        >
           <RefreshCw />
         </button>
       </div>
@@ -109,7 +117,8 @@ function AudioPanel() {
               <span className="device-text">
                 <span className="text-body-strong">{d.name}</span>
                 <span className="text-caption muted">
-                  {d.maxInputChannels} {d.maxInputChannels === 1 ? "input" : "inputs"} · {d.defaultSampleRate / 1000} kHz
+                  {d.maxInputChannels} {d.maxInputChannels === 1 ? "input" : "inputs"} · {d.defaultSampleRate / 1000}{" "}
+                  kHz
                 </span>
               </span>
               {d.isDante && <span className="text-label muted">Dante</span>}
@@ -145,6 +154,12 @@ function AudioPanel() {
       </div>
     </section>
   );
+}
+
+/** Common input counts, plus the saved one if it is something else. */
+const INPUT_COUNTS = [8, 16, 24, 32, 48, 64, 96, 128];
+function inputCountOptions(current: number): number[] {
+  return INPUT_COUNTS.includes(current) ? INPUT_COUNTS : [...INPUT_COUNTS, current].sort((a, b) => a - b);
 }
 
 const IPV4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
@@ -217,14 +232,18 @@ function ConsolePanel() {
         )}
         <label className="sm-field">
           <span className="sm-field__label">Inputs to show</span>
-          <input
+          <select
             className="sm-input"
-            type="number"
-            min={1}
-            max={128}
             value={form.inputCount}
-            onChange={(e) => update({ inputCount: Math.max(1, Math.min(128, Number(e.target.value) || 1)) })}
-          />
+            onChange={(e) => update({ inputCount: Number(e.target.value) })}
+          >
+            {inputCountOptions(form.inputCount).map((n) => (
+              <option key={n} value={n}>
+                {n} inputs
+              </option>
+            ))}
+          </select>
+          <span className="sm-field__help">How many channel strips the mixer shows.</span>
         </label>
       </div>
       {consoleError && <p className="error">{consoleError}</p>}

@@ -1,6 +1,7 @@
 import { ChevronRight, CloudOff, HardDrive, Mic, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Dialog } from "../components/Dialog";
+import { PageHeader } from "../components/PageHeader";
 import { useIsRecording } from "../components/RecordControl";
 import { getBackend } from "../lib/backend";
 import {
@@ -41,45 +42,44 @@ function ServicesList() {
   const groups = groupByServiceDate(list);
 
   return (
-    <div className="page services-page">
-      <div className="services-main">
-        <div className="services-head">
-          <h1 className="text-title">Services</h1>
-          <p className="muted">
-            Every recorded service with its mix and each fader and mute move. Open one to listen and see what changed.
-          </p>
+    <div className="page">
+      <PageHeader title="Services">
+        Every recorded service with its mix and each fader and mute move. Open one to listen and see what changed.
+      </PageHeader>
+      <div className="page-split">
+        <div className="page-main">
+          {error && <p className="error">{error}</p>}
+          {loaded && list.length === 0 && (
+            <section className="panel">
+              <p className="muted">
+                No services yet. Press Record service in the top bar when the service starts; it saves when you press
+                Stop.
+              </p>
+            </section>
+          )}
+          {groups.map((g) => (
+            <section key={g.date} className="service-group" aria-label={serviceDateLabel(g.date)}>
+              <h2 className="text-heading service-date">
+                {serviceDateLabel(g.date)}
+                <span className="text-caption muted">
+                  {g.items.length} {g.items.length === 1 ? "service" : "services"}
+                </span>
+              </h2>
+              <ul className="service-list">
+                {g.items.map((r) => (
+                  <li key={r.id}>
+                    <ServiceRow r={r} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
         </div>
-        {error && <p className="error">{error}</p>}
-        {loaded && list.length === 0 && (
-          <section className="panel">
-            <p className="muted">
-              No services yet. Press Record service in the top bar when the service starts; it saves when you press
-              Stop.
-            </p>
-          </section>
-        )}
-        {groups.map((g) => (
-          <section key={g.date} className="service-group" aria-label={serviceDateLabel(g.date)}>
-            <h2 className="text-heading service-date">
-              {serviceDateLabel(g.date)}
-              <span className="text-caption muted">
-                {g.items.length} {g.items.length === 1 ? "service" : "services"}
-              </span>
-            </h2>
-            <ul className="service-list">
-              {g.items.map((r) => (
-                <li key={r.id}>
-                  <ServiceRow r={r} />
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
+        <aside className="page-side">
+          <RecordingSettingsPanel />
+          <DiskPanel />
+        </aside>
       </div>
-      <aside className="services-side">
-        <DiskPanel />
-        <RecordingSettingsPanel />
-      </aside>
     </div>
   );
 }
@@ -107,16 +107,25 @@ function ServiceRow({ r }: { r: RecordingSummary }) {
         </span>
         {r.notes && <span className="text-caption muted service-notes">{r.notes}</span>}
       </span>
-      <span className="text-readout service-duration" aria-label="Length">
-        {formatClock(r.durationMs)}
+      <span className="service-facts">
+        <span className="text-readout" aria-label="Length">
+          {formatClock(r.durationMs)}
+        </span>
+        <span className="text-caption muted">
+          {audioModeLabel(r)} · <span aria-label="Size">{formatBytes(r.bytesOnDisk)}</span>
+        </span>
       </span>
-      <span className="text-caption service-what">{audioModeLabel(r)}</span>
-      <span className="text-readout service-size muted" aria-label="Size">
-        {formatBytes(r.bytesOnDisk)}
-      </span>
-      <span className="text-label muted service-sync" title="Saved on this computer. Cloud backup comes with team accounts.">
+      <span
+        className="text-caption muted service-sync"
+        title={
+          r.syncState === "localOnly"
+            ? "Saved on this computer. Cloud backup comes with team accounts."
+            : SYNC_LABEL[r.syncState]
+        }
+      >
         <CloudOff size={20} strokeWidth={1.75} aria-hidden />
-        {SYNC_LABEL[r.syncState]}
+        {/* Every service is local today, so the icon alone says it; other states show their word. */}
+        <span className={r.syncState === "localOnly" ? "visually-hidden" : undefined}>{SYNC_LABEL[r.syncState]}</span>
       </span>
       <ChevronRight size={20} strokeWidth={1.75} className="muted" aria-hidden />
     </button>
@@ -134,7 +143,10 @@ function DiskPanel() {
   const old = oldMultitracks(list, RETENTION_DAYS, now);
   const oldBytes = old.reduce((n, r) => n + estimatedTrackBytes(r), 0);
   const canDelete = role === "admin" || role === "engineer";
-  const cutoff = new Date(now - RETENTION_DAYS * 86_400_000).toLocaleDateString("en-US", { month: "long", day: "numeric" });
+  const cutoff = new Date(now - RETENTION_DAYS * 86_400_000).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+  });
 
   return (
     <section className="panel">
@@ -164,7 +176,11 @@ function DiskPanel() {
       ) : (
         <p className="empty">Checking disk space…</p>
       )}
-      {disk && <p className="text-caption muted folder" title={disk.folder}>{disk.folder}</p>}
+      {disk && (
+        <p className="text-caption muted folder" title={disk.folder}>
+          {disk.folder}
+        </p>
+      )}
       <div className="disk-action">
         <button
           className="sm-btn sm-btn--danger"
@@ -208,8 +224,8 @@ function DiskPanel() {
           }
         >
           <p>
-            This deletes the separate input tracks from {old.length} {old.length === 1 ? "service" : "services"} recorded
-            before {cutoff}, about {formatBytes(oldBytes)}. Their stereo mix and the fader and mute moves stay.
+            This deletes the separate input tracks from {old.length} {old.length === 1 ? "service" : "services"}{" "}
+            recorded before {cutoff}, about {formatBytes(oldBytes)}. Their stereo mix and the fader and mute moves stay.
           </p>
           <p className="muted">This can't be undone.</p>
         </Dialog>
@@ -291,7 +307,9 @@ function RecordingSettingsPanel() {
       {!stereo && <p className="text-caption muted">Without audio, only the fader and mute moves are recorded.</p>}
 
       <div className="sm-field">
-        <span className="sm-field__label" id="multitrack-label">Multitrack</span>
+        <span className="sm-field__label" id="multitrack-label">
+          Multitrack
+        </span>
         <div className="sm-seg" role="group" aria-labelledby="multitrack-label">
           <button aria-pressed={!settings.multitrack} onClick={() => void save({ ...settings, multitrack: false })}>
             Off

@@ -110,6 +110,12 @@ function DetailHeader() {
             <span className="sm-pill__meta">The app stopped before Stop was pressed</span>
           </span>
         )}
+        {canDelete && (
+          <button className="sm-btn sm-btn--danger delete-btn" onClick={() => setConfirmDelete(true)}>
+            <Trash2 />
+            Delete service
+          </button>
+        )}
       </div>
       <div className="detail-fields">
         <label className="sm-field title-field">
@@ -140,12 +146,6 @@ function DetailHeader() {
           />
           <span className="sm-field__help">{saved ? "Saved." : "Saved when you click away."}</span>
         </label>
-        {canDelete && (
-          <button className="sm-btn sm-btn--danger delete-btn" onClick={() => setConfirmDelete(true)}>
-            <Trash2 />
-            Delete service
-          </button>
-        )}
       </div>
       {confirmDelete && (
         <Dialog

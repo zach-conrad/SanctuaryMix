@@ -173,6 +173,10 @@
   --hit-min: 44px;
   --strip-width: 88px;
   --meter-width: 8px;
+  --inspector-width: 320px;
+  --side-width: 360px;
+  --page-max: 1200px;
+  --page-narrow: 760px;
   --duration-fast: 120ms;
   --duration-base: 200ms;
   --duration-slow: 320ms;
