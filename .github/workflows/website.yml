@@ -69,6 +69,18 @@ jobs:
           gh release download "$tag" --pattern "SanctuaryMix-mac-universal.dmg" --dir website/dist/downloads
           node scripts/write-site-manifest.mjs website/dist/downloads "$tag" "$published"
 
+      # Vercel Hobby rejects CLI deploys over 100 MB of files. Fail with a
+      # clear message first, with headroom.
+      - name: Check site size
+        if: steps.site.outputs.exists == 'true'
+        run: |
+          du -ah website/dist | sort -rh | head -5
+          kb=$(du -sk website/dist | cut -f1)
+          if [ "$kb" -gt $((90 * 1024)) ]; then
+            echo "::error::website/dist is $((kb / 1024)) MB; Vercel Hobby allows 100 MB per deploy. Shrink the installer or change hosting."
+            exit 1
+          fi
+
       # Deploys the prebuilt folder as static files. The Vercel project
       # should NOT also be connected to this repo through Vercel's Git
       # integration, or its own builds would replace these and drop the
