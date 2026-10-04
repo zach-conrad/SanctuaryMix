@@ -332,3 +332,4 @@ img { display: block; max-width: 100%; height: auto; }
 }
 .plan-picked > svg { width: 20px; height: 20px; stroke-width: 1.75; flex: none; margin-top: 2px; color: var(--accent-text); }
 .plan-picked .feature__body { margin-top: var(--space-1); }
+.pricing__foot { margin-top: var(--space-5); color: var(--text-muted); }

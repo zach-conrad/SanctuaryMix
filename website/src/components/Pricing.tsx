@@ -3,9 +3,11 @@ import { useState } from "react";
 import {
   PLANS,
   PRICES_ARE_PLACEHOLDERS,
+  PRICING_FOOTNOTE,
   TRIAL_DAYS,
   formatPrice,
   maxYearlySavingsPercent,
+  monthsFreeYearly,
   planHref,
   pricePerMonth,
   yearlySavingsPercent,
@@ -20,6 +22,7 @@ interface Props {
 export function Pricing({ root }: Props) {
   const [billing, setBilling] = useState<Billing>("yearly");
   const bestSaving = maxYearlySavingsPercent();
+  const monthsFree = monthsFreeYearly();
 
   return (
     <section id="pricing" className="section section--surface" aria-labelledby="pricing-heading">
@@ -28,8 +31,8 @@ export function Pricing({ root }: Props) {
           <div>
             <h2 id="pricing-heading" className="section__title">Pricing</h2>
             <p className="section__lede">
-              One price per church, not per seat. Every plan starts with a {TRIAL_DAYS}-day free trial, and you can
-              cancel any time.
+              One price per church, not per seat. Every plan starts with a {TRIAL_DAYS}-day free trial, no card
+              needed.
             </p>
           </div>
           <div className="pricing__toggle">
@@ -41,7 +44,9 @@ export function Pricing({ root }: Props) {
                 Yearly
               </button>
             </div>
-            {bestSaving > 0 ? (
+            {monthsFree > 0 ? (
+              <span className="pricing__save text-caption">Yearly: {monthsFree} months free</span>
+            ) : bestSaving > 0 ? (
               <span className="pricing__save text-caption">Save up to {bestSaving}% yearly</span>
             ) : null}
           </div>
@@ -61,7 +66,7 @@ export function Pricing({ root }: Props) {
               <li key={plan.id} className={`plan${plan.featured ? " plan--featured" : ""}`}>
                 <div className="plan__top">
                   <h3 className="text-heading">{plan.name}</h3>
-                  {plan.featured ? <span className="plan__tag text-label">Most churches</span> : null}
+                  {plan.featured ? <span className="plan__tag text-label">Most popular</span> : null}
                 </div>
                 <p className="feature__body">{plan.audience}</p>
                 <p className="plan__price">
@@ -73,6 +78,7 @@ export function Pricing({ root }: Props) {
                     ? `${formatPrice(plan.yearly)} billed yearly${saving > 0 ? `, save ${saving}%` : ""}`
                     : `Billed monthly, or ${formatPrice(plan.yearly)} a year`}
                 </p>
+                {plan.note ? <p className="plan__billed text-caption">{plan.note}</p> : null}
                 <a
                   className={`sm-btn sm-btn--lg plan__cta${plan.featured ? " sm-btn--primary" : ""}`}
                   href={planHref(root, plan, billing)}
@@ -92,6 +98,7 @@ export function Pricing({ root }: Props) {
             );
           })}
         </ul>
+        <p className="pricing__foot text-caption">{PRICING_FOOTNOTE}</p>
       </div>
     </section>
   );
