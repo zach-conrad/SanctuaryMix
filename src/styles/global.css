@@ -138,3 +138,63 @@ select.sm-input { appearance: auto; }
 }
 /* Break long names between words where possible, hyphenating only when a word can't fit. */
 .sm-strip__label { overflow-wrap: break-word; hyphens: auto; }
+
+/* Auto-mix */
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.assist-mode { display: flex; align-items: center; gap: var(--space-2); }
+.topbar-freeze { height: var(--hit-min); }
+.automix-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+.automix-state { flex: 1; min-width: 240px; font: var(--text-caption); }
+.assist-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: var(--space-5); align-items: start; }
+
+.feel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-2); }
+.feel-card {
+  display: flex; flex-direction: column; gap: var(--space-1); min-height: var(--hit-min); padding: var(--space-3);
+  text-align: left; border-radius: var(--radius-md); border: 1px solid var(--border-strong);
+  background: var(--surface-raised); color: var(--text);
+  transition: background-color var(--duration-fast) ease-out;
+}
+.feel-card:hover:not(:disabled) { background: var(--control-hover); }
+.feel-card[aria-checked="true"] { border-color: var(--accent); background: var(--accent-subtle); box-shadow: inset 0 0 0 1px var(--accent); }
+.feel-card:disabled { opacity: 0.45; cursor: not-allowed; }
+.feel-warning { color: var(--warning); }
+
+.nudges { display: flex; flex-direction: column; gap: var(--space-3); }
+.nudge { display: flex; flex-direction: column; gap: var(--space-1); }
+.nudge-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.nudge-head .text-readout { white-space: nowrap; }
+.nudge input[type="range"] { width: 100%; height: var(--hit-min); margin: 0; accent-color: var(--accent); }
+
+.am-table { width: 100%; border-collapse: collapse; }
+.am-table th { text-align: left; color: var(--text-muted); letter-spacing: var(--text-label-tracking); padding: 0 var(--space-2) var(--space-2); }
+.am-table td { padding: var(--space-1) var(--space-2); height: var(--hit-min); border-top: 1px solid var(--border); vertical-align: middle; }
+.am-table tr[data-managed="false"] td:not(:first-child) { color: var(--text-muted); }
+.am-table input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); }
+.am-table select.sm-input { height: var(--control-sm); min-width: 180px; }
+.am-row-actions { text-align: right; white-space: nowrap; }
+.am-mode { font: var(--text-caption); color: var(--text-muted); }
+.am-mode[data-mode="riding"], .am-mode[data-mode="settled"] { color: var(--assist); }
+.am-mode[data-mode="clipping"] { color: var(--danger); }
+.am-mode[data-mode="heldByOperator"], .am-mode[data-mode="waitingForFader"], .am-mode[data-mode="atLimit"], .am-mode[data-mode="noAudio"],
+.am-mode[data-mode="consoleOffline"] { color: var(--warning); }
+.am-change { color: var(--assist); }
+
+.activity { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); max-height: 560px; overflow-y: auto; }
+.activity-move { max-width: none; gap: var(--space-1); padding: var(--space-2) var(--space-3); }
+.activity-move:not(.sm-assist) {
+  display: grid; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--surface-raised);
+}
+.activity-move .sm-assist__why { font: var(--text-caption); }
+.activity-note { padding: 0 var(--space-1); }
+.rules { margin: 0; padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); color: var(--text-muted); }
+
+.strip-auto { align-self: center; }
+.strip-auto.is-manual {
+  display: inline-flex; align-items: center; padding: 0 var(--space-2); border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong); color: var(--text-muted);
+  font: var(--text-label); letter-spacing: var(--text-label-tracking); text-transform: uppercase;
+}
+.inspector-auto-head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }

@@ -1,5 +1,6 @@
 use audio_engine::{AudioDeviceInfo, MicAccess};
 use auth::Session;
+use automix::{Adjustment, AutoMixConfig, AutoMixStatus, ChannelRole, Preset, RoomFeel};
 use console::{ConsoleConfig, ConsoleError};
 use mix_core::{ChangeSource, ChannelId, ChannelKind, ConsoleEvent};
 use serde::Serialize;
@@ -67,7 +68,9 @@ pub async fn start_metering(app: AppHandle, device: Option<String>) -> CmdResult
         // Stop the old stream before opening the device again.
         slot.take();
         let emitter = app.clone();
+        let automix = state.automix.clone();
         let handle = audio_engine::start_metering(device, move |frame| {
+            automix.push_meters(frame.clone());
             let _ = emitter.emit("meters", frame);
         })
         .map_err(err)?;
@@ -105,11 +108,13 @@ pub async fn connect_console(
 
     let mut adapter = console::create_adapter(config);
     let mut events = adapter.subscribe();
+    let automix = state.automix.clone();
     let forwarder = tauri::async_runtime::spawn(async move {
         use tokio::sync::broadcast::error::RecvError;
         loop {
             match events.recv().await {
                 Ok(event) => {
+                    automix.push_console(event.clone());
                     let _ = app.emit("console", &event);
                     app.state::<AppState>()
                         .control
@@ -126,13 +131,13 @@ pub async fn connect_console(
 
     adapter.connect().await.map_err(err)?;
     for index in 0..input_count {
-        adapter
-            .request_name(ChannelId {
-                kind: ChannelKind::Input,
-                index,
-            })
-            .await
-            .map_err(err)?;
+        let id = ChannelId {
+            kind: ChannelKind::Input,
+            index,
+        };
+        adapter.request_name(id).await.map_err(err)?;
+        // Auto-mix needs to know where each fader sits before it may move it.
+        adapter.request_fader(id).await.map_err(err)?;
     }
     *slot = Some(adapter);
     Ok(())
@@ -215,4 +220,115 @@ pub async fn complete_sign_in(
 #[tauri::command]
 pub async fn sign_out(state: State<'_, AppState>) -> CmdResult<Session> {
     Ok(state.auth.sign_out().await)
+}
+
+// Auto-mix. The rules live in the automix crate; these only pass requests
+// through, so nothing the UI sends can loosen a guardrail.
+
+#[tauri::command]
+pub async fn automix_presets() -> Vec<Preset> {
+    RoomFeel::ALL.iter().map(|f| f.preset()).collect()
+}
+
+#[tauri::command]
+pub async fn automix_guess_roles(names: Vec<String>) -> Vec<ChannelRole> {
+    names.iter().map(|n| automix::guess_role(n)).collect()
+}
+
+#[tauri::command]
+pub async fn automix_get_config(app: AppHandle) -> CmdResult<AutoMixConfig> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        let saved = state
+            .store
+            .lock()
+            .unwrap()
+            .get_setting::<AutoMixConfig>(store::keys::AUTOMIX_CONFIG)
+            .map_err(err)?;
+        Ok(saved.unwrap_or_default().sanitized())
+    })
+    .await
+}
+
+/// Applies and saves the operator's choices. Returns them as the core will use them.
+#[tauri::command]
+pub async fn automix_set_config(app: AppHandle, config: AutoMixConfig) -> CmdResult<AutoMixConfig> {
+    let preset = config.feel.preset();
+    if preset.admin_only {
+        let session = app.state::<AppState>().auth.current_session().await;
+        if session.role != auth::Role::Admin {
+            return Err(format!(
+                "Only an admin can choose {}. Ask an admin, or pick another room feel.",
+                preset.name.to_lowercase()
+            ));
+        }
+    }
+    let applied = app
+        .state::<AppState>()
+        .automix
+        .configure(config)
+        .await
+        .map_err(err)?;
+    let saved = applied.clone();
+    blocking(move || {
+        app.state::<AppState>()
+            .store
+            .lock()
+            .unwrap()
+            .set_setting(store::keys::AUTOMIX_CONFIG, &saved)
+            .map_err(err)
+    })
+    .await?;
+    Ok(applied)
+}
+
+#[tauri::command]
+pub async fn automix_engage(state: State<'_, AppState>, on: bool) -> CmdResult<()> {
+    state.automix.engage(on).await.map_err(err)
+}
+
+/// Stops every automatic move immediately.
+#[tauri::command]
+pub async fn automix_freeze(state: State<'_, AppState>) -> CmdResult<()> {
+    state.automix.freeze();
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn automix_resume(state: State<'_, AppState>) -> CmdResult<()> {
+    state.automix.unfreeze().await.map_err(err)
+}
+
+#[tauri::command]
+pub async fn automix_resume_channel(state: State<'_, AppState>, channel: u16) -> CmdResult<()> {
+    state.automix.resume_channel(channel).await.map_err(err)
+}
+
+#[tauri::command]
+pub async fn automix_undo(state: State<'_, AppState>, channel: u16) -> CmdResult<()> {
+    state.automix.undo(channel).await.map_err(err)
+}
+
+#[tauri::command]
+pub async fn automix_undo_all(state: State<'_, AppState>) -> CmdResult<()> {
+    state.automix.undo_all().await.map_err(err)
+}
+
+#[tauri::command]
+pub async fn automix_status(state: State<'_, AppState>) -> CmdResult<AutoMixStatus> {
+    state.automix.status().await.map_err(err)
+}
+
+/// The most recent auto-mix log entries, newest first.
+#[tauri::command]
+pub async fn automix_log(app: AppHandle, limit: Option<u32>) -> CmdResult<Vec<Adjustment>> {
+    blocking(move || {
+        app.state::<AppState>()
+            .store
+            .lock()
+            .unwrap()
+            .recent_adjustments(limit.unwrap_or(200).min(5_000))
+            .map_err(err)
+    })
+    .await
 }

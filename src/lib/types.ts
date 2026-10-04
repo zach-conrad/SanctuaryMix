@@ -63,6 +63,130 @@ export interface Session {
   authenticated: boolean;
 }
 
+// Auto-mix (crates/automix).
+
+export type ChannelRole =
+  | "speech"
+  | "leadVocal"
+  | "backingVocal"
+  | "choir"
+  | "kick"
+  | "bass"
+  | "drums"
+  | "keysPads"
+  | "pianoOrgan"
+  | "electricGuitar"
+  | "acousticGuitar"
+  | "playback"
+  | "other";
+
+export type RoomFeel = "fullModern" | "bigLoud" | "deepLowEnd" | "warmIntimate" | "traditionalChoral" | "spokenWord";
+
+export interface Preset {
+  feel: RoomFeel;
+  name: string;
+  description: string;
+  roomLevel: string;
+  referenceDb: number;
+  speechReferenceDb: number;
+  /** dB under the lead vocal: backing vocal, choir, kick, bass, drums, keys, piano, electric gtr, acoustic gtr, playback, other. */
+  balance: number[];
+  speechOverMusicDb: number;
+  adminOnly: boolean;
+  warning: string | null;
+}
+
+export interface Nudges {
+  loudnessDb: number;
+  lowEndDb: number;
+  vocalPresenceDb: number;
+}
+
+export interface RideLimits {
+  maxStepDb: number;
+  maxRateDbPerSec: number;
+  deadbandDb: number;
+  maxBoostDb: number;
+  maxCutDb: number;
+}
+
+export interface Guardrails {
+  music: RideLimits;
+  speech: RideLimits;
+  gateDbfs: number;
+  noRaiseAbovePeakDbfs: number;
+}
+
+export interface ManagedChannel {
+  channel: number;
+  role: ChannelRole;
+}
+
+export interface AutoMixConfig {
+  feel: RoomFeel;
+  nudges: Nudges;
+  channels: ManagedChannel[];
+  guardrails: Guardrails;
+}
+
+export type ChannelMode =
+  | "off"
+  | "consoleOffline"
+  | "frozen"
+  | "heldByOperator"
+  | "undone"
+  | "waitingForFader"
+  | "muted"
+  | "clipping"
+  | "noAudio"
+  | "idle"
+  | "waitingForLead"
+  | "riding"
+  | "atLimit"
+  | "settled";
+
+export interface ChannelStatus {
+  channel: number;
+  name: string | null;
+  role: ChannelRole;
+  mode: ChannelMode;
+  faderDb: number | null;
+  baselineDb: number | null;
+  targetDb: number | null;
+  levelDb: number | null;
+}
+
+export interface AutoMixStatus {
+  engaged: boolean;
+  frozen: boolean;
+  consoleOnline: boolean;
+  audioOk: boolean;
+  feel: RoomFeel;
+  speechChannel: number | null;
+  leadChannel: number | null;
+  channels: ChannelStatus[];
+}
+
+export type AdjustmentKind =
+  | "auto"
+  | "undo"
+  | "operatorTookOver"
+  | "engaged"
+  | "disengaged"
+  | "frozen"
+  | "resumed"
+  | "channelResumed";
+
+export interface Adjustment {
+  atMs: number;
+  kind: AdjustmentKind;
+  channel: number | null;
+  channelName: string | null;
+  fromDb: number | null;
+  toDb: number | null;
+  reason: string;
+}
+
 // ---- Service recordings (crates/recorder, docs/RECORDINGS.md) ----
 
 /** Who made a control change. Mirrors mix_core::ChangeSource. */

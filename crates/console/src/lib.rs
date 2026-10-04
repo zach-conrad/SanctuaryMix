@@ -66,6 +66,11 @@ pub trait ConsoleAdapter: Send + Sync {
     async fn set_mute(&self, id: ChannelId, muted: bool) -> Result<()>;
     /// Ask the console for a channel name; the answer arrives as [`ConsoleEvent::Name`].
     async fn request_name(&self, id: ChannelId) -> Result<()>;
+    /// Ask the console where a fader sits; the answer arrives as [`ConsoleEvent::Fader`].
+    /// Consoles that can't be asked report faders only when they move.
+    async fn request_fader(&self, _id: ChannelId) -> Result<()> {
+        Ok(())
+    }
     /// Every change the console reports. Lagging receivers drop old events.
     fn subscribe(&self) -> broadcast::Receiver<ConsoleEvent>;
 }

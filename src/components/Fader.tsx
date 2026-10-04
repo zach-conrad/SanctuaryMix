@@ -5,11 +5,13 @@ interface Props {
   db: number | null;
   disabled?: boolean;
   label: string;
+  /** Auto-mix moved it: outline the cap in the Assist hue. */
+  assist?: boolean;
   onChange(db: number | null): void;
 }
 
 /** Vertical fader, unity at 75%. Drag, arrow keys (Shift for 0.1 dB), or double-click for 0 dB. */
-export function Fader({ db, disabled, label, onChange }: Props) {
+export function Fader({ db, disabled, label, assist, onChange }: Props) {
   const track = useRef<HTMLDivElement>(null);
 
   const fromPointer = (clientY: number) => {
@@ -36,6 +38,7 @@ export function Fader({ db, disabled, label, onChange }: Props) {
       <div className="sm-fader-unity" style={{ bottom: "75%" }} />
       <div
         className="sm-fader-cap"
+        data-assist={assist || undefined}
         role="slider"
         tabIndex={disabled ? -1 : 0}
         aria-label={`${label} fader`}

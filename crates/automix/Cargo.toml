@@ -1,0 +1,19 @@
+[package]
+name = "automix"
+description = "AI auto-mix: rides input faders toward a room-feel target inside hard guardrails."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+mix-core.workspace = true
+async-trait.workspace = true
+log.workspace = true
+serde.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+console.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
