@@ -1,0 +1,72 @@
+name: Security
+
+# Dependency and secret scanning. Runs on every PR and push to main, and weekly
+# so a newly published advisory against a dependency we already use is caught
+# even when nobody is pushing code.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+  schedule:
+    - cron: "0 13 * * 1" # Mondays 13:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: 8.30.1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar xz -C /usr/local/bin gitleaks
+      # Scans every commit in history, so a key that was committed and then
+      # deleted is still caught.
+      - run: gitleaks git . --redact --no-banner --verbose
+
+  cargo-deny:
+    name: Rust deps (${{ matrix.checks }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        checks: [advisories, "bans licenses sources"]
+    # A brand-new advisory shouldn't block unrelated PRs: it is reported here,
+    # on the weekly run, and Dependabot opens the fix. Licenses, banned crates
+    # and unknown sources are always blocking.
+    continue-on-error: ${{ matrix.checks == 'advisories' && github.event_name == 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check ${{ matrix.checks }}
+
+  npm-audit:
+    name: npm audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      # Shipped (runtime) dependencies: fail on high or critical.
+      - run: npm audit --omit=dev --audit-level=high
+      # Build tooling: report only.
+      - run: npm audit --audit-level=high || echo "::warning::npm audit found issues in dev dependencies"

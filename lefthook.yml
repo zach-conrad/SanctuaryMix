@@ -1,0 +1,36 @@
+# Git hooks for SanctuaryMix (https://lefthook.dev).
+# Installed automatically by `npm install`. Re-install with `npm run hooks:install`.
+#
+# pre-commit: fast, staged files only (formats in place and re-stages).
+# pre-push:   the same checks CI runs first, so a red build is caught before it leaves your machine.
+# Skip in an emergency with `git commit --no-verify` / `git push --no-verify`. CI still runs everything.
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: rustfmt
+      glob: "*.rs"
+      run: rustfmt --edition 2021 {staged_files}
+      stage_fixed: true
+
+    - name: eslint
+      glob: "*.{ts,tsx,js,mjs}"
+      run: npx eslint --fix --max-warnings 0 {staged_files}
+      stage_fixed: true
+
+    - name: secrets
+      run: |
+        if command -v gitleaks >/dev/null 2>&1; then
+          gitleaks git --pre-commit --staged --redact --no-banner
+        else
+          echo "gitleaks not installed, skipping secret scan (brew install gitleaks). CI will still scan."
+        fi
+
+pre-push:
+  parallel: true
+  jobs:
+    - name: web
+      run: npm run check:web
+
+    - name: rust
+      run: npm run check:rust

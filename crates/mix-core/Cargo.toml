@@ -4,6 +4,7 @@ description = "Shared mixer domain types used by every SanctuaryMix crate and th
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish = false
 
 [dependencies]
 serde.workspace = true

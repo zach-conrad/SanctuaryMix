@@ -66,7 +66,8 @@ crates/
 src-tauri/        The desktop app: Tauri commands and events that wire the crates to the UI
 assets/brand/      SanctuaryMix wordmark (light and dark SVGs); assets/icon.svg is the app icon source
 src/              React UI (views, components, Zustand store, backend bridge)
-.github/workflows CI: lint + tests, macOS universal .app/.dmg, Windows build check
+.github/workflows CI, security scans, dev builds and releases (see docs/CI.md)
+docs/CI.md        How checks, git hooks, the dev channel and releases work
 ```
 
 Platform-specific code is kept out of the crates, so a Windows build is the

@@ -4,6 +4,7 @@ description = "SanctuaryMix desktop app (Tauri shell)."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish = false
 
 [lib]
 name = "sanctuary_mix_lib"

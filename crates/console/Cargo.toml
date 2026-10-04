@@ -4,6 +4,7 @@ description = "Console control adapters (Allen & Heath dLive first) behind one C
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish = false
 
 [dependencies]
 mix-core.workspace = true

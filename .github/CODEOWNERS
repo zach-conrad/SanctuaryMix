@@ -1,0 +1,6 @@
+# Changes to the pipeline and dependency policy need the owner's review
+# (enforced once "Require review from Code Owners" is on for main).
+/.github/          @zach-conrad
+/deny.toml         @zach-conrad
+/lefthook.yml      @zach-conrad
+/rust-toolchain.toml @zach-conrad
