@@ -78,3 +78,57 @@ pub enum ConsoleEvent {
     Mute { id: ChannelId, muted: bool },
     Name { id: ChannelId, name: String },
 }
+
+/// Who made a control change. Recordings keep this so a replay can show
+/// whether a move came from the desk, a person in the app, or Assist.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ChangeSource {
+    /// Someone moved it on the console itself.
+    Console,
+    /// A person changed it in SanctuaryMix.
+    Operator,
+    /// The AI auto-mix changed it.
+    Assist,
+    /// A recording replay sent it to the console.
+    Replay,
+    /// Console state captured when a recording started.
+    Snapshot,
+}
+
+impl ChangeSource {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Console => "console",
+            Self::Operator => "operator",
+            Self::Assist => "assist",
+            Self::Replay => "replay",
+            Self::Snapshot => "snapshot",
+        }
+    }
+}
+
+/// One timestamped change on the shared control bus.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ControlChange {
+    /// Unix epoch milliseconds (UTC).
+    pub at_ms: u64,
+    pub source: ChangeSource,
+    pub event: ConsoleEvent,
+}
+
+impl ControlChange {
+    /// Stamps `event` with the current wall-clock time.
+    pub fn now(source: ChangeSource, event: ConsoleEvent) -> Self {
+        let at_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or_default();
+        Self {
+            at_ms,
+            source,
+            event,
+        }
+    }
+}
