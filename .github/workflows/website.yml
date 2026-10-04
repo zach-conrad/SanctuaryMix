@@ -1,0 +1,83 @@
+name: Website
+
+# Builds the launch site in website/ and deploys it with the newest installer,
+# so the site's Download button always serves the latest release and visitors
+# never need a GitHub account. Runs when:
+#   - a release finishes (new installer to publish),
+#   - website/ changes on main (new copy or design), or
+#   - someone runs it by hand.
+# The installer comes from the newest (non-prerelease) GitHub release, which
+# stays private as the internal copy. Contract with the site: website/src/release.ts.
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  push:
+    branches: [main]
+    paths: ["website/**", ".github/workflows/website.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy website
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Check the site exists
+        id: site
+        run: |
+          if [ -f website/package.json ]; then echo "exists=true" >> "$GITHUB_OUTPUT"
+          else echo "::notice::No website/ on main yet; nothing to deploy."; fi
+
+      - uses: actions/setup-node@v7
+        if: steps.site.outputs.exists == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Build site
+        if: steps.site.outputs.exists == 'true'
+        working-directory: website
+        run: npm ci && npm run build
+
+      - name: Add the latest installer and latest.json
+        if: steps.site.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! tag=$(gh release view --json tagName --jq .tagName 2>/dev/null); then
+            echo "::notice::No release published yet; the site will show the download as coming soon."
+            exit 0
+          fi
+          published=$(gh release view "$tag" --json publishedAt --jq .publishedAt)
+          mkdir -p website/dist/downloads
+          gh release download "$tag" --pattern "SanctuaryMix-mac-universal.dmg" --dir website/dist/downloads
+          node scripts/write-site-manifest.mjs website/dist/downloads "$tag" "$published"
+
+      - name: Deploy to Netlify
+        if: steps.site.outputs.exists == 'true'
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "::warning::NETLIFY_AUTH_TOKEN / NETLIFY_SITE_ID not set; built the site but did not deploy it."
+            exit 0
+          fi
+          npx --yes netlify-cli@27 deploy --prod --dir website/dist \
+            --site "$NETLIFY_SITE_ID" --message "${GITHUB_SHA::7} (${GITHUB_EVENT_NAME})"

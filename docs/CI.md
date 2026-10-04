@@ -11,7 +11,9 @@ through the dev channel first.
  (format, lint,          then Mac + Windows         Dev build ──▶           wait for approval
   secret scan)           builds, Security           rolling "dev"           ("production" env)
  pre-push hook           scans, Mac preview          prerelease             sign, build, publish
- (= CI fast checks)      build to download                                  GitHub release
+ (= CI fast checks)      build to download                                  GitHub release,
+                                                                                then deploy the
+                                                                                website with it
 ```
 
 ## 1. On your machine (git hooks)
@@ -88,10 +90,10 @@ points at a separate dev Supabase project (see section 6).
      are set, see below);
    - builds the Mac universal `.dmg` (signed and notarized once Apple secrets
      exist) and Windows `.exe`/`.msi`;
-   - asks for approval again before publishing, so you can check the builds;
    - publishes a GitHub release (private, like the repo) with generated notes
-     and `SHA256SUMS.txt`, and uploads to private download storage when
-     configured (see "Private downloads" below).
+     and `SHA256SUMS.txt`;
+   - triggers the website deploy, which puts the new installer on the site
+     (see "Website downloads" below).
 
 Assets use fixed names (`SanctuaryMix-mac-universal.dmg`,
 `SanctuaryMix-windows-x64-setup.exe`) so "latest" paths never change.
@@ -146,25 +148,31 @@ Put these on the **production** environment, not the repo:
 
 Signing needs an Apple Developer Program membership ($99/year).
 
-### Private downloads
+### Website downloads (Netlify)
 
-Downloads are never public. Today, release and dev-build files live on this
-private repo's GitHub releases, so only people with access to the repo (signed
-in to GitHub) can download them.
+End users download from the website, never from GitHub. GitHub releases stay
+private as the internal copy. `.github/workflows/website.yml` builds
+`website/`, copies the newest release's `SanctuaryMix-mac-universal.dmg` into
+`downloads/` with a `latest.json` manifest (contract: `website/src/release.ts`),
+and deploys to Netlify. It runs after every release, on every change to
+`website/` on main, and by hand. CI also builds the site on every PR.
 
-Once Supabase is set up, the release and dev workflows also upload the
-installers to a **private** Supabase Storage bucket (`releases`), under
-`stable/<version>/`, `stable/latest/`, `dev/<sha>/` and `dev/latest/`. The
-website then gives a signed-in user a short-lived signed URL (for example from
-a small Supabase Edge Function that checks the user's church membership), so
-a link that gets shared stops working within minutes. To turn it on:
+To turn deploys on:
 
-| Name | Where | Value |
-| --- | --- | --- |
-| `SUPABASE_URL` | variable on each environment | that environment's project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | secret on each environment | service-role key, used only by CI to upload, never shipped in the app or site |
+1. Create a free Netlify account and a site (Add new site, then Deploy
+   manually; any placeholder folder is fine, CI replaces it).
+2. Add two **repository** secrets (Settings, then Secrets and variables, then
+   Actions):
 
-Create the `releases` bucket as private (not public) in each Supabase project.
+| Secret | Value |
+| --- | --- |
+| `NETLIFY_AUTH_TOKEN` | Netlify, then User settings, then Applications, then Personal access token |
+| `NETLIFY_SITE_ID` | Netlify, then Site configuration, then Site ID |
+
+Until real sign-in exists, anyone with the site's address can download. The
+installer is not linked from GitHub or listed anywhere public. The planned
+upgrade is to store installers in a private Supabase Storage bucket and have
+the account page hand signed-in users short-lived signed links.
 
 ## 6. Backend environments (later)
 

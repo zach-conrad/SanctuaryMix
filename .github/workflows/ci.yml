@@ -59,6 +59,28 @@ jobs:
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
 
+  # The launch site (website/), when present. Built here so a broken page is
+  # caught on the PR, not at deploy time.
+  website:
+    name: Website build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the site exists
+        id: site
+        run: if [ -f website/package.json ]; then echo "exists=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/setup-node@v7
+        if: steps.site.outputs.exists == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - name: Build site
+        if: steps.site.outputs.exists == 'true'
+        working-directory: website
+        run: npm ci && npm run build
+
   macos:
     name: macOS app (.app + .dmg)
     needs: [web, rust]
@@ -113,7 +135,7 @@ jobs:
   ci-passed:
     name: CI passed
     if: always()
-    needs: [web, rust, macos, windows]
+    needs: [web, rust, website, macos, windows]
     runs-on: ubuntu-24.04
     steps:
       - name: Check every job succeeded

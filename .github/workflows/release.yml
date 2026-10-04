@@ -118,13 +118,9 @@ jobs:
     name: Publish GitHub release
     needs: build
     runs-on: ubuntu-24.04
-    environment: production
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
-        with:
-          sparse-checkout: scripts
       - uses: actions/download-artifact@v8
         with:
           path: dist-release
@@ -140,12 +136,3 @@ jobs:
             --title "SanctuaryMix ${GITHUB_REF_NAME#v}" \
             --generate-notes \
             --verify-tag
-      # Downloads stay private. When Supabase is configured, the installers
-      # also go to a private Storage bucket so the website can hand signed-in
-      # users a short-lived download link. Nothing is ever public.
-      - name: Upload to private download storage (when configured)
-        env:
-          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: |
-          scripts/upload-to-storage.sh stable "${GITHUB_REF_NAME#v}" dist-release/*
