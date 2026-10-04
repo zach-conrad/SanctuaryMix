@@ -82,6 +82,10 @@ export function Account() {
                     time, Control-click the app and choose Open.{" "}
                     <a href={releasesPageUrl}>All releases</a>
                   </p>
+                  <p className="text-caption panel__foot">
+                    Downloads are private during early access. Sign in to GitHub with an account that has access to
+                    the SanctuaryMix repository first.
+                  </p>
                 </>
               )}
             </section>

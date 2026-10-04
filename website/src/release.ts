@@ -1,12 +1,18 @@
-// Where the Download button points. The source repo is private, so the CI/CD
-// release workflow mirrors each tagged release to a public, binaries-only repo
-// and uploads the installers under these stable, unversioned asset names.
+// Where the Download button points. The CI/CD release workflow publishes each
+// tagged release as a GitHub Release on this repo and uploads the installers
+// under these stable, unversioned asset names.
 // GitHub's /releases/latest/download/<name> URL always redirects to the newest published (non-prerelease) release, so
 // the site never needs a rebuild when a new build ships.
 //
-// If downloads move (a CDN, the site host), change only this file.
+// Downloads are private: the repo is private, so the link only works for
+// people signed in to GitHub with access to it. When real accounts exist,
+// this should hand out a short-lived signed link instead. Change only this file.
 
-export const RELEASE_REPO = "zach-conrad/sanctuarymix-releases";
+export const RELEASE_REPO = "zach-conrad/SanctuaryMix";
+
+// The GitHub API can't see a private repo's releases without a token, so the
+// version lookup below only runs when the releases are public.
+export const RELEASES_ARE_PUBLIC = false;
 
 export const ASSETS = {
   mac: "SanctuaryMix-mac-universal.dmg",
@@ -34,6 +40,7 @@ export type ReleaseLookup =
 
 // Best-effort lookup of the version, date and size to show next to the button.
 export async function fetchLatestRelease(signal?: AbortSignal): Promise<ReleaseLookup> {
+  if (!RELEASES_ARE_PUBLIC) return { status: "unknown" };
   try {
     const res = await fetch(`https://api.github.com/repos/${RELEASE_REPO}/releases/latest`, {
       headers: { Accept: "application/vnd.github+json" },
