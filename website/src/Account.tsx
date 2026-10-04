@@ -1,7 +1,8 @@
-import { Download, Info, Laptop, Monitor } from "lucide-react";
+import { CircleCheck, Download, Info, Laptop, Monitor } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
+import { FOUNDING_OFFER, TRIAL_DAYS, findPlan, formatPrice, foundingPrice, type Billing } from "./pricing";
 import { downloadUrl, fetchLatestRelease, type ReleaseLookup } from "./release";
 
 const ROOT = "../";
@@ -12,7 +13,17 @@ function formatSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/** The plan picked on the pricing section, passed in the page's query string. */
+function chosenPlan() {
+  const params = new URLSearchParams(window.location.search);
+  const plan = findPlan(params.get("plan"));
+  if (!plan) return null;
+  const billing: Billing = params.get("billing") === "monthly" ? "monthly" : "yearly";
+  return { plan, billing };
+}
+
 export function Account() {
+  const [choice] = useState(chosenPlan);
   const [lookup, setLookup] = useState<ReleaseLookup>({ status: "loading" });
   const release = lookup.status === "ok" ? lookup.release : null;
   const notYet = lookup.status === "none";
@@ -35,7 +46,30 @@ export function Account() {
             This is a preview account page. Sign-in isn't built yet, so everyone sees this sample account.
           </p>
 
-          <h1 className="account__title">Welcome back, Alex</h1>
+          {choice ? (
+            <section className="plan-picked" aria-labelledby="picked-heading">
+              <CircleCheck aria-hidden="true" />
+              <div>
+                <h2 id="picked-heading" className="text-heading">
+                  Your {TRIAL_DAYS}-day {choice.plan.name} trial has started
+                </h2>
+                <p className="feature__body">
+                  After the trial it's{" "}
+                  {choice.billing === "yearly"
+                    ? `${formatPrice(choice.plan.yearly)} a year`
+                    : `${formatPrice(choice.plan.monthly)} a month`}
+                  {FOUNDING_OFFER
+                    ? `, or ${formatPrice(
+                        foundingPrice(choice.billing === "yearly" ? choice.plan.yearly : choice.plan.monthly),
+                      )} with the founding church offer`
+                    : ""}
+                  . Checkout isn't built yet, so nothing is charged. <a href={`${ROOT}#pricing`}>Change plan</a>
+                </p>
+              </div>
+            </section>
+          ) : null}
+
+          <h1 className="account__title">{choice ? "Welcome, Alex" : "Welcome back, Alex"}</h1>
           <p className="section__lede">Download the latest SanctuaryMix for your booth computer.</p>
 
           <div className="account__grid">
@@ -118,7 +152,9 @@ export function Account() {
                 </div>
                 <div>
                   <dt className="text-caption">Plan</dt>
-                  <dd>Early access</dd>
+                  <dd>
+                    {choice ? `${choice.plan.name}, ${choice.billing} (trial)` : "Early access"}
+                  </dd>
                 </div>
               </dl>
             </section>

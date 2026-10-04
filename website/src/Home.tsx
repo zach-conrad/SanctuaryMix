@@ -2,6 +2,7 @@ import { Cable, Laptop, LogIn, Monitor, SlidersVertical, Sparkles, Users, WifiOf
 import type { ReactNode } from "react";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
+import { Pricing } from "./components/Pricing";
 
 const ROOT = "./";
 
@@ -43,12 +44,12 @@ export function Home() {
               attention: a quiet pastor, a hot kick, a mic left open. It suggests the fix and you decide.
             </p>
             <div className="hero__actions">
-              <a className="sm-btn sm-btn--primary sm-btn--lg" href={`${ROOT}account/`}>
+              <a className="sm-btn sm-btn--primary sm-btn--lg" href="#pricing">
+                See plans and pricing
+              </a>
+              <a className="sm-btn sm-btn--ghost sm-btn--lg" href={`${ROOT}account/`}>
                 <LogIn aria-hidden="true" />
                 Log in to download
-              </a>
-              <a className="sm-btn sm-btn--ghost sm-btn--lg" href="#features">
-                See what it does
               </a>
             </div>
             <p className="hero__note text-caption">Early access for macOS. Windows is planned.</p>
@@ -155,13 +156,20 @@ export function Home() {
           </div>
         </section>
 
+        <Pricing root={ROOT} />
+
         <section className="section cta">
           <div className="site-container cta__inner">
             <h2 className="section__title">Ready to try it in your booth?</h2>
-            <a className="sm-btn sm-btn--primary sm-btn--lg" href={`${ROOT}account/`}>
-              <LogIn aria-hidden="true" />
-              Log in to download
-            </a>
+            <div className="cta__actions">
+              <a className="sm-btn sm-btn--ghost sm-btn--lg" href={`${ROOT}account/`}>
+                <LogIn aria-hidden="true" />
+                Log in
+              </a>
+              <a className="sm-btn sm-btn--primary sm-btn--lg" href="#pricing">
+                Choose a plan
+              </a>
+            </div>
           </div>
         </section>
       </main>

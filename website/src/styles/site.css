@@ -261,3 +261,90 @@ img { display: block; max-width: 100%; height: auto; }
   padding-block: var(--space-5);
   color: var(--text-subtle);
 }
+
+/* ---------- Pricing ---------- */
+.pricing__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.pricing__toggle { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.pricing__toggle .sm-seg button { height: var(--hit-min); }
+.pricing__save { color: var(--accent-text); font-weight: 600; }
+.pricing__note { margin-top: var(--space-5); }
+.plans {
+  list-style: none;
+  padding: 0;
+  margin-top: var(--space-6);
+  display: grid;
+  gap: var(--space-4);
+  align-items: stretch;
+}
+@media (min-width: 900px) {
+  .plans { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.plan--featured { border: 2px solid var(--accent); }
+.plan__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.plan__tag {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+}
+.plan__price { display: flex; align-items: baseline; gap: var(--space-2); margin-top: var(--space-2); }
+.plan__amount { font: var(--text-display); letter-spacing: var(--text-display-tracking); font-variant-numeric: tabular-nums; }
+.plan__per, .plan__billed { color: var(--text-muted); }
+.plan__cta { width: 100%; margin-top: var(--space-2); }
+.plan__features {
+  list-style: none;
+  padding: var(--space-4) 0 0;
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: var(--space-2);
+}
+.plan__features li { display: flex; align-items: flex-start; gap: var(--space-2); }
+.plan__features svg { width: 20px; height: 20px; stroke-width: 1.75; flex: none; color: var(--accent-text); }
+
+.cta__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+
+/* Shown on the account page after choosing a plan */
+.plan-picked {
+  margin-top: var(--space-5);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-lg);
+}
+.plan-picked > svg { width: 20px; height: 20px; stroke-width: 1.75; flex: none; margin-top: 2px; color: var(--accent-text); }
+.plan-picked .feature__body { margin-top: var(--space-1); }
+.pricing__foot { margin-top: var(--space-5); color: var(--text-muted); }
+
+/* Founding church launch offer */
+.founding {
+  margin-top: var(--space-5);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  color: var(--text);
+}
+.founding svg { width: 20px; height: 20px; stroke-width: 1.75; flex: none; margin-top: -1px; color: var(--accent-text); }
+.founding strong { font-weight: 600; }
