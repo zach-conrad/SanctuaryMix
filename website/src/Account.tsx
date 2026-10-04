@@ -2,10 +2,9 @@ import { Download, Info, Laptop, Monitor } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
-import { getDownload, type ReleaseLookup } from "./release";
+import { downloadUrl, fetchLatestRelease, type ReleaseLookup } from "./release";
 
 const ROOT = "../";
-
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" });
 
@@ -17,22 +16,10 @@ export function Account() {
   const [lookup, setLookup] = useState<ReleaseLookup>({ status: "loading" });
   const release = lookup.status === "ok" ? lookup.release : null;
   const notYet = lookup.status === "none";
-  const [starting, setStarting] = useState(false);
-  const [clickError, setClickError] = useState(false);
-
-  // Signed links expire after a few minutes, so fetch a fresh one on click.
-  async function startDownload() {
-    setStarting(true);
-    setClickError(false);
-    const fresh = await getDownload("mac");
-    setStarting(false);
-    if (fresh.status === "ok") window.location.assign(fresh.release.url);
-    else setClickError(true);
-  }
 
   useEffect(() => {
     const ctrl = new AbortController();
-    getDownload("mac", ctrl.signal).then((r) => {
+    fetchLatestRelease(ROOT, ctrl.signal).then((r) => {
       if (!ctrl.signal.aborted) setLookup(r);
     });
     return () => ctrl.abort();
@@ -61,7 +48,7 @@ export function Account() {
               <dl className="release-meta">
                 <div>
                   <dt className="text-label">Version</dt>
-                  <dd className={release ? "text-readout" : undefined}>{release ? release.version ?? "Latest build" : notYet ? "Coming soon" : lookup.status === "error" ? "Unavailable" : "Checking"}</dd>
+                  <dd className={release ? "text-readout" : undefined}>{release ? release.version : notYet ? "Coming soon" : "Checking"}</dd>
                 </div>
                 {release?.publishedAt ? (
                   <div>
@@ -69,29 +56,19 @@ export function Account() {
                     <dd className="text-readout">{dateFormat.format(release.publishedAt)}</dd>
                   </div>
                 ) : null}
-                {release?.size ? (
+                {release?.mac.size ? (
                   <div>
                     <dt className="text-label">Size</dt>
-                    <dd className="text-readout">{formatSize(release.size)}</dd>
+                    <dd className="text-readout">{formatSize(release.mac.size)}</dd>
                   </div>
                 ) : null}
               </dl>
               {release ? (
                 <>
-                  <button
-                    type="button"
-                    className="sm-btn sm-btn--primary sm-btn--lg"
-                    onClick={startDownload}
-                    disabled={starting}
-                  >
+                  <a className="sm-btn sm-btn--primary sm-btn--lg" href={downloadUrl(ROOT, release.mac.file)} download>
                     <Download aria-hidden="true" />
-                    {starting ? "Starting download" : "Download for Mac"}
-                  </button>
-                  {clickError ? (
-                    <p className="text-caption panel__error" role="alert">
-                      Couldn't start the download. Check your connection and try again.
-                    </p>
-                  ) : null}
+                    Download for Mac
+                  </a>
                   <p className="text-caption panel__foot">
                     Open the .dmg and drag SanctuaryMix to Applications. Early builds aren't signed yet: the first
                     time, Control-click the app and choose Open.
@@ -106,10 +83,6 @@ export function Account() {
                   {notYet ? (
                     <p className="text-caption panel__foot">
                       The first build is on its way. This button turns on as soon as it's published.
-                    </p>
-                  ) : lookup.status === "error" ? (
-                    <p className="text-caption panel__error" role="alert">
-                      Couldn't reach the download service. Refresh the page to try again.
                     </p>
                   ) : null}
                 </>

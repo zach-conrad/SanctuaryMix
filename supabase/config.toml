@@ -1,7 +1,0 @@
-project_id = "sanctuarymix"
-
-# Supabase project settings used by `supabase functions deploy`.
-# The website's sign-in is a sample for now, so the download function accepts
-# calls without a user token. Turn this on when real auth lands.
-[functions.download]
-verify_jwt = false

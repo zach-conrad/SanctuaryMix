@@ -11,24 +11,21 @@ npm run build    # static output in website/dist
 
 ## Download link
 
-Visitors never need a GitHub account, and there is no permanent public link to the installer.
-
-- The CI/CD release workflow uploads every tagged release to a **private** Supabase Storage bucket, `releases`, at `stable/latest/SanctuaryMix-mac-universal.dmg` (Windows later: `SanctuaryMix-windows-x64-setup.exe`). It can also write `stable/latest/latest.json` with `{ "version", "publishedAt" }`.
-- The `download` Edge Function (`supabase/functions/download`) finds that file and returns its version, date, size and a signed link that expires after 5 minutes.
-- The account page calls the function on load to show the version, and again when someone clicks **Download for Mac**, so the link is always fresh.
-
-Because the newest build is read at click time, the website never needs a redeploy for a new release.
-
-Build settings, from `website/.env` or CI:
+Downloads are served by the website itself, so visitors never need a GitHub account. The CI/CD release workflow keeps them current: on each tagged release it copies the installer into the built site and writes a small manifest, then deploys the site.
 
 ```
-VITE_SUPABASE_URL=https://<project>.supabase.co
-VITE_SUPABASE_ANON_KEY=<anon key>   # optional while verify_jwt is off
+dist/downloads/SanctuaryMix-mac-universal.dmg
+dist/downloads/latest.json
+  { "version": "0.2.0",
+    "publishedAt": "2026-10-04T19:00:00Z",
+    "mac": { "file": "SanctuaryMix-mac-universal.dmg", "size": 48213504 } }
 ```
 
-Without `VITE_SUPABASE_URL` the button shows as coming soon. Deploy the function with `supabase functions deploy download` from the repo root.
+The account page reads `downloads/latest.json` and points the Download button at the file it names. Until a release has been deployed there's no manifest, and the button shows as coming soon. A `windows` entry with the same shape is added once a Windows build ships. The contract lives in `src/release.ts`.
 
-Sign-in is a sample for now, so the function doesn't check who is asking (`verify_jwt = false` in `supabase/config.toml`). When real Supabase Auth lands, turn that on and check church membership in the function before signing.
+To try it locally, drop any file and a matching `latest.json` into `public/downloads/` (git-ignored) and run `npm run dev`.
+
+Note: there's no real sign-in yet, so anyone who has the site's address can reach the account page and download. Hosting must allow files the size of the dmg (GitHub Pages caps files at 100 MB; Cloudflare Pages at 25 MB).
 
 ## Design
 
