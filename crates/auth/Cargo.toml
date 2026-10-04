@@ -4,6 +4,7 @@ description = "User accounts and sessions. Interface only for now; providers com
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish = false
 
 [dependencies]
 async-trait.workspace = true

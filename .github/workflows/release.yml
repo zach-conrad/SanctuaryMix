@@ -1,0 +1,138 @@
+name: Release
+
+# Production releases. Push a tag like v0.2.0 from main:
+#
+#   npm version 0.2.0 --no-git-tag-version   # then bump tauri.conf.json + Cargo.toml (see docs/CI.md)
+#   git tag v0.2.0 && git push origin v0.2.0
+#
+# The run re-runs all of CI on the tagged commit, then waits for approval on
+# the "production" environment before building, signing (when Apple
+# credentials are configured) and publishing the GitHub release.
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify:
+    name: Verify tag
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Versions match the tag
+        run: node scripts/check-version.mjs "$GITHUB_REF_NAME"
+      - name: Tagged commit is on main
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME points at a commit that is not on main. Only release reviewed code."
+            exit 1
+          fi
+
+  ci:
+    name: CI
+    needs: verify
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Build (${{ matrix.name }})
+    needs: ci
+    environment: production
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+            targets: aarch64-apple-darwin x86_64-apple-darwin
+            build: npm run app:build:mac
+          - name: Windows
+            os: windows-latest
+            targets: ""
+            build: npm run tauri -- build --bundles nsis,msi
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust (version from rust-toolchain.toml)
+        shell: bash
+        run: |
+          rustup toolchain install
+          if [ -n "${{ matrix.targets }}" ]; then rustup target add ${{ matrix.targets }}; fi
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      # Signing and notarization switch on by themselves once these secrets
+      # exist on the "production" environment. Without them the build is
+      # unsigned (fine for testing; Gatekeeper will warn users).
+      - name: Configure Apple signing (when secrets are set)
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "::warning::No Apple signing secrets on the production environment. This release will be unsigned."
+            exit 0
+          fi
+          for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -n "${!v}" ]; then echo "$v=${!v}" >> "$GITHUB_ENV"; fi
+          done
+
+      - name: Build
+        run: ${{ matrix.build }}
+        env:
+          VITE_APP_CHANNEL: stable
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+      - name: Collect installers under fixed names
+        shell: bash
+        run: node scripts/collect-bundles.mjs dist-release SanctuaryMix
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.name }}
+          path: dist-release/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub release
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist-release
+          merge-multiple: true
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ls -l dist-release
+          (cd dist-release && sha256sum * > SHA256SUMS.txt)
+          gh release create "$GITHUB_REF_NAME" dist-release/* \
+            --title "SanctuaryMix ${GITHUB_REF_NAME#v}" \
+            --generate-notes \
+            --verify-tag

@@ -4,6 +4,7 @@ description = "Multichannel audio capture (Dante Virtual Soundcard via CoreAudio
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish = false
 
 [dependencies]
 mix-core.workspace = true

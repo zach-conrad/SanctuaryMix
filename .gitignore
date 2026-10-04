@@ -6,4 +6,5 @@ src-tauri/gen/schemas/
 *.log
 .env
 .env.*
+dist-release/
 *.tsbuildinfo

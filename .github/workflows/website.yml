@@ -1,0 +1,114 @@
+name: Website
+
+# Builds the launch site in website/ and deploys it with the newest installer,
+# so the site's Download button always serves the latest release and visitors
+# never need a GitHub account. Runs when:
+#   - a release finishes (new installer to publish),
+#   - website/ changes on main (new copy or design), or
+#   - someone runs it by hand.
+# The installer comes from the newest (non-prerelease) GitHub release, which
+# stays private as the internal copy. Contract with the site: website/src/release.ts.
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  push:
+    branches: [main]
+    paths: ["website/**", ".github/workflows/website.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy website
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Check the site exists
+        id: site
+        run: |
+          if [ -f website/package.json ]; then echo "exists=true" >> "$GITHUB_OUTPUT"
+          else echo "::notice::No website/ on main yet; nothing to deploy."; fi
+
+      - uses: actions/setup-node@v7
+        if: steps.site.outputs.exists == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Build site
+        if: steps.site.outputs.exists == 'true'
+        working-directory: website
+        run: npm ci && npm run build
+
+      - name: Add the latest installer and latest.json
+        if: steps.site.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! tag=$(gh release view --json tagName --jq .tagName 2>/dev/null); then
+            echo "::notice::No release published yet; the site will show the download as coming soon."
+            exit 0
+          fi
+          published=$(gh release view "$tag" --json publishedAt --jq .publishedAt)
+          mkdir -p website/dist/downloads
+          gh release download "$tag" --pattern "SanctuaryMix-mac-universal.dmg" --dir website/dist/downloads
+          node scripts/write-site-manifest.mjs website/dist/downloads "$tag" "$published"
+
+      # Vercel Hobby rejects CLI deploys over 100 MB of files. Fail with a
+      # clear message first, with headroom.
+      - name: Check site size
+        if: steps.site.outputs.exists == 'true'
+        run: |
+          du -ah website/dist | sort -rh | head -5
+          kb=$(du -sk website/dist | cut -f1)
+          if [ "$kb" -gt $((90 * 1024)) ]; then
+            echo "::error::website/dist is $((kb / 1024)) MB; Vercel Hobby allows 100 MB per deploy. Shrink the installer or change hosting."
+            exit 1
+          fi
+
+      # Deploys the prebuilt folder as static files with the Vercel CLI. Only
+      # VERCEL_TOKEN is needed: CI creates the "sanctuarymix" project on first
+      # run and links to it. The project is never connected to Git, so
+      # Vercel's own builds can't replace this deploy (which holds the installer).
+      # Optional: VERCEL_ORG_ID + VERCEL_PROJECT_ID (both or neither) to target
+      # an existing project instead.
+      - name: Deploy to Vercel
+        if: steps.site.outputs.exists == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          PROJECT: sanctuarymix
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::warning::VERCEL_TOKEN not set; built the site but did not deploy it."
+            exit 0
+          fi
+          vercel() { npx --yes vercel@62 "$@" --token "$VERCEL_TOKEN"; }
+          if [ -n "$ORG_ID" ] && [ -n "$PROJECT_ID" ]; then
+            export VERCEL_ORG_ID="$ORG_ID" VERCEL_PROJECT_ID="$PROJECT_ID"
+          else
+            if ! vercel project inspect "$PROJECT" >/dev/null 2>&1; then
+              echo "Creating Vercel project $PROJECT"
+              vercel project create "$PROJECT"
+            fi
+            vercel link --yes --project "$PROJECT" --cwd website/dist
+          fi
+          url=$(vercel deploy --prod --yes --cwd website/dist)
+          echo "Deployed: $url"
+          echo "Deployed to $url" >> "$GITHUB_STEP_SUMMARY"
