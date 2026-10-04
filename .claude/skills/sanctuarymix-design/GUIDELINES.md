@@ -12,13 +12,14 @@ SanctuaryMix is a live mixing app for church sound teams. It runs on a Mac in th
 3. **Volunteer first.** Plain words a newcomer understands ("Mute", "Pastor Lav", "Connect to your console"). Jargon only where the console uses it, and then exactly as the console spells it.
 4. **The console is the truth.** Channel names, numbers and colors mirror the dLive. A control shows a state only after the console confirms it.
 5. **AI is visible and reversible.** Anything Assist suggests or changes wears the `assist` hue and can be undone in one tap.
-6. **Nothing moves unless the sound does.** No decorative animation. Meters and faders track the console in real time with no easing.
+6. **Feels like a Mac.** Follow macOS patterns people already know (System Settings, Finder, Mail): a source-list sidebar, grouped lists, controls that step back so the content leads, and the same pattern everywhere. Reasoning in `apple-direction.md`.
+7. **Nothing moves unless the sound does.** No decorative animation. Meters and faders track the console in real time with no easing.
 
 ## Color
 
 The palette starts from the logo: `brand-ink` (#15171C) and `brand-paper` (#F3F2EE) become the surfaces, and the logo's teal becomes `accent` (`brand-teal` #0E7C7B in light, `brand-teal-bright` #3FC1BE in dark).
 
-**Surfaces, back to front:** `bg`, `surface`, `surface-raised`, then `control` for things you press. Separate regions with `border`; outline controls with `border-strong`, which holds 3:1. Panels use borders, not shadows; only popovers and dialogs take `shadow-overlay`.
+**Surfaces, back to front:** `bg`, `surface` (top bar, sidebar, inspector), `surface-raised` (panels, groups, strips, dialogs), then `control` for things you press and for row hover. Panels and groups are told apart by fill, not outlines; use `border` for hairlines between rows and regions, and `border-strong` to outline controls (it holds 3:1). A border on a panel always means something: focus, selection, AI, or danger. Only popovers and dialogs take `shadow-overlay`.
 
 **Text:** `text` on every surface; `text-muted` for secondary lines; `text-subtle` for scale numbers, timestamps and placeholders. All three hold 4.5:1 on `bg`, `surface`, `surface-raised` and `control` in both themes. Teal text uses `accent-text`, never `accent`.
 
@@ -66,10 +67,23 @@ The palette starts from the logo: `brand-ink` (#15171C) and `brand-paper` (#F3F2
 
 The main window, minimum 1280 × 800:
 
-- **Top bar** (56px, `surface`): logo at left, then status pills (console, Dante, scene), Assist mode at right.
-- **Navigation** (left rail, 72px): Mixer, Scenes, Assist, Setup.
+- **Top bar** (56px, `surface`): logo at left, then status pills (console, Dante, warnings) with the Assist or Auto-mix badge at the end of that row; at the right, Freeze (only while auto-mix runs) right beside Record service.
+- **Sidebar** (source list, `sidebar-width` 200px, `surface`): icon + name for Mixer, Scenes, Services, Assist, Setup, with Settings pinned at the bottom. The current page gets an `accent-subtle` fill. Below 1440px wide it folds to a 72px icon rail so the mixer keeps its room.
 - **Mixer bay** (`bg`): channel strips on `surface-raised`, grouped by the console's layers.
 - **Inspector** (right, 320px, `surface`): the selected channel's detail and the Assist panel.
+
+**Pages** (everything except the mixer):
+
+- Every page opens with a page header: the title in `title` and any page-wide action at the right. No description line unless the page can't be understood without it.
+- Content centers in the window and never grows wider than `page-max` (1200px). Pages made of forms and settings (Setup, Settings, Scenes) use one column at `page-narrow` (760px).
+- When a page has a main list or table plus supporting panels (status, history, settings), put the supporting panels in a side column `side-width` (360px) on the right. Don't lay panels out in a free-flowing grid.
+- Settings and records are **grouped lists**, as in macOS System Settings: a small bold section heading outside the box, then a rounded `surface-raised` group of rows. Each row has its label (regular weight, optional caption) on the left and its control at the right edge, with a hairline (`border`, inset from the left) between rows. The group's action goes in a last row: state on the left, button on the right. One footnote line under the group at most.
+- Lists of records (services, scenes) are one group per date or category with hairline rows, not a bordered card per item.
+- Picking one item from a short list (audio devices) is a row with a teal checkmark on the chosen one, not radio cards.
+- Empty pages show a centered symbol, a one-line title and one line of text.
+- Reference text people read once (rules, explanations) sits in a collapsed disclosure, not an always-open panel.
+
+**Choosing a control for options:** two to four short options are a SegmentedControl. Five or more, or options that each need a sentence of explanation, are a dropdown (`select`) in a row, with the chosen option's explanation as the group's footnote. Picking one item from a short list of things (devices) uses checkmark rows. Don't lay out a grid of cards for a single choice.
 
 ## Interaction and states
 
@@ -82,6 +96,8 @@ The main window, minimum 1280 × 800:
 ## Voice
 
 Write like a calm, experienced sound tech helping a first-timer.
+
+- **Fewer words.** Labels are one to three words. A panel gets at most one short line of help, and only when the control can't be used without it. Explanations of how something works go in a tooltip (`title`), not on screen. States are a word or two ("Off", "Frozen", "Riding 10 channels"), not sentences.
 
 - Name things the way the room does: "Pastor Lav", "Worship Lead", "the band", not "Input 1 (dyn mic)".
 - Buttons are verbs: "Connect", "Recall scene", "Apply". Never "OK" or "Submit".
