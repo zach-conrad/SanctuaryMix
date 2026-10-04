@@ -48,6 +48,8 @@ pub struct SimulatedConsole {
     connected: bool,
     input_count: u16,
     names: Mutex<HashMap<ChannelId, String>>,
+    /// Fader positions; every input starts at 0 dB.
+    faders: Mutex<HashMap<ChannelId, Option<f32>>>,
     events: broadcast::Sender<ConsoleEvent>,
 }
 
@@ -58,6 +60,7 @@ impl SimulatedConsole {
             connected: false,
             input_count,
             names: Mutex::new(HashMap::new()),
+            faders: Mutex::new(HashMap::new()),
             events,
         }
     }
@@ -103,6 +106,7 @@ impl ConsoleAdapter for SimulatedConsole {
 
     async fn set_fader(&self, id: ChannelId, db: Option<f32>) -> Result<()> {
         self.check(id)?;
+        self.faders.lock().unwrap().insert(id, db);
         self.emit(ConsoleEvent::Fader { id, db });
         Ok(())
     }
@@ -128,6 +132,13 @@ impl ConsoleAdapter for SimulatedConsole {
             })
             .clone();
         self.emit(ConsoleEvent::Name { id, name });
+        Ok(())
+    }
+
+    async fn request_fader(&self, id: ChannelId) -> Result<()> {
+        self.check(id)?;
+        let db = *self.faders.lock().unwrap().entry(id).or_insert(Some(0.0));
+        self.emit(ConsoleEvent::Fader { id, db });
         Ok(())
     }
 
@@ -175,5 +186,25 @@ mod tests {
             desk.set_fader(ChannelId::input(0), Some(0.0)).await,
             Err(ConsoleError::NotConnected)
         ));
+    }
+
+    #[tokio::test]
+    async fn reports_fader_positions() {
+        let mut desk = SimulatedConsole::new(8);
+        desk.connect().await.unwrap();
+        let mut rx = desk.subscribe();
+        let id = ChannelId::input(1);
+        desk.request_fader(id).await.unwrap();
+        assert_eq!(
+            rx.recv().await.unwrap(),
+            ConsoleEvent::Fader { id, db: Some(0.0) }
+        );
+        desk.set_fader(id, Some(-6.5)).await.unwrap();
+        rx.recv().await.unwrap();
+        desk.request_fader(id).await.unwrap();
+        assert_eq!(
+            rx.recv().await.unwrap(),
+            ConsoleEvent::Fader { id, db: Some(-6.5) }
+        );
     }
 }

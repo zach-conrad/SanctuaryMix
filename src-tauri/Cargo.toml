@@ -18,6 +18,10 @@ mix-core.workspace = true
 audio-engine.workspace = true
 console.workspace = true
 auth.workspace = true
+automix.workspace = true
+store.workspace = true
+
+async-trait.workspace = true
 
 log.workspace = true
 serde.workspace = true
