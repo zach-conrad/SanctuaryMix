@@ -1,5 +1,12 @@
 //! Supabase Auth (GoTrue) and the church tables, called from the core.
 //!
+//! People sign in on the website, not in the app: [`AuthProvider::begin_sign_in`]
+//! opens the website's account page with a PKCE challenge, the person signs in
+//! there however they like (email, Google, or a new account), and the website
+//! sends the browser to `sanctuarymix://auth/callback?code=…`. The app trades
+//! that one-time code plus its PKCE secret at the `app-handoff` Edge Function
+//! for a session of its own (supabase/functions/app-handoff).
+//!
 //! Sign-in gives an access token (one hour) and a single-use refresh token.
 //! The refresh token, the person and their church are saved together in the
 //! OS keychain after every exchange, so the app opens signed in without the
@@ -34,7 +41,9 @@ const KEYCHAIN_ACCOUNT: &str = "supabase-session";
 pub struct SupabaseConfig {
     pub url: String,
     pub publishable_key: String,
-    /// Where Google sends the browser back: the app's deep link.
+    /// The website page the app sends people to for signing in.
+    pub website_url: String,
+    /// Where the website sends the browser back: the app's deep link.
     pub redirect_url: String,
 }
 
@@ -44,6 +53,7 @@ impl SupabaseConfig {
         Self {
             url: "https://pfymsavkmnnxpbayyrsw.supabase.co".into(),
             publishable_key: "sb_publishable_QBbXzdnsQJOjNElfeJwhTQ_5MQYAwD8".into(), // gitleaks:allow (publishable, not a secret)
+            website_url: "https://sanctuarymix.vercel.app/account/".into(),
             redirect_url: "sanctuarymix://auth/callback".into(),
         }
     }
@@ -187,7 +197,7 @@ fn now_secs() -> i64 {
 struct Inner {
     saved: Option<Saved>,
     access_token: Option<String>,
-    /// PKCE secret for a Google sign-in in progress.
+    /// PKCE secret for a website sign-in in progress.
     pkce_verifier: Option<String>,
 }
 
@@ -257,10 +267,10 @@ impl ApiError {
                 AuthError::Offline
             }
             ApiError::Server { code, message } => match code.as_str() {
-                "invalid_credentials" => AuthError::WrongCredentials,
-                "invalid_grant" if message.contains("credentials") => AuthError::WrongCredentials,
-                "email_not_confirmed" => AuthError::EmailNotConfirmed,
-                _ if message.contains("Email not confirmed") => AuthError::EmailNotConfirmed,
+                // The handoff function's own sentences are written for the operator.
+                "handoff_invalid" => {
+                    AuthError::Failed(format!("{}.", message.trim_end_matches('.')))
+                }
                 "over_request_rate_limit" | "over_email_send_rate_limit" => AuthError::Failed(
                     "Too many tries for now. Wait a few minutes and try again.".into(),
                 ),
@@ -338,12 +348,21 @@ impl SupabaseAuth {
         grant: &str,
         body: serde_json::Value,
     ) -> std::result::Result<Tokens, ApiError> {
+        self.post_tokens(
+            format!("{}/auth/v1/token?grant_type={grant}", self.config.url),
+            body,
+        )
+        .await
+    }
+
+    async fn post_tokens(
+        &self,
+        url: String,
+        body: serde_json::Value,
+    ) -> std::result::Result<Tokens, ApiError> {
         let resp = self
             .http
-            .post(format!(
-                "{}/auth/v1/token?grant_type={grant}",
-                self.config.url
-            ))
+            .post(url)
             .header("apikey", &self.config.publishable_key)
             .json(&body)
             .send()
@@ -477,29 +496,12 @@ impl AuthProvider for SupabaseAuth {
         self.session()
     }
 
-    async fn sign_in_with_password(&self, email: &str, password: &str) -> Result<Session> {
-        let _one = self.exchange.lock().await;
-        let tokens = self
-            .token(
-                "password",
-                json!({ "email": email.trim(), "password": password }),
-            )
-            .await
-            .map_err(ApiError::into_auth)?;
-        self.finish(tokens, None).await.map_err(ApiError::into_auth)
-    }
-
     async fn begin_sign_in(&self) -> Result<String> {
         let verifier = random_secret();
         let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
         let url = url::Url::parse_with_params(
-            &format!("{}/auth/v1/authorize", self.config.url),
-            [
-                ("provider", "google"),
-                ("redirect_to", self.config.redirect_url.as_str()),
-                ("code_challenge", challenge.as_str()),
-                ("code_challenge_method", "s256"),
-            ],
+            &self.config.website_url,
+            [("app_challenge", challenge.as_str())],
         )
         .map_err(|e| AuthError::Failed(e.to_string()))?;
         self.inner.lock().unwrap().pkce_verifier = Some(verifier);
@@ -514,41 +516,25 @@ impl AuthProvider for SupabaseAuth {
                 "That sign-in link isn't for SanctuaryMix.".into(),
             ));
         }
-        // Errors come back in the query or the fragment.
-        let mut params: Vec<(String, String)> = url.query_pairs().into_owned().collect();
-        if let Some(fragment) = url.fragment() {
-            params.extend(url::form_urlencoded::parse(fragment.as_bytes()).into_owned());
-        }
-        let get = |k: &str| {
-            params
-                .iter()
-                .find(|(key, _)| key == k)
-                .map(|(_, v)| v.clone())
-        };
-        if let Some(description) = get("error_description") {
-            self.inner.lock().unwrap().pkce_verifier = None;
-            return Err(AuthError::Failed(format!(
-                "Google sign-in didn't finish: {}",
-                description.trim_end_matches('.')
-            )));
-        }
-        let code = get("code").ok_or_else(|| {
-            AuthError::Failed("That sign-in link is missing its code. Try again.".into())
-        })?;
+        let code = url
+            .query_pairs()
+            .find(|(key, _)| key == "code")
+            .map(|(_, v)| v.into_owned())
+            .ok_or_else(|| {
+                AuthError::Failed("That sign-in link is missing its code. Try again.".into())
+            })?;
         let verifier = self
             .inner
             .lock()
             .unwrap()
             .pkce_verifier
             .take()
-            .ok_or_else(|| {
-                AuthError::Failed("Start Continue with Google again from SanctuaryMix.".into())
-            })?;
+            .ok_or_else(|| AuthError::Failed("Start signing in again from SanctuaryMix.".into()))?;
         let _one = self.exchange.lock().await;
         let tokens = self
-            .token(
-                "pkce",
-                json!({ "auth_code": code, "code_verifier": verifier }),
+            .post_tokens(
+                format!("{}/functions/v1/app-handoff", self.config.url),
+                json!({ "code": code, "code_verifier": verifier }),
             )
             .await
             .map_err(ApiError::into_auth)?;

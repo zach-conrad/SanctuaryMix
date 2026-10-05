@@ -11,7 +11,7 @@ The draft recordings and share-link schema stays in `docs/supabase/` until the a
 
 These live in the Supabase and Google dashboards, not in code.
 
-1. **Authentication → URL Configuration**: Site URL `https://sanctuarymix.vercel.app/account/`. Add redirect URLs `https://sanctuarymix.vercel.app/account/**`, `sanctuarymix://auth/callback` (the desktop app's Continue with Google) and, for local work, `http://localhost:5173/account/**`.
+1. **Authentication → URL Configuration**: Site URL `https://sanctuarymix.vercel.app/account/`. Add redirect URLs `https://sanctuarymix.vercel.app/account/**` and, for local work, `http://localhost:5173/account/**`.
 2. **Authentication → Sign In / Providers → Email**: keep Email on and **Confirm email** on. Set the minimum password length to 10 and require letters and digits.
 3. **Google sign-in**: in Google Cloud Console, create an OAuth client (Web application) with the authorized redirect URI `https://pfymsavkmnnxpbayyrsw.supabase.co/auth/v1/callback`. Then in **Authentication → Sign In / Providers → Google**, turn it on and paste the client ID and secret.
 4. **Before launch**: set up custom SMTP (Authentication → Emails → SMTP). Supabase's built-in sender allows only a couple of emails an hour and is for testing.
@@ -20,6 +20,15 @@ The website only ever holds the publishable key (`sb_publishable_…`). The secr
 
 ## The desktop app
 
-The app signs in from the Rust core (`crates/auth/src/supabase.rs`), never from the webview: email and password go straight to Supabase Auth, and Continue with Google opens the browser with PKCE and comes back through `sanctuarymix://auth/callback`. The refresh token and the last confirmed church and plan are kept in the macOS Keychain (Windows Credential Manager), so the app opens signed in without the network. It re-checks the plan at launch and every six hours, only between services, and keeps the last confirmed plan offline for 14 days. Accounts are created, and passwords reset, on the website.
+The app signs in through the website, from the Rust core (`crates/auth/src/supabase.rs`), never from the webview:
+
+1. Sign in in the app makes a secret, keeps it, and opens `https://sanctuarymix.vercel.app/account/?app_challenge=<SHA-256 of the secret>`.
+2. The person signs in or creates an account on the website as usual (email, Google, confirm-email links all work; the challenge waits in the browser for 15 minutes).
+3. The website calls `create_app_handoff(challenge)` (migration `20261005200000_app_handoff.sql`) for a one-time code and opens `sanctuarymix://auth/callback?code=<code>`.
+4. The app posts the code and its secret to the `app-handoff` Edge Function (`supabase/functions/app-handoff`), which uses the code up (once, within five minutes), checks the secret against the challenge, and returns a separate session for the app. A code seen by anyone else is useless without the app's secret.
+
+The refresh token and the last confirmed church and plan are kept in the macOS Keychain (Windows Credential Manager), so the app opens signed in without the network. It re-checks the plan at launch and every six hours, only between services, and keeps the last confirmed plan offline for 14 days.
+
+The Edge Function is deployed with `verify_jwt` off (the app has no session yet) and reads `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, which Supabase sets for every function. Redeploy it with `supabase functions deploy app-handoff --no-verify-jwt`.
 
 Deep links only work from an installed build (`npm run app:build`), not `tauri dev` on macOS.

@@ -1,7 +1,9 @@
-import { ChevronRight, CircleCheck, CloudOff, Download, Laptop, Monitor, Music } from "lucide-react";
+import { AppWindow, ChevronRight, CircleCheck, CloudOff, Download, Laptop, Monitor, Music } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { audioModeLabel, formatClock, serviceDateLabel, timeOfDay } from "../../src/lib/recordings";
+import { appSignInLink, appWaiting, cancelAppHandoff } from "./auth/appHandoff";
 import { AuthForm, ChurchForm, NewPasswordForm } from "./auth/AuthForms";
+import { authMessage } from "./auth/client";
 import { cloudSession, signOut, useAccount, type Account as SignedIn } from "./auth/useAccount";
 import { connectCloud, type CloudRecording, type RecordingsCloud } from "./cloud";
 import { Footer } from "./components/Footer";
@@ -24,6 +26,7 @@ const DAY_MS = 86_400_000;
 /** Signed out: the sign-in form. Signed in: downloads, services and the account. */
 export function Account() {
   const { state, refresh } = useAccount();
+  const [forApp, setForApp] = useState(appWaiting);
   const user = state.status === "ready" ? { name: state.account.name, church: state.account.church.name } : null;
 
   return (
@@ -32,7 +35,7 @@ export function Account() {
       <main className="section section--tight">
         <div className="site-container">
           {state.status === "loading" ? <p className="mix-muted service__status">Checking your account</p> : null}
-          {state.status === "signedOut" ? <AuthForm root={ROOT} notice={state.notice} /> : null}
+          {state.status === "signedOut" ? <AuthForm root={ROOT} notice={state.notice} lede={forApp ? "Sign in to use SanctuaryMix on this computer." : null} /> : null}
           {state.status === "recovery" ? <NewPasswordForm onDone={() => void refresh()} /> : null}
           {state.status === "needsChurch" ? <ChurchForm name={state.name} onDone={() => void refresh()} /> : null}
           {state.status === "error" ? (
@@ -45,11 +48,60 @@ export function Account() {
               </button>
             </div>
           ) : null}
-          {state.status === "ready" ? <AccountHome account={state.account} /> : null}
+          {state.status === "ready" && forApp ? <OpenApp onDone={() => setForApp(false)} /> : null}
+          {state.status === "ready" && !forApp ? <AccountHome account={state.account} /> : null}
         </div>
       </main>
       <Footer />
     </>
+  );
+}
+
+/** Signed in after the app sent the person here: hand the sign-in back to the app. */
+function OpenApp({ onDone }: { onDone: () => void }) {
+  const [link, setLink] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    appSignInLink().then(
+      (url) => {
+        if (!live) return;
+        setLink(url);
+        window.location.href = url;
+      },
+      (e: unknown) => {
+        if (live) setError(authMessage(e as { message?: string }));
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const leave = () => {
+    cancelAppHandoff();
+    onDone();
+  };
+
+  return (
+    <div className="auth">
+      <div className="empty-state">
+        <AppWindow aria-hidden="true" />
+        <h1 className="text-heading">{error ? "The app didn't sign in" : link ? "Back to SanctuaryMix" : "Signing in to the app"}</h1>
+        <p className="text-caption mix-muted">
+          {error ?? (link ? "If the app didn't open, choose Open SanctuaryMix. The link works once, for five minutes." : "One moment.")}
+        </p>
+      </div>
+      {link ? (
+        <a className="sm-btn sm-btn--primary sm-btn--lg auth__wide" href={link}>
+          Open SanctuaryMix
+        </a>
+      ) : null}
+      <button type="button" className="sm-btn sm-btn--ghost auth__wide" onClick={leave}>
+        Go to your account
+      </button>
+    </div>
   );
 }
 

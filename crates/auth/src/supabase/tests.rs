@@ -62,6 +62,7 @@ fn config(url: &str) -> SupabaseConfig {
     SupabaseConfig {
         url: url.into(),
         publishable_key: "sb_publishable_test".into(),
+        website_url: "https://sanctuarymix.test/account/".into(),
         redirect_url: "sanctuarymix://auth/callback".into(),
     }
 }
@@ -97,8 +98,17 @@ impl SecretStore for SharedStore {
     }
 }
 
+const CODE: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+/// Opens the website (as the app would) and comes back through the deep link.
+async fn sign_in(auth: &SupabaseAuth) -> Result<Session> {
+    auth.begin_sign_in().await.unwrap();
+    auth.complete_sign_in(format!("sanctuarymix://auth/callback?code={CODE}"))
+        .await
+}
+
 #[tokio::test]
-async fn password_sign_in_reads_church_and_saves_it() {
+async fn website_handoff_reads_church_and_saves_it() {
     let server = fake(vec![
         (200, tokens("r1")),
         (200, membership("engineer", "pro", 20)),
@@ -108,8 +118,24 @@ async fn password_sign_in_reads_church_and_saves_it() {
     let auth = SupabaseAuth::new(config(&server.url), Box::new(store.clone()));
     assert!(!auth.current_session().await.authenticated);
 
+    // Sign-in starts on the website, carrying only the PKCE challenge.
+    let url = url::Url::parse(&auth.begin_sign_in().await.unwrap()).unwrap();
+    assert_eq!(
+        url.as_str().split('?').next(),
+        Some("https://sanctuarymix.test/account/")
+    );
+    let q: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
+    let challenge = q["app_challenge"].clone();
+    assert_eq!(challenge.len(), 43);
+
+    // Someone else's link is refused and doesn't use up the sign-in.
+    assert!(auth
+        .complete_sign_in(format!("https://evil.example/?code={CODE}"))
+        .await
+        .is_err());
+
     let s = auth
-        .sign_in_with_password(" pat@stmarks.org ", "goodpassword1")
+        .complete_sign_in(format!("sanctuarymix://auth/callback?code={CODE}"))
         .await
         .unwrap();
     assert!(s.authenticated);
@@ -120,35 +146,57 @@ async fn password_sign_in_reads_church_and_saves_it() {
     assert!(s.access.require(Feature::CloudSync).is_ok());
 
     let seen = server.seen.lock().unwrap().clone();
-    assert!(seen[0].starts_with("POST /auth/v1/token?grant_type=password"));
-    assert!(seen[0].contains(r#""email":"pat@stmarks.org""#));
+    assert!(seen[0].starts_with("POST /functions/v1/app-handoff"));
+    let body: serde_json::Value =
+        serde_json::from_str(&seen[0][seen[0].find('{').unwrap()..]).unwrap();
+    assert_eq!(body["code"], CODE);
+    // The secret sent with the code is the one behind the challenge.
+    let verifier = body["code_verifier"].as_str().unwrap();
+    assert_eq!(
+        URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes())),
+        challenge
+    );
     assert!(seen[1].starts_with("GET /rest/v1/memberships?select=role%2Corganizations"));
+
+    // The secret is single-use.
+    assert!(auth
+        .complete_sign_in(format!("sanctuarymix://auth/callback?code={CODE}"))
+        .await
+        .is_err());
 
     // The next launch opens signed in, without the network.
     let saved = store.load().unwrap();
-    assert!(
-        saved.contains("r1") && !saved.contains("access-1") && !saved.contains("goodpassword1")
-    );
+    assert!(saved.contains("r1") && !saved.contains("access-1"));
     let again = SupabaseAuth::new(config("http://127.0.0.1:9"), Box::new(store.clone()));
     assert_eq!(again.current_session().await, s);
 }
 
 #[tokio::test]
-async fn wrong_password_and_unconfirmed_email_say_so() {
-    let server = fake(vec![
-        (400, json!({ "code": 400, "error_code": "invalid_credentials", "msg": "Invalid login credentials" })),
-        (400, json!({ "code": 400, "error_code": "email_not_confirmed", "msg": "Email not confirmed" })),
-    ])
+async fn a_callback_the_app_didnt_start_is_refused() {
+    let auth = SupabaseAuth::new(
+        config("http://127.0.0.1:9"),
+        Box::new(MemoryStore::default()),
+    );
+    let err = auth
+        .complete_sign_in(format!("sanctuarymix://auth/callback?code={CODE}"))
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("again"));
+}
+
+#[tokio::test]
+async fn expired_code_says_so() {
+    let server = fake(vec![(
+        400,
+        json!({ "error_code": "handoff_invalid", "msg": "That sign-in link has expired or was already used. Sign in again from SanctuaryMix" }),
+    )])
     .await;
     let auth = SupabaseAuth::new(config(&server.url), Box::new(MemoryStore::default()));
-    assert!(matches!(
-        auth.sign_in_with_password("a@b.org", "x").await,
-        Err(AuthError::WrongCredentials)
-    ));
-    assert!(matches!(
-        auth.sign_in_with_password("a@b.org", "x").await,
-        Err(AuthError::EmailNotConfirmed)
-    ));
+    let err = sign_in(&auth).await.unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "That sign-in link has expired or was already used. Sign in again from SanctuaryMix."
+    );
     assert!(!auth.current_session().await.authenticated);
 }
 
@@ -158,89 +206,17 @@ async fn offline_sign_in_says_offline() {
         config("http://127.0.0.1:9"),
         Box::new(MemoryStore::default()),
     );
-    assert!(matches!(
-        auth.sign_in_with_password("a@b.org", "x").await,
-        Err(AuthError::Offline)
-    ));
+    assert!(matches!(sign_in(&auth).await, Err(AuthError::Offline)));
 }
 
 #[tokio::test]
-async fn google_uses_pkce_through_the_deep_link() {
+async fn signed_in_without_a_church_has_no_plan() {
     let server = fake(vec![(200, tokens("r1")), (200, json!([]))]).await;
     let auth = SupabaseAuth::new(config(&server.url), Box::new(MemoryStore::default()));
-
-    // A callback with no sign-in started is refused.
-    assert!(auth
-        .complete_sign_in("sanctuarymix://auth/callback?code=abc".into())
-        .await
-        .is_err());
-
-    let url = url::Url::parse(&auth.begin_sign_in().await.unwrap()).unwrap();
-    assert_eq!(url.path(), "/auth/v1/authorize");
-    let q: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
-    assert_eq!(q["provider"], "google");
-    assert_eq!(q["redirect_to"], "sanctuarymix://auth/callback");
-    assert_eq!(q["code_challenge_method"], "s256");
-
-    // Someone else's link is refused and doesn't use up the sign-in.
-    assert!(auth
-        .complete_sign_in("https://evil.example/?code=abc".into())
-        .await
-        .is_err());
-
-    let s = auth
-        .complete_sign_in("sanctuarymix://auth/callback?code=abc".into())
-        .await
-        .unwrap();
+    let s = sign_in(&auth).await.unwrap();
     assert!(s.authenticated);
-    // No church yet: signed in, nothing paid for.
     assert!(s.active_org.is_none());
     assert!(s.access.require(Feature::AutoMix).is_err());
-
-    let seen = server.seen.lock().unwrap().clone();
-    assert!(seen[0].starts_with("POST /auth/v1/token?grant_type=pkce"));
-    let body: serde_json::Value = serde_json::from_str(
-        seen[0]
-            .split_once(' ')
-            .unwrap()
-            .1
-            .split_once(' ')
-            .unwrap()
-            .1
-            .split_once(' ')
-            .unwrap()
-            .1,
-    )
-    .unwrap();
-    assert_eq!(body["auth_code"], "abc");
-    let verifier = body["code_verifier"].as_str().unwrap();
-    assert_eq!(
-        URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes())),
-        q["code_challenge"]
-    );
-
-    // The secret is single-use.
-    assert!(auth
-        .complete_sign_in("sanctuarymix://auth/callback?code=abc".into())
-        .await
-        .is_err());
-}
-
-#[tokio::test]
-async fn google_error_in_callback_is_shown() {
-    let auth = SupabaseAuth::new(
-        config("http://127.0.0.1:9"),
-        Box::new(MemoryStore::default()),
-    );
-    auth.begin_sign_in().await.unwrap();
-    let err = auth
-        .complete_sign_in(
-            "sanctuarymix://auth/callback#error=access_denied&error_description=User+cancelled"
-                .into(),
-        )
-        .await
-        .unwrap_err();
-    assert!(err.to_string().contains("User cancelled"));
 }
 
 #[tokio::test]
@@ -254,7 +230,7 @@ async fn refresh_rotates_the_token_and_picks_up_plan_changes() {
     .await;
     let store = SharedStore::default();
     let auth = SupabaseAuth::new(config(&server.url), Box::new(store.clone()));
-    auth.sign_in_with_password("a@b.org", "pw").await.unwrap();
+    sign_in(&auth).await.unwrap();
     let s = auth.refresh().await;
     assert_eq!(s.access.plan, Some(Plan::Campus));
     assert!(store.load().unwrap().contains("r2"));
@@ -272,7 +248,7 @@ async fn revoked_refresh_token_signs_out_but_offline_does_not() {
     .await;
     let store = SharedStore::default();
     let auth = SupabaseAuth::new(config(&server.url), Box::new(store.clone()));
-    auth.sign_in_with_password("a@b.org", "pw").await.unwrap();
+    sign_in(&auth).await.unwrap();
 
     // Offline: same provider pointed nowhere keeps the saved session.
     let offline = SupabaseAuth::new(config("http://127.0.0.1:9"), Box::new(store.clone()));

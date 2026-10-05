@@ -225,23 +225,8 @@ pub async fn get_session(state: State<'_, AppState>) -> CmdResult<Session> {
     Ok(state.auth.current_session().await)
 }
 
-/// Signs in from the app's email and password form. The password goes no
-/// further than the auth provider.
-#[tauri::command]
-pub async fn sign_in_with_password(
-    state: State<'_, AppState>,
-    email: String,
-    password: String,
-) -> CmdResult<Session> {
-    state
-        .auth
-        .sign_in_with_password(&email, &password)
-        .await
-        .map_err(err)
-}
-
-/// Website pages the app links to. Billing, sign-up and password resets live
-/// there; card entry never happens in the app.
+/// The website account page. Sign-in, sign-up, password resets and billing all
+/// live there; passwords and cards are never typed into the app.
 const WEBSITE: &str = "https://sanctuarymix.vercel.app/account/";
 
 /// Opens a URL in the default browser.
@@ -268,18 +253,9 @@ pub fn open_billing() -> CmdResult<()> {
     open_in_browser(WEBSITE)
 }
 
-/// Opens the website to create an account or reset a password.
-#[tauri::command]
-pub fn open_account_page(page: String) -> CmdResult<()> {
-    match page.as_str() {
-        "signUp" => open_in_browser(&format!("{WEBSITE}?signup=1")),
-        "resetPassword" => open_in_browser(&format!("{WEBSITE}?forgot=1")),
-        _ => Err("Unknown page.".into()),
-    }
-}
-
-/// Starts Continue with Google in the browser. The browser comes back through
-/// a sanctuarymix:// link, which finishes sign-in and sends a `session` event.
+/// Opens the website to sign in. When the person is signed in there, the
+/// browser comes back through a sanctuarymix:// link, which finishes sign-in
+/// here and sends a `session` event.
 #[tauri::command]
 pub async fn begin_sign_in(state: State<'_, AppState>) -> CmdResult<()> {
     let url = state.auth.begin_sign_in().await.map_err(err)?;

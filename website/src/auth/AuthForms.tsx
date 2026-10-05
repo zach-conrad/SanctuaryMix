@@ -76,19 +76,20 @@ function FormError({ message }: { message: string | null }) {
   return message ? <p className="auth__error" role="alert">{message}</p> : null;
 }
 
-function AuthShell({ title, children }: { title: string; children: ReactNode }) {
+function AuthShell({ title, lede, children }: { title: string; lede?: string | null; children: ReactNode }) {
   return (
     <div className="auth">
       <header className="page-header">
         <h1 className="page-title">{title}</h1>
       </header>
+      {lede ? <p className="section-foot auth__lede">{lede}</p> : null}
       {children}
     </div>
   );
 }
 
 /** Sign in, create an account, or ask for a password reset. */
-export function AuthForm({ root, notice }: { root: string; notice: string | null }) {
+export function AuthForm({ root, notice, lede }: { root: string; notice: string | null; lede?: string | null }) {
   const [mode, setMode] = useState<Mode>(initialMode);
   const [name, setName] = useState("");
   const [church, setChurch] = useState("");
@@ -170,7 +171,7 @@ export function AuthForm({ root, notice }: { root: string; notice: string | null
   const title = mode === "signIn" ? "Sign in" : mode === "signUp" ? "Create your account" : "Reset your password";
 
   return (
-    <AuthShell title={title}>
+    <AuthShell title={title} lede={mode !== "reset" ? lede : null}>
       {mode !== "reset" ? (
         <>
           <div className="sm-seg auth__seg" role="group" aria-label="Account">

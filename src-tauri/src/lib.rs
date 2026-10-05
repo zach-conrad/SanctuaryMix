@@ -8,8 +8,8 @@
 //! `recording` (recorder status about once a second), `playback` (the
 //! transport about 10x a second), `replay` (sending recorded moves), and
 //! `session` (an [`auth::Session`] whenever sign-in changes outside a command:
-//! Google sign-in finishing, or the plan check between services) or
-//! `session-error` (a sentence, when Google sign-in fails).
+//! website sign-in finishing, or the plan check between services) or
+//! `session-error` (a sentence, when website sign-in fails).
 
 mod commands;
 mod control;
@@ -121,9 +121,7 @@ pub fn run() {
             spl::spl_reading,
             spl::spl_history,
             commands::get_session,
-            commands::sign_in_with_password,
             commands::open_billing,
-            commands::open_account_page,
             commands::begin_sign_in,
             commands::complete_sign_in,
             commands::sign_out,
@@ -132,7 +130,7 @@ pub fn run() {
         .expect("error while running SanctuaryMix");
 }
 
-/// Finishes Continue with Google from the browser's sanctuarymix:// link.
+/// Finishes sign-in from the website's sanctuarymix:// link.
 async fn finish_sign_in(app: AppHandle, url: String) {
     let result = app.state::<AppState>().auth.complete_sign_in(url).await;
     match result {

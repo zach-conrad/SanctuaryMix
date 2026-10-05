@@ -1,9 +1,9 @@
 //! Authentication boundary.
 //!
-//! The app depends only on [`AuthProvider`], which is [`SupabaseAuth`]: email
-//! and password from the app's own form (sent from this core, never stored by
-//! the webview), or Google in the system browser (OAuth + PKCE) back through a
-//! `sanctuarymix://` deep link. The refresh token and the last confirmed
+//! The app depends only on [`AuthProvider`], which is [`SupabaseAuth`]: people
+//! sign in on the website in their browser (email, Google, or a new account),
+//! and it hands the sign-in back through a `sanctuarymix://` deep link, guarded
+//! by PKCE so only the app that started it can finish it. The refresh token and the last confirmed
 //! session live in the OS keychain, so the app opens signed in and keeps its
 //! plan offline for [`OFFLINE_GRACE_DAYS`]. Signed out, everyone gets the
 //! [`LocalGuest`] session: the console is never locked out on a Sunday morning.
@@ -27,10 +27,6 @@ use serde::{Deserialize, Serialize};
 pub enum AuthError {
     #[error("sign-in is not available yet")]
     NotImplemented,
-    #[error("That email and password don't match. Check them and try again.")]
-    WrongCredentials,
-    #[error("Confirm your email first. Open the link we sent you, then sign in.")]
-    EmailNotConfirmed,
     #[error("Can't reach SanctuaryMix. Check the internet connection, or mix without signing in.")]
     Offline,
     #[error("{0}")]
@@ -134,10 +130,6 @@ impl Session {
 #[async_trait]
 pub trait AuthProvider: Send + Sync {
     async fn current_session(&self) -> Session;
-    /// Signs in from the app's own email and password form.
-    async fn sign_in_with_password(&self, _email: &str, _password: &str) -> Result<Session> {
-        Err(AuthError::NotImplemented)
-    }
     /// Starts a browser sign-in and returns the URL to open.
     async fn begin_sign_in(&self) -> Result<String>;
     /// Finishes sign-in from the deep-link callback URL.
