@@ -245,6 +245,22 @@ label.row:hover { background: var(--control); }
 }
 .empty-state > svg { width: 32px; height: 32px; stroke-width: 1.75; color: var(--text-muted); margin-bottom: var(--space-2); }
 
+/* ---------- Sign in and create account ---------- */
+.auth { display: grid; gap: var(--space-4); max-width: calc(var(--side-width) + var(--space-8)); margin: 0 auto; padding-bottom: var(--space-6); }
+.auth .page-header { margin-bottom: 0; }
+.auth__seg { display: flex; }
+.auth__seg button { flex: 1; min-height: var(--hit-min); }
+.auth__wide { width: 100%; justify-content: center; }
+.auth__or { display: flex; align-items: center; gap: var(--space-3); color: var(--text-muted); }
+.auth__or::before, .auth__or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.auth__form { display: grid; gap: var(--space-4); }
+.auth__field { max-width: none; }
+.auth__field .sm-input { height: var(--control-lg); }
+.auth__error { font: var(--text-caption); color: var(--danger); }
+.auth__lede, .auth__foot { text-align: center; }
+.auth .empty-state { padding-bottom: var(--space-2); }
+.account__email { overflow-wrap: anywhere; }
+
 /* ---------- Footer ---------- */
 .site-footer { border-top: 1px solid var(--border); background: var(--surface); }
 .site-footer__inner {

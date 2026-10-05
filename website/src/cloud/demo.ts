@@ -1,7 +1,7 @@
-// Demo stand-in for the cloud: serves the sample account's services from
-// static files laid out exactly like Supabase Storage keys
-// (public/demo-cloud/org/<org_id>/recordings/<id>/...), and keeps share links
-// in this browser's storage. Nothing here talks to a server.
+// Sample stand-in for the public share page until recordings sync from the
+// app: serves a sample church's service from static files laid out exactly
+// like Supabase Storage keys (public/demo-cloud/org/<org_id>/recordings/<id>/...).
+// Accounts are real (see src/auth); nothing here signs anyone in.
 
 import {
   isLive,
@@ -18,9 +18,9 @@ import {
 const DAY_MS = 86_400_000;
 const LINKS_KEY = "sanctuarymix.demo.shareLinks";
 
-export const DEMO_SESSION: CloudSession = {
+export const SAMPLE_SESSION: CloudSession = {
   userId: "0199a0c2-7b40-7e21-8f3a-1d5c9e6b2a08",
-  name: "Alex Rivera",
+  name: "Sample engineer",
   orgId: "0199a0c2-5e1d-7a3c-9b41-6c2f0e8d4a17",
   orgName: "Grace Community Church",
   role: "engineer",
@@ -69,7 +69,7 @@ export class DemoCloud implements RecordingsCloud {
   constructor(private readonly root: string) {}
 
   session(): CloudSession {
-    return DEMO_SESSION;
+    return SAMPLE_SESSION;
   }
 
   private url(key: string): string {
@@ -77,7 +77,7 @@ export class DemoCloud implements RecordingsCloud {
   }
 
   listRecordings(): Promise<CloudRecording[]> {
-    this.recordings ??= fetch(this.url(`org/${DEMO_SESSION.orgId}/recordings.json`))
+    this.recordings ??= fetch(this.url(`org/${SAMPLE_SESSION.orgId}/recordings.json`))
       .then((r) => {
         if (!r.ok) throw new Error(`Couldn't load services (${r.status})`);
         return r.json() as Promise<{ recordings: CloudRecording[] }>;
@@ -115,7 +115,7 @@ export class DemoCloud implements RecordingsCloud {
       id: newId(),
       recordingId,
       token: newToken(),
-      createdBy: DEMO_SESSION.userId,
+      createdBy: SAMPLE_SESSION.userId,
       createdAt: now,
       expiresAt: options.expiresInDays === null ? null : now + options.expiresInDays * DAY_MS,
       revokedAt: null,
@@ -145,7 +145,7 @@ export class DemoCloud implements RecordingsCloud {
     const showMoves = link?.showMoves ?? true;
     return {
       status: "ok",
-      orgName: DEMO_SESSION.orgName,
+      orgName: SAMPLE_SESSION.orgName,
       recording,
       events: showMoves ? await this.getEvents(recording) : [],
       audioUrl: await this.listenUrl(recording),

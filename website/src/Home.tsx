@@ -56,7 +56,7 @@ export function Home() {
               </a>
               <a className="sm-btn sm-btn--ghost sm-btn--lg" href={`${ROOT}account/`}>
                 <LogIn aria-hidden="true" />
-                Log in to download
+                Sign in to download
               </a>
             </div>
             <p className="hero__note text-caption">Early access for macOS. Windows is planned.</p>
@@ -146,7 +146,7 @@ export function Home() {
             <div className="cta__actions">
               <a className="sm-btn sm-btn--ghost sm-btn--lg" href={`${ROOT}account/`}>
                 <LogIn aria-hidden="true" />
-                Log in
+                Sign in
               </a>
               <a className="sm-btn sm-btn--primary sm-btn--lg" href="#pricing">
                 Choose a plan

@@ -1,7 +1,8 @@
-import { ArrowLeft, CloudOff, Info, Link2, Music, X } from "lucide-react";
+import { ArrowLeft, CloudOff, Info, Link2, LogIn, Music, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { audioModeLabel, formatClock, serviceDateLabel, timeOfDay } from "../../src/lib/recordings";
-import { connectCloud, type CloudRecording, type RecordedEvent } from "./cloud";
+import { cloudSession, signOut, useAccount } from "./auth/useAccount";
+import { connectCloud, type CloudRecording, type RecordedEvent, type RecordingsCloud } from "./cloud";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
 import { MixPlayer } from "./mix/MixPlayer";
@@ -17,7 +18,41 @@ type Load =
 
 /** One recorded service from the church's cloud library: listen, watch the moves, share. */
 export function Service() {
-  const cloud = useMemo(() => connectCloud(ROOT), []);
+  const { state } = useAccount();
+  const account = state.status === "ready" ? state.account : null;
+  const cloud = useMemo(() => (account ? connectCloud(cloudSession(account)) : null), [account]);
+
+  return (
+    <>
+      <Header
+        root={ROOT}
+        account
+        user={account ? { name: account.name, church: account.church.name } : null}
+        onSignOut={() => void signOut(ROOT)}
+      />
+      <main className="section section--tight">
+        <div className="site-container">
+          {state.status === "loading" ? <p className="mix-muted service__status">Checking your account</p> : null}
+          {cloud ? (
+            <ServiceView cloud={cloud} />
+          ) : state.status !== "loading" ? (
+            <div className="empty-state">
+              <LogIn aria-hidden="true" />
+              <h1 className="text-heading">Sign in to listen</h1>
+              <p className="text-caption mix-muted">Services are private to your church.</p>
+              <a className="sm-btn sm-btn--primary" href={`${ROOT}account/`}>
+                Sign in
+              </a>
+            </div>
+          ) : null}
+        </div>
+      </main>
+      <Footer />
+    </>
+  );
+}
+
+function ServiceView({ cloud }: { cloud: RecordingsCloud }) {
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const shareDialog = useRef<HTMLDialogElement>(null);
 
@@ -45,9 +80,6 @@ export function Service() {
 
   return (
     <>
-      <Header root={ROOT} signedIn />
-      <main className="section section--tight">
-        <div className="site-container">
           <a className="back-link" href={`${ROOT}account/#services`}>
             <ArrowLeft aria-hidden="true" />
             All services
@@ -116,9 +148,6 @@ export function Service() {
               </dialog>
             </>
           ) : null}
-        </div>
-      </main>
-      <Footer />
     </>
   );
 }

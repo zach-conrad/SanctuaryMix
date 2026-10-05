@@ -1,7 +1,7 @@
 import { CloudOff, Info, Link2Off } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { audioModeLabel, formatClock, serviceDateLabel, timeOfDay } from "../../src/lib/recordings";
-import { connectCloud, type SharedMix } from "./cloud";
+import { connectShareCloud, type SharedMix } from "./cloud";
 import { Footer } from "./components/Footer";
 import { Wordmark } from "./components/Wordmark";
 import { MixPlayer } from "./mix/MixPlayer";
@@ -18,7 +18,7 @@ const GONE: Record<Exclude<SharedMix["status"], "ok">, { title: string; body: st
 
 /** Public playback page for a share link. No sign-in, no account details. */
 export function Share() {
-  const cloud = useMemo(() => connectCloud(ROOT), []);
+  const cloud = useMemo(() => connectShareCloud(ROOT), []);
   const [shared, setShared] = useState<SharedMix | null>(null);
   const [failed, setFailed] = useState(false);
 

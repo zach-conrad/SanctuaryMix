@@ -2,7 +2,7 @@
 // change a number here and the pricing section, the yearly discount and the
 // account page all follow.
 //
-// There's no checkout yet. Choosing a plan opens the sample account page with
+// There's no checkout yet. Choosing a plan opens the account page (sign-up) with
 // ?plan=<id>&billing=<monthly|yearly>, which a real checkout will replace.
 
 export type Billing = "monthly" | "yearly";
@@ -124,6 +124,6 @@ export function formatPrice(amount: number) {
 export const pricePerMonth = (plan: Plan, billing: Billing) =>
   billing === "monthly" ? plan.monthly : Math.round((plan.yearly / 12) * 100) / 100;
 
-/** Link from a plan card into the sample account flow. */
+/** Link from a plan card into sign-up, which starts the trial on that plan. */
 export const planHref = (root: string, plan: Plan, billing: Billing) =>
   `${root}account/?plan=${encodeURIComponent(plan.id)}&billing=${billing}`;

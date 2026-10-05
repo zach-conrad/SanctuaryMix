@@ -1,10 +1,12 @@
-import { ChevronRight, CircleCheck, Download, Info, Laptop, Monitor, Music } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ChevronRight, CircleCheck, CloudOff, Download, Laptop, Monitor, Music } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { audioModeLabel, formatClock, serviceDateLabel, timeOfDay } from "../../src/lib/recordings";
-import { connectCloud, type CloudRecording } from "./cloud";
+import { AuthForm, ChurchForm, NewPasswordForm } from "./auth/AuthForms";
+import { cloudSession, signOut, useAccount, type Account as SignedIn } from "./auth/useAccount";
+import { connectCloud, type CloudRecording, type RecordingsCloud } from "./cloud";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
-import { FOUNDING_OFFER, TRIAL_DAYS, findPlan, formatPrice, foundingPrice, type Billing } from "./pricing";
+import { FOUNDING_OFFER, PLANS, formatPrice, foundingPrice } from "./pricing";
 import { downloadUrl, fetchLatestRelease, type ReleaseLookup } from "./release";
 
 const ROOT = "../";
@@ -15,17 +17,45 @@ function formatSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-/** The plan picked on the pricing section, passed in the page's query string. */
-function chosenPlan() {
-  const params = new URLSearchParams(window.location.search);
-  const plan = findPlan(params.get("plan"));
-  if (!plan) return null;
-  const billing: Billing = params.get("billing") === "monthly" ? "monthly" : "yearly";
-  return { plan, billing };
+const ROLE_LABEL = { admin: "Admin", engineer: "Engineer", volunteer: "Volunteer" } as const;
+
+const DAY_MS = 86_400_000;
+
+/** Signed out: the sign-in form. Signed in: downloads, services and the account. */
+export function Account() {
+  const { state, refresh } = useAccount();
+  const user = state.status === "ready" ? { name: state.account.name, church: state.account.church.name } : null;
+
+  return (
+    <>
+      <Header root={ROOT} account user={user} onSignOut={() => void signOut(ROOT)} />
+      <main className="section section--tight">
+        <div className="site-container">
+          {state.status === "loading" ? <p className="mix-muted service__status">Checking your account</p> : null}
+          {state.status === "signedOut" ? <AuthForm root={ROOT} notice={state.notice} /> : null}
+          {state.status === "recovery" ? <NewPasswordForm onDone={() => void refresh()} /> : null}
+          {state.status === "needsChurch" ? <ChurchForm name={state.name} onDone={() => void refresh()} /> : null}
+          {state.status === "error" ? (
+            <div className="empty-state">
+              <CloudOff aria-hidden="true" />
+              <h1 className="text-heading">Your account didn't load</h1>
+              <p className="text-caption mix-muted">{state.message} Reload the page to try again.</p>
+              <button type="button" className="sm-btn sm-btn--ghost" onClick={() => void signOut(ROOT)}>
+                Sign out
+              </button>
+            </div>
+          ) : null}
+          {state.status === "ready" ? <AccountHome account={state.account} /> : null}
+        </div>
+      </main>
+      <Footer />
+    </>
+  );
 }
 
-export function Account() {
-  const [choice] = useState(chosenPlan);
+function AccountHome({ account }: { account: SignedIn }) {
+  const { church } = account;
+  const cloud = useMemo(() => connectCloud(cloudSession(account)), [account]);
   const [lookup, setLookup] = useState<ReleaseLookup>({ status: "loading" });
   const release = lookup.status === "ok" ? lookup.release : null;
   const notYet = lookup.status === "none";
@@ -38,15 +68,13 @@ export function Account() {
     return () => ctrl.abort();
   }, []);
 
-  const plan = choice ? `${choice.plan.name}, ${choice.billing}` : "Early access";
-  const afterTrial = choice
-    ? choice.billing === "yearly"
-      ? `${formatPrice(choice.plan.yearly)} a year`
-      : `${formatPrice(choice.plan.monthly)} a month`
-    : "";
-  const founding = choice && FOUNDING_OFFER
-    ? formatPrice(foundingPrice(choice.billing === "yearly" ? choice.plan.yearly : choice.plan.monthly))
-    : null;
+  const plan = PLANS.find((p) => p.id === church.plan);
+  const planName = plan?.name ?? church.plan;
+  const price = plan ? (church.billing === "yearly" ? plan.yearly : plan.monthly) : null;
+  const per = church.billing === "yearly" ? "a year" : "a month";
+  const founding = price !== null && FOUNDING_OFFER ? formatPrice(foundingPrice(price)) : null;
+  const daysLeft = Math.ceil((church.trialEndsAt.getTime() - Date.now()) / DAY_MS);
+  const trialOn = daysLeft > 0;
   const versionLine = release
     ? [
         `Version ${release.version}`,
@@ -61,137 +89,129 @@ export function Account() {
 
   return (
     <>
-      <Header root={ROOT} signedIn />
-      <main className="section section--tight">
-        <div className="site-container">
-          <header className="page-header">
-            <h1 className="page-title">{choice ? "Welcome, Alex" : "Welcome back, Alex"}</h1>
-          </header>
+      <header className="page-header">
+        <h1 className="page-title">Welcome, {account.name}</h1>
+      </header>
 
-          {choice ? (
-            <section className="grouped" aria-labelledby="picked-heading">
-              <div className="group">
-                <div className="row">
-                  <span className="row-icon row-icon--accent">
-                    <CircleCheck aria-hidden="true" />
-                  </span>
-                  <span className="row-text">
-                    <span id="picked-heading">
-                      {choice.plan.name} trial started · {TRIAL_DAYS} days
-                    </span>
-                    <span className="text-caption">
-                      Then {afterTrial}
-                      {founding ? `, or ${founding} with the founding church offer` : ""}. Nothing is charged yet.
-                    </span>
-                  </span>
-                  <a className="sm-btn" href={`${ROOT}#pricing`}>
-                    Change plan
-                  </a>
-                </div>
-              </div>
-            </section>
-          ) : null}
-
-          <div className="page-split">
-            <div className="page-main">
-              <section className="grouped" aria-labelledby="download-heading">
-                <div className="section-head">
-                  <h2 id="download-heading">Download</h2>
-                </div>
-                <ul className="group">
-                  <li className="row">
-                    <span className="row-icon">
-                      <Laptop aria-hidden="true" />
-                    </span>
-                    <span className="row-text">
-                      <span>macOS</span>
-                      <span className="text-caption">{versionLine}</span>
-                    </span>
-                    {release ? (
-                      <a className="sm-btn sm-btn--primary sm-btn--lg" href={downloadUrl(ROOT, release.mac.file)} download>
-                        <Download aria-hidden="true" />
-                        Download
-                      </a>
-                    ) : (
-                      <button className="sm-btn sm-btn--primary sm-btn--lg" disabled>
-                        <Download aria-hidden="true" />
-                        Download
-                      </button>
-                    )}
-                  </li>
-                  <li className="row">
-                    <span className="row-icon">
-                      <Monitor aria-hidden="true" />
-                    </span>
-                    <span className="row-text">
-                      <span>Windows</span>
-                      <span className="text-caption">After the Mac version settles</span>
-                    </span>
-                    <span className="sm-pill">
-                      <span className="sm-pill__dot" aria-hidden="true" />
-                      Planned
-                    </span>
-                  </li>
-                </ul>
-                <p className="section-foot">
-                  {release
-                    ? "Early builds aren't signed yet. The first time, Control-click the app and choose Open."
-                    : notYet
-                      ? "The button turns on when the first build is published."
-                      : "Universal app for Apple silicon and Intel Macs, macOS 12 or later."}
-                </p>
-              </section>
-
-              <Services />
-            </div>
-
-            <aside className="page-side">
-              <section className="grouped" aria-labelledby="acct-heading">
-                <div className="section-head">
-                  <h2 id="acct-heading">Account</h2>
-                </div>
-                <dl className="group">
-                  <div className="row">
-                    <dt className="row-text">Name</dt>
-                    <dd className="row-value">Alex Rivera</dd>
-                  </div>
-                  <div className="row">
-                    <dt className="row-text">Church</dt>
-                    <dd className="row-value">Grace Community Church</dd>
-                  </div>
-                  <div className="row">
-                    <dt className="row-text">Role</dt>
-                    <dd className="row-value">Engineer</dd>
-                  </div>
-                  <div className="row">
-                    <dt className="row-text">Plan</dt>
-                    <dd className="row-value">{choice ? `${plan} (trial)` : plan}</dd>
-                  </div>
-                </dl>
-                <p className="section-foot footnote">
-                  <Info aria-hidden="true" />
-                  Preview account. Sign-in isn't built yet.
-                </p>
-              </section>
-            </aside>
+      <section className="grouped" aria-labelledby="trial-heading">
+        <div className="group">
+          <div className="row">
+            <span className="row-icon row-icon--accent">
+              <CircleCheck aria-hidden="true" />
+            </span>
+            <span className="row-text">
+              <span id="trial-heading">
+                {trialOn
+                  ? `${planName} trial · ${daysLeft} ${daysLeft === 1 ? "day" : "days"} left`
+                  : `${planName} trial ended`}
+              </span>
+              <span className="text-caption">
+                {price !== null ? `Then ${formatPrice(price)} ${per}` : "Then billed by plan"}
+                {founding ? `, or ${founding} with the founding church offer` : ""}. Nothing is charged yet.
+              </span>
+            </span>
           </div>
         </div>
-      </main>
-      <Footer />
+      </section>
+
+      <div className="page-split">
+        <div className="page-main">
+          <section className="grouped" aria-labelledby="download-heading">
+            <div className="section-head">
+              <h2 id="download-heading">Download</h2>
+            </div>
+            <ul className="group">
+              <li className="row">
+                <span className="row-icon">
+                  <Laptop aria-hidden="true" />
+                </span>
+                <span className="row-text">
+                  <span>macOS</span>
+                  <span className="text-caption">{versionLine}</span>
+                </span>
+                {release ? (
+                  <a className="sm-btn sm-btn--primary sm-btn--lg" href={downloadUrl(ROOT, release.mac.file)} download>
+                    <Download aria-hidden="true" />
+                    Download
+                  </a>
+                ) : (
+                  <button className="sm-btn sm-btn--primary sm-btn--lg" disabled>
+                    <Download aria-hidden="true" />
+                    Download
+                  </button>
+                )}
+              </li>
+              <li className="row">
+                <span className="row-icon">
+                  <Monitor aria-hidden="true" />
+                </span>
+                <span className="row-text">
+                  <span>Windows</span>
+                  <span className="text-caption">After the Mac version settles</span>
+                </span>
+                <span className="sm-pill">
+                  <span className="sm-pill__dot" aria-hidden="true" />
+                  Planned
+                </span>
+              </li>
+            </ul>
+            <p className="section-foot">
+              {release
+                ? "Early builds aren't signed yet. The first time, Control-click the app and choose Open."
+                : notYet
+                  ? "The button turns on when the first build is published."
+                  : "Universal app for Apple silicon and Intel Macs, macOS 12 or later."}
+            </p>
+          </section>
+
+          <Services cloud={cloud} />
+        </div>
+
+        <aside className="page-side">
+          <section className="grouped" aria-labelledby="acct-heading">
+            <div className="section-head">
+              <h2 id="acct-heading">Account</h2>
+            </div>
+            <dl className="group">
+              <div className="row">
+                <dt className="row-text">Name</dt>
+                <dd className="row-value">{account.name}</dd>
+              </div>
+              <div className="row">
+                <dt className="row-text">Email</dt>
+                <dd className="row-value account__email">{account.email}</dd>
+              </div>
+              <div className="row">
+                <dt className="row-text">Church</dt>
+                <dd className="row-value">{church.name}</dd>
+              </div>
+              <div className="row">
+                <dt className="row-text">Role</dt>
+                <dd className="row-value">{ROLE_LABEL[church.role]}</dd>
+              </div>
+              <div className="row">
+                <dt className="row-text">Plan</dt>
+                <dd className="row-value">
+                  {planName}, {church.billing}
+                  {trialOn ? " (trial)" : ""}
+                </dd>
+              </div>
+            </dl>
+          </section>
+        </aside>
+      </div>
     </>
   );
 }
 
-const cloud = connectCloud(ROOT);
-
 /** Services the church's booth computers have uploaded. */
-function Services() {
+function Services({ cloud }: { cloud: RecordingsCloud }) {
   const [list, setList] = useState<CloudRecording[] | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
     cloud.listRecordings().then(setList, () => setError(true));
-  }, []);
+  }, [cloud]);
 
   const days = groupByDate(list ?? []);
 
