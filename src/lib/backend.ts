@@ -52,6 +52,14 @@ export interface Backend {
   getSession(): Promise<Session>;
   /** Email and password from the sign-in screen. Rejects with a sentence to show. */
   signInWithPassword(email: string, password: string): Promise<Session>;
+  /** Opens Continue with Google in the browser. The result arrives through onSession or onSessionError. */
+  beginGoogleSignIn(): Promise<void>;
+  /** Opens the website to create an account or reset a password. */
+  openAccountPage(page: "signUp" | "resetPassword"): Promise<void>;
+  /** Sign-in changed outside a call: Google finished, or the plan was re-checked between services. */
+  onSession(cb: (session: Session) => void): Promise<Unlisten>;
+  /** Google sign-in didn't finish; a sentence to show. */
+  onSessionError(cb: (message: string) => void): Promise<Unlisten>;
   /** Back to the local session. Refused mid-service (recording or auto-mix on). */
   signOut(): Promise<Session>;
   /** Opens the website account page, where billing lives. */
@@ -155,6 +163,10 @@ async function createTauriBackend(): Promise<Backend> {
     setMute: (id, muted) => invoke("set_mute", { id, muted }),
     getSession: () => invoke("get_session"),
     signInWithPassword: (email, password) => invoke("sign_in_with_password", { email, password }),
+    beginGoogleSignIn: () => invoke("begin_sign_in"),
+    openAccountPage: (page) => invoke("open_account_page", { page }),
+    onSession: (cb) => listen<Session>("session", (e) => cb(e.payload)),
+    onSessionError: (cb) => listen<string>("session-error", (e) => cb(e.payload)),
     signOut: () => invoke("sign_out"),
     openBilling: () => invoke("open_billing"),
     automixPresets: () => invoke("automix_presets"),

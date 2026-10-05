@@ -1,12 +1,11 @@
-// The browser demo's copy of the sample account in crates/auth/src/sample.rs:
-// test@example.com / 1234 signs in as an admin on Campus, so everything is on.
-// Not secrets; the core's provider is the one the app uses.
+// Sign-in for the browser demo (npm run dev), which has no core and no
+// network. Any email and password opens a demo church on a Pro trial, so every
+// screen can be seen; there is no account behind it. The desktop app signs in
+// with Supabase in the core (crates/auth/src/supabase.rs).
 
 import { accessFor, NO_ACCESS } from "./plans";
 import type { Session } from "./types";
 
-const SAMPLE_EMAIL = "test@example.com";
-const SAMPLE_PASSWORD = "1234";
 const KEY = "sanctuarymix.demoSignedIn";
 
 const LOCAL: Session = {
@@ -17,25 +16,28 @@ const LOCAL: Session = {
   access: NO_ACCESS,
 };
 
-const SAMPLE: Session = {
-  user: { id: "sample-user", displayName: "Test User", email: SAMPLE_EMAIL },
-  activeOrg: { id: "sample-church", name: "Sample Church" },
-  role: "admin",
-  authenticated: true,
-  access: accessFor("campus", "active"),
-};
+function demoSession(email: string): Session {
+  const name = email.split("@")[0] || "Demo";
+  return {
+    user: { id: "demo-user", displayName: name.charAt(0).toUpperCase() + name.slice(1), email },
+    activeOrg: { id: "demo-church", name: "Demo church" },
+    role: "admin",
+    authenticated: true,
+    access: accessFor("pro", "trialing"),
+  };
+}
 
-function load(): boolean {
+function load(): string | null {
   try {
-    return localStorage.getItem(KEY) === "1";
+    return localStorage.getItem(KEY);
   } catch {
-    return false;
+    return null;
   }
 }
 
-function save(on: boolean) {
+function save(email: string | null) {
   try {
-    if (on) localStorage.setItem(KEY, "1");
+    if (email) localStorage.setItem(KEY, email);
     else localStorage.removeItem(KEY);
   } catch {
     // Sign-in still works for this run.
@@ -43,21 +45,21 @@ function save(on: boolean) {
 }
 
 export function createDemoAuth() {
-  let signedIn = load();
-  const session = () => (signedIn ? SAMPLE : LOCAL);
+  let email = load();
+  const session = () => (email ? demoSession(email) : LOCAL);
   return {
     session,
-    async signIn(email: string, password: string): Promise<Session> {
-      if (email.trim().toLowerCase() !== SAMPLE_EMAIL || password !== SAMPLE_PASSWORD) {
-        throw "That email and password don't match. Check them and try again.";
+    async signIn(address: string, password: string): Promise<Session> {
+      if (!/^[^\s@]+@[^\s@]+$/.test(address.trim()) || !password) {
+        throw "Enter an email and password. In the browser demo, any will do.";
       }
-      signedIn = true;
-      save(true);
+      email = address.trim().toLowerCase();
+      save(email);
       return session();
     },
     signOut(): Session {
-      signedIn = false;
-      save(false);
+      email = null;
+      save(null);
       return session();
     },
   };

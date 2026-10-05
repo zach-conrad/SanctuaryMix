@@ -43,6 +43,10 @@ interface MixerState {
   init(): Promise<void>;
   /** Rejects with a sentence to show under the form. */
   signIn(email: string, password: string): Promise<void>;
+  /** Opens Google sign-in in the browser; the session arrives by event. */
+  signInWithGoogle(): Promise<void>;
+  /** Why Google sign-in didn't finish, for the sign-in screen. */
+  signInError: string | null;
   /** Rejects with a sentence to show (refused mid-service). */
   signOut(): Promise<void>;
   workLocally(): void;
@@ -105,6 +109,7 @@ export const useMixer = create<MixerState>((set, get) => ({
   view: "mixer",
   isDemo: false,
   session: null,
+  signInError: null,
   workingLocally: false,
   audioStatus: "off",
   audio: null,
@@ -136,6 +141,8 @@ export const useMixer = create<MixerState>((set, get) => ({
     initialized = true;
     const backend = await getBackend();
     set({ isDemo: backend.isDemo, session: await backend.getSession() });
+    await backend.onSession((session) => set({ session, signInError: null }));
+    await backend.onSessionError((signInError) => set({ signInError }));
     await backend.onMeters((frame) => useMeters.setState({ frame }));
     await backend.onConsole((event) => applyConsoleEvent(event, set, get));
     // In the browser demo, start with something to look at.
@@ -148,7 +155,16 @@ export const useMixer = create<MixerState>((set, get) => ({
   async signIn(email, password) {
     const backend = await getBackend();
     try {
-      set({ session: await backend.signInWithPassword(email, password), workingLocally: false });
+      set({ session: await backend.signInWithPassword(email, password), workingLocally: false, signInError: null });
+    } catch (e) {
+      throw reportError(e);
+    }
+  },
+
+  async signInWithGoogle() {
+    set({ signInError: null });
+    try {
+      await (await getBackend()).beginGoogleSignIn();
     } catch (e) {
       throw reportError(e);
     }

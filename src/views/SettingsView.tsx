@@ -94,6 +94,17 @@ function AccountSection({ session }: { session: Session }) {
             <span className="muted">{session.activeOrg.name}</span>
           </div>
         )}
+        {session.authenticated && !session.activeOrg && (
+          <div className="row">
+            <span className="row-text">
+              <span>Church</span>
+              <span className="text-caption">Name your church on the website to start the trial.</span>
+            </span>
+            <button className="sm-btn" onClick={() => void getBackend().then((b) => b.openBilling())}>
+              Open website
+            </button>
+          </div>
+        )}
         {session.authenticated && (
           <div className="row">
             <span className="row-text">Role</span>

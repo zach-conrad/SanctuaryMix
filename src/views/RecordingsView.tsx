@@ -1,4 +1,5 @@
 import { ChevronRight, CloudOff, Trash2 } from "lucide-react";
+import { can } from "../lib/plans";
 import { useEffect, useState } from "react";
 import { Dialog } from "../components/Dialog";
 import { PageHeader } from "../components/PageHeader";
@@ -130,14 +131,13 @@ function ServiceRow({ r }: { r: RecordingSummary }) {
 function DiskPanel() {
   const disk = useRecordings((s) => s.disk);
   const list = useRecordings((s) => s.list);
-  const role = useMixer((s) => s.session?.role);
+  const canDelete = useMixer((s) => can(s.session, "deleteRecordings"));
   const deleteOld = useRecordings((s) => s.deleteOldMultitracks);
   const [confirming, setConfirming] = useState(false);
   const [freed, setFreed] = useState<number | null>(null);
   const [now] = useState(() => Date.now());
   const old = oldMultitracks(list, RETENTION_DAYS, now);
   const oldBytes = old.reduce((n, r) => n + estimatedTrackBytes(r), 0);
-  const canDelete = role === "admin" || role === "engineer";
   const cutoff = new Date(now - RETENTION_DAYS * 86_400_000).toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",

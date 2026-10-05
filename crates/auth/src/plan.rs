@@ -157,8 +157,8 @@ impl Entitlements {
     }
 }
 
-/// The church's plan as this Mac knows it. Comes from the signed licence
-/// token once billing is live; from the provider until then.
+/// The church's plan as this Mac knows it. Comes from the church's row in
+/// Supabase today; from the signed licence token once billing is live.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Access {
@@ -191,6 +191,16 @@ impl Access {
         }
     }
 
+    /// Signed in, but the plan hasn't been confirmed online within the grace
+    /// period: manual mixing and playback only until it checks in.
+    pub fn unconfirmed(plan: Option<Plan>) -> Self {
+        Self {
+            plan,
+            status: None,
+            entitlements: Entitlements::lapsed(),
+        }
+    }
+
     /// `Ok` if the plan has `feature`, otherwise a sentence for the operator.
     pub fn require(&self, feature: Feature) -> Result<(), String> {
         if self.entitlements.allows(feature) {
@@ -198,6 +208,10 @@ impl Access {
         }
         Err(match (self.plan, self.status) {
             (None, _) => format!("{} needs a SanctuaryMix plan. Sign in in Settings.", feature.label()),
+            (Some(_), None) => format!(
+                "{} needs SanctuaryMix to check your plan. Connect this computer to the internet.",
+                feature.label()
+            ),
             (Some(_), Some(s)) if !s.grants_plan() => format!(
                 "{} is paused until your plan is active again. An admin can fix billing on the website.",
                 feature.label()
@@ -265,5 +279,9 @@ mod tests {
             .require(Feature::AutoMix)
             .unwrap_err()
             .contains("Sign in"));
+        assert!(Access::unconfirmed(Some(Plan::Pro))
+            .require(Feature::AutoMix)
+            .unwrap_err()
+            .contains("internet"));
     }
 }

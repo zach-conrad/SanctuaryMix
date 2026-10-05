@@ -14,6 +14,14 @@ function pickedPlan() {
   return plan ? { plan, billing: params.get("billing") === "monthly" ? "monthly" : "yearly" } : null;
 }
 
+/** The app links here with ?signup=1 or ?forgot=1; the pricing section with ?plan=. */
+function initialMode(): Mode {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("forgot") === "1") return "reset";
+  if (params.get("signup") === "1" || pickedPlan()) return "signUp";
+  return "signIn";
+}
+
 function trialNote() {
   const picked = pickedPlan();
   return picked
@@ -81,7 +89,7 @@ function AuthShell({ title, children }: { title: string; children: ReactNode }) 
 
 /** Sign in, create an account, or ask for a password reset. */
 export function AuthForm({ root, notice }: { root: string; notice: string | null }) {
-  const [mode, setMode] = useState<Mode>(pickedPlan() ? "signUp" : "signIn");
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [name, setName] = useState("");
   const [church, setChurch] = useState("");
   const [email, setEmail] = useState("");

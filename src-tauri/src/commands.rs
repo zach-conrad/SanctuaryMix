@@ -1,5 +1,5 @@
 use audio_engine::{AudioDeviceInfo, MicAccess};
-use auth::Session;
+use auth::{Permission, Session};
 use automix::{Adjustment, AutoMixConfig, AutoMixStatus, ChannelRole, Preset, RoomFeel};
 use console::{ConsoleConfig, ConsoleError};
 use mix_core::hearing::Sound;
@@ -229,45 +229,61 @@ pub async fn get_session(state: State<'_, AppState>) -> CmdResult<Session> {
 /// further than the auth provider.
 #[tauri::command]
 pub async fn sign_in_with_password(
-    app: AppHandle,
+    state: State<'_, AppState>,
     email: String,
     password: String,
 ) -> CmdResult<Session> {
-    let session = app
-        .state::<AppState>()
+    state
         .auth
         .sign_in_with_password(&email, &password)
         .await
-        .map_err(err)?;
-    remember_sign_in(app, true).await;
-    Ok(session)
+        .map_err(err)
 }
 
-/// Billing lives on the website; card entry never happens in the app.
-const BILLING_URL: &str = "https://sanctuarymix.vercel.app/account/";
+/// Website pages the app links to. Billing, sign-up and password resets live
+/// there; card entry never happens in the app.
+const WEBSITE: &str = "https://sanctuarymix.vercel.app/account/";
+
+/// Opens a URL in the default browser.
+fn open_in_browser(url: &str) -> CmdResult<()> {
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open")
+        .arg(url)
+        .spawn()
+        .map_err(err)?;
+    #[cfg(target_os = "windows")]
+    std::process::Command::new("explorer")
+        .arg(url)
+        .spawn()
+        .map_err(err)?;
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    log::info!("open {url} in a browser");
+    Ok(())
+}
 
 /// Opens the website account page in the browser. Takes no URL so the UI
 /// can't open anything else.
 #[tauri::command]
 pub fn open_billing() -> CmdResult<()> {
-    #[cfg(target_os = "macos")]
-    std::process::Command::new("open")
-        .arg(BILLING_URL)
-        .spawn()
-        .map_err(err)?;
-    #[cfg(target_os = "windows")]
-    std::process::Command::new("explorer")
-        .arg(BILLING_URL)
-        .spawn()
-        .map_err(err)?;
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    log::info!("open {BILLING_URL} in a browser");
-    Ok(())
+    open_in_browser(WEBSITE)
 }
 
+/// Opens the website to create an account or reset a password.
 #[tauri::command]
-pub async fn begin_sign_in(state: State<'_, AppState>) -> CmdResult<String> {
-    state.auth.begin_sign_in().await.map_err(err)
+pub fn open_account_page(page: String) -> CmdResult<()> {
+    match page.as_str() {
+        "signUp" => open_in_browser(&format!("{WEBSITE}?signup=1")),
+        "resetPassword" => open_in_browser(&format!("{WEBSITE}?forgot=1")),
+        _ => Err("Unknown page.".into()),
+    }
+}
+
+/// Starts Continue with Google in the browser. The browser comes back through
+/// a sanctuarymix:// link, which finishes sign-in and sends a `session` event.
+#[tauri::command]
+pub async fn begin_sign_in(state: State<'_, AppState>) -> CmdResult<()> {
+    let url = state.auth.begin_sign_in().await.map_err(err)?;
+    open_in_browser(&url)
 }
 
 #[tauri::command]
@@ -276,6 +292,23 @@ pub async fn complete_sign_in(
     callback_url: String,
 ) -> CmdResult<Session> {
     state.auth.complete_sign_in(callback_url).await.map_err(err)
+}
+
+/// True while a service is under way (recording, or auto-mix on). Sign-out and
+/// plan changes wait for it to end.
+pub async fn in_service(app: &AppHandle) -> bool {
+    let state = app.state::<AppState>();
+    if let Some(recs) = &state.recordings {
+        if recs.is_recording().await {
+            return true;
+        }
+    }
+    state
+        .automix
+        .status()
+        .await
+        .map(|s| s.engaged)
+        .unwrap_or(false)
 }
 
 /// Signing out drops to the local session, which has no plan. Like any plan
@@ -291,26 +324,7 @@ pub async fn sign_out(app: AppHandle) -> CmdResult<Session> {
     if state.automix.status().await.map_err(err)?.engaged {
         return Err("Turn off auto-mix before you sign out.".into());
     }
-    let session = state.auth.sign_out().await;
-    remember_sign_in(app, false).await;
-    Ok(session)
-}
-
-/// Keeps the sample account signed in across launches. Real accounts will keep
-/// their tokens in the keychain instead.
-async fn remember_sign_in(app: AppHandle, signed_in: bool) {
-    let saved = blocking(move || {
-        app.state::<AppState>()
-            .store
-            .lock()
-            .unwrap()
-            .set_setting(store::keys::SIGNED_IN, &signed_in)
-            .map_err(err)
-    })
-    .await;
-    if let Err(e) = saved {
-        log::warn!("couldn't save sign-in, it will be asked again next launch: {e}");
-    }
+    Ok(state.auth.sign_out().await)
 }
 
 // Auto-mix. The rules live in the automix crate; these only pass requests
@@ -344,15 +358,14 @@ pub async fn automix_get_config(app: AppHandle) -> CmdResult<AutoMixConfig> {
 /// Applies and saves the operator's choices. Returns them as the core will use them.
 #[tauri::command]
 pub async fn automix_set_config(app: AppHandle, config: AutoMixConfig) -> CmdResult<AutoMixConfig> {
+    let session = app.state::<AppState>().auth.current_session().await;
+    session.require(Permission::ChangeAutoMixSetup)?;
     let preset = config.feel.preset();
-    if preset.admin_only {
-        let session = app.state::<AppState>().auth.current_session().await;
-        if session.role != auth::Role::Admin {
-            return Err(format!(
-                "Only an admin can choose {}. Ask an admin, or pick another room feel.",
-                preset.name.to_lowercase()
-            ));
-        }
+    if preset.admin_only && session.require(Permission::ChooseAdminFeel).is_err() {
+        return Err(format!(
+            "Only an admin can choose {}. Ask an admin, or pick another room feel.",
+            preset.name.to_lowercase()
+        ));
     }
     let applied = app
         .state::<AppState>()

@@ -1,4 +1,5 @@
 import { ArrowLeft, Pause, Play, RotateCcw, RotateCw, Send, Trash2, TriangleAlert } from "lucide-react";
+import { can } from "../lib/plans";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "../components/Dialog";
 import { useConsoleName, useIsRecording } from "../components/RecordControl";
@@ -80,12 +81,12 @@ function DetailHeader() {
   const detail = useRecordings((s) => s.detail)!;
   const saveDetails = useRecordings((s) => s.saveDetails);
   const deleteOpen = useRecordings((s) => s.deleteOpen);
-  const role = useMixer((s) => s.session?.role);
+  const mayDelete = useMixer((s) => can(s.session, "deleteRecordings"));
   const [title, setTitle] = useState(detail.title);
   const [notes, setNotes] = useState(detail.notes);
   const [saved, setSaved] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const canDelete = (role === "admin" || role === "engineer") && detail.status !== "recording";
+  const canDelete = mayDelete && detail.status !== "recording";
 
   const commit = async () => {
     const t = title.trim() || detail.title;
@@ -258,13 +259,13 @@ function Transport({ lanes }: { lanes: Lane[] }) {
 
 /** The guarded way to put recorded moves back on the console. */
 function SendMoves({ lanes }: { lanes: Lane[] }) {
-  const role = useMixer((s) => s.session?.role);
+  const mayReplay = useMixer((s) => can(s.session, "replayToConsole"));
   const consoleName = useConsoleName();
   const recording = useIsRecording();
   const running = useRecordings((s) => s.replay?.state === "running");
   const [open, setOpen] = useState(false);
 
-  if (role === "volunteer") {
+  if (!mayReplay) {
     return <span className="text-caption muted">Engineers and admins can send these moves to the console.</span>;
   }
   const reason = recording

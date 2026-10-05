@@ -1,22 +1,24 @@
 //! Authentication boundary.
 //!
-//! The app depends only on [`AuthProvider`]. Today that is [`SampleAccount`]:
-//! one built-in account with every feature, and the signed-out local session
-//! for everyone else, so the console is never locked out on a Sunday morning.
-//! The approved plan is Supabase Auth: email and password from an in-app form
-//! (sent from this core, never stored by the webview), or Google in the system
-//! browser (OAuth + PKCE) back through a `sanctuarymix://` deep link, with
-//! tokens in the OS keychain. That provider implements the same trait without
-//! touching the UI or commands.
+//! The app depends only on [`AuthProvider`], which is [`SupabaseAuth`]: email
+//! and password from the app's own form (sent from this core, never stored by
+//! the webview), or Google in the system browser (OAuth + PKCE) back through a
+//! `sanctuarymix://` deep link. The refresh token and the last confirmed
+//! session live in the OS keychain, so the app opens signed in and keeps its
+//! plan offline for [`OFFLINE_GRACE_DAYS`]. Signed out, everyone gets the
+//! [`LocalGuest`] session: the console is never locked out on a Sunday morning.
 //!
 //! What a session may do comes from two places: its [`Role`] in the church
-//! (who), and the church's plan in [`plan::Access`] (what's paid for).
+//! (who, see [`Permission`]), and the church's plan in [`plan::Access`] (what's
+//! paid for).
 
 pub mod plan;
-mod sample;
+mod supabase;
 
 pub use plan::{Access, Entitlements, Feature, Plan, SubscriptionStatus};
-pub use sample::SampleAccount;
+pub use supabase::{
+    KeychainStore, MemoryStore, SecretStore, SupabaseAuth, SupabaseConfig, OFFLINE_GRACE_DAYS,
+};
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -27,7 +29,11 @@ pub enum AuthError {
     NotImplemented,
     #[error("That email and password don't match. Check them and try again.")]
     WrongCredentials,
-    #[error("sign-in failed: {0}")]
+    #[error("Confirm your email first. Open the link we sent you, then sign in.")]
+    EmailNotConfirmed,
+    #[error("Can't reach SanctuaryMix. Check the internet connection, or mix without signing in.")]
+    Offline,
+    #[error("{0}")]
     Failed(String),
 }
 
@@ -44,6 +50,33 @@ pub enum Role {
     Engineer,
     /// Simplified view; AI suggestions need an engineer to approve.
     Volunteer,
+}
+
+/// Something only some roles may do. Mixing by hand, playback, Freeze and
+/// Undo are never on this list: anyone at the desk can always use them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Permission {
+    /// Pick auto-mix channels, roles and room feel. Turning a ready setup on
+    /// or off is open to everyone.
+    ChangeAutoMixSetup,
+    /// Room feels marked admin-only (the loosest guardrails).
+    ChooseAdminFeel,
+    /// Delete recordings and old multitracks.
+    DeleteRecordings,
+    /// Send a recording's moves back to the console.
+    ReplayToConsole,
+}
+
+impl Role {
+    pub fn can(self, permission: Permission) -> bool {
+        match permission {
+            Permission::ChooseAdminFeel => self == Role::Admin,
+            Permission::ChangeAutoMixSetup
+            | Permission::DeleteRecordings
+            | Permission::ReplayToConsole => matches!(self, Role::Admin | Role::Engineer),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -76,6 +109,28 @@ pub struct Session {
     pub access: Access,
 }
 
+impl Session {
+    /// `Ok` if this session's role may do it, otherwise a sentence for the operator.
+    pub fn require(&self, permission: Permission) -> std::result::Result<(), String> {
+        if self.role.can(permission) {
+            return Ok(());
+        }
+        Err(match permission {
+            Permission::ChangeAutoMixSetup => {
+                "Ask an engineer or admin to change the auto-mix setup."
+            }
+            Permission::ChooseAdminFeel => {
+                "Only an admin can choose this room feel. Ask an admin, or pick another."
+            }
+            Permission::DeleteRecordings => "Ask an engineer or admin to delete recordings.",
+            Permission::ReplayToConsole => {
+                "Ask an engineer or admin to send recorded moves to the console."
+            }
+        }
+        .into())
+    }
+}
+
 #[async_trait]
 pub trait AuthProvider: Send + Sync {
     async fn current_session(&self) -> Session;
@@ -88,6 +143,12 @@ pub trait AuthProvider: Send + Sync {
     /// Finishes sign-in from the deep-link callback URL.
     async fn complete_sign_in(&self, callback_url: String) -> Result<Session>;
     async fn sign_out(&self) -> Session;
+    /// Checks the account and plan with the server. Offline, keeps the last
+    /// confirmed session (within the grace period). Callers only run this
+    /// between services, so a plan never changes mid-service.
+    async fn refresh(&self) -> Session {
+        self.current_session().await
+    }
 }
 
 /// No account: a local admin with manual mixing and playback only.
@@ -146,5 +207,28 @@ mod tests {
             auth.begin_sign_in().await,
             Err(AuthError::NotImplemented)
         ));
+    }
+
+    #[test]
+    fn volunteers_mix_but_dont_change_setup() {
+        use Permission::*;
+        for p in [
+            ChangeAutoMixSetup,
+            ChooseAdminFeel,
+            DeleteRecordings,
+            ReplayToConsole,
+        ] {
+            assert!(Role::Admin.can(p));
+            assert!(!Role::Volunteer.can(p));
+        }
+        assert!(Role::Engineer.can(ChangeAutoMixSetup));
+        assert!(!Role::Engineer.can(ChooseAdminFeel));
+
+        let mut s = LocalGuest::session();
+        s.role = Role::Volunteer;
+        assert!(s
+            .require(DeleteRecordings)
+            .unwrap_err()
+            .contains("engineer or admin"));
     }
 }

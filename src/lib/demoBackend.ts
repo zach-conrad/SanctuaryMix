@@ -161,6 +161,18 @@ export function createDemoBackend(): Backend {
     async signInWithPassword(email, password) {
       return auth.signIn(email, password);
     },
+    async beginGoogleSignIn() {
+      throw "Continue with Google works in the desktop app.";
+    },
+    async openAccountPage(page) {
+      window.open(`https://sanctuarymix.vercel.app/account/?${page === "signUp" ? "signup" : "forgot"}=1`, "_blank", "noopener");
+    },
+    async onSession() {
+      return () => {};
+    },
+    async onSessionError() {
+      return () => {};
+    },
     async signOut() {
       if (automix.status().engaged) throw "Turn off auto-mix before you sign out.";
       if ((await recorder.recorderStatus()).active) throw "Stop recording the service before you sign out.";

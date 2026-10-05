@@ -4,7 +4,7 @@ import { getBackend } from "../lib/backend";
 import { formatDb } from "../lib/levels";
 import type { Adjustment, ChannelRole, ChannelStatus, HeardChannel, Nudges, RoomFeel } from "../lib/types";
 import { MODE_DETAIL, MODE_LABEL, ROLE_LABEL, SOUND_LABEL, useAutoMix } from "../store/automix";
-import { lockReason } from "../lib/plans";
+import { can, lockReason } from "../lib/plans";
 import { useMixer } from "../store/mixer";
 
 const ROLES = Object.keys(ROLE_LABEL) as ChannelRole[];
@@ -112,7 +112,8 @@ export function RoomFeelPicker() {
   const presets = useAutoMix((s) => s.presets);
   const feel = useAutoMix((s) => s.config?.feel);
   const setFeel = useAutoMix((s) => s.setFeel);
-  const isAdmin = useMixer((s) => s.session?.role === "admin");
+  const isAdmin = useMixer((s) => can(s.session, "chooseAdminFeel"));
+  const canEdit = useMixer((s) => can(s.session, "changeAutoMixSetup"));
   const chosen = presets.find((p) => p.feel === feel);
 
   return (
@@ -126,7 +127,7 @@ export function RoomFeelPicker() {
           <select
             className="sm-input"
             value={feel ?? ""}
-            disabled={presets.length === 0}
+            disabled={presets.length === 0 || !canEdit}
             onChange={(e) => void setFeel(e.target.value as RoomFeel)}
           >
             {presets.map((p) => (
@@ -137,7 +138,7 @@ export function RoomFeelPicker() {
             ))}
           </select>
         </label>
-        <NudgeSliders />
+        <NudgeSliders disabled={!canEdit} />
       </div>
       {chosen && (
         <p className="section-foot" title={`Room level ${chosen.roomLevel}`}>
@@ -163,7 +164,7 @@ const NUDGES: { key: keyof Nudges; label: string; help: string }[] = [
   },
 ];
 
-function NudgeSliders() {
+function NudgeSliders({ disabled }: { disabled: boolean }) {
   const nudges = useAutoMix((s) => s.config?.nudges);
   const setNudge = useAutoMix((s) => s.setNudge);
   if (!nudges) return null;
@@ -173,6 +174,7 @@ function NudgeSliders() {
         <label key={key} className="row nudge" title={help}>
           <span className="nudge-label">{label}</span>
           <input
+            disabled={disabled}
             type="range"
             min={-3}
             max={3}
@@ -196,6 +198,7 @@ export function ChannelPicker() {
   const statuses = useAutoMix((s) => s.status?.channels ?? []);
   const scanResults = useAutoMix((s) => s.scan.results);
   const { setManaged, setRole, setListen, undo, resumeChannel, applySuggestion } = useAutoMix();
+  const canEdit = useMixer((s) => can(s.session, "changeAutoMixSetup"));
 
   const roleOf = new Map(managed.map((c) => [c.channel, c.role]));
   const statusOf = new Map(statuses.map((c) => [c.channel, c]));
@@ -219,13 +222,13 @@ export function ChannelPicker() {
       </div>
       <div className="group channels-group">
         <div className="toolbar">
-          <button className="sm-btn" onClick={() => void pickVoices()}>
+          <button className="sm-btn" disabled={!canEdit} onClick={() => void pickVoices()}>
             Select vocals and speech
           </button>
-          <ListenForRolesButton />
+          <ListenForRolesButton disabled={!canEdit} />
           <button
             className="sm-btn sm-btn--ghost"
-            disabled={managed.length === 0}
+            disabled={managed.length === 0 || !canEdit}
             onClick={() =>
               void setManaged(
                 managed.map((c) => c.channel),
@@ -240,7 +243,12 @@ export function ChannelPicker() {
           className="am-listen"
           title="Tells a real voice from band bleed, so bleed is never turned up. Runs on this computer only."
         >
-          <input type="checkbox" checked={listen} onChange={(e) => void setListen(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={listen}
+            disabled={!canEdit}
+            onChange={(e) => void setListen(e.target.checked)}
+          />
           <span className="text-body-strong">Listen to each mic</span>
         </label>
         <div className="am-table-scroll">
@@ -272,6 +280,7 @@ export function ChannelPicker() {
                       <input
                         type="checkbox"
                         checked={role !== undefined}
+                        disabled={!canEdit}
                         aria-label={`Let auto-mix ride ${strip.name}`}
                         onChange={(e) => void setManaged([strip.index], e.target.checked)}
                       />
@@ -284,6 +293,7 @@ export function ChannelPicker() {
                         <select
                           className="sm-input"
                           value={role}
+                          disabled={!canEdit}
                           aria-label={`What ${strip.name} is`}
                           onChange={(e) => void setRole(strip.index, e.target.value as ChannelRole)}
                         >
@@ -303,7 +313,7 @@ export function ChannelPicker() {
                             scanned={heardOf.get(strip.index)}
                             name={strip.name}
                             role={role}
-                            apply={applySuggestion}
+                            apply={canEdit ? applySuggestion : null}
                           />
                         </td>
                         <td>{st && <ModeWord status={st} />}</td>
@@ -320,12 +330,13 @@ export function ChannelPicker() {
           </table>
         </div>
       </div>
+      {!canEdit && <p className="section-foot">Ask an engineer or admin to change the setup.</p>}
     </section>
   );
 }
 
 /** Listens to every input for a while and suggests roles from what it hears. */
-function ListenForRolesButton() {
+function ListenForRolesButton({ disabled }: { disabled: boolean }) {
   const until = useAutoMix((s) => s.scan.until);
   const listenForRoles = useAutoMix((s) => s.listenForRoles);
   const audioOn = useMixer((s) => s.audioStatus === "on");
@@ -348,7 +359,7 @@ function ListenForRolesButton() {
   return (
     <button
       className="sm-btn"
-      disabled={!audioOn}
+      disabled={!audioOn || disabled}
       title={audioOn ? "Play or sing through every mic while it listens." : "Start Dante audio in Setup first."}
       onClick={() => void listenForRoles()}
     >
@@ -370,7 +381,8 @@ function HeardCell({
   scanned: HeardChannel | undefined;
   name: string;
   role: ChannelRole | undefined;
-  apply(channel: number, role: ChannelRole): Promise<void>;
+  /** Null when this role can't change the setup. */
+  apply: ((channel: number, role: ChannelRole) => Promise<void>) | null;
 }) {
   const live = status?.heard ?? null;
   const suggestion = scanned?.suggestedRole ?? null;
@@ -397,7 +409,8 @@ function HeardCell({
           title={`${name} sounds like ${SOUND_LABEL[scanned.sound].toLowerCase()}${
             role ? `, not ${ROLE_LABEL[role].toLowerCase()}` : ""
           }.`}
-          onClick={() => void apply(scanned.channel, suggestion)}
+          disabled={!apply}
+          onClick={() => void apply?.(scanned.channel, suggestion)}
         >
           Use {ROLE_LABEL[suggestion]}
           <span className="visually-hidden"> for {name}</span>
