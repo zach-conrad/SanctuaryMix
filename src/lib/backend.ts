@@ -50,8 +50,12 @@ export interface Backend {
   setFader(id: ChannelId, db: number | null): Promise<void>;
   setMute(id: ChannelId, muted: boolean): Promise<void>;
   getSession(): Promise<Session>;
-  /** Email and password from the sign-in screen. Rejects with a sentence to show. */
-  signInWithPassword(email: string, password: string): Promise<Session>;
+  /** Opens the website to sign in. The result arrives through onSession or onSessionError. */
+  beginSignIn(): Promise<void>;
+  /** Sign-in changed outside a call: the website handed it back, or the plan was re-checked between services. */
+  onSession(cb: (session: Session) => void): Promise<Unlisten>;
+  /** Website sign-in didn't finish; a sentence to show. */
+  onSessionError(cb: (message: string) => void): Promise<Unlisten>;
   /** Back to the local session. Refused mid-service (recording or auto-mix on). */
   signOut(): Promise<Session>;
   /** Opens the website account page, where billing lives. */
@@ -154,7 +158,9 @@ async function createTauriBackend(): Promise<Backend> {
     setFader: (id, db) => invoke("set_fader", { id, db }),
     setMute: (id, muted) => invoke("set_mute", { id, muted }),
     getSession: () => invoke("get_session"),
-    signInWithPassword: (email, password) => invoke("sign_in_with_password", { email, password }),
+    beginSignIn: () => invoke("begin_sign_in"),
+    onSession: (cb) => listen<Session>("session", (e) => cb(e.payload)),
+    onSessionError: (cb) => listen<string>("session-error", (e) => cb(e.payload)),
     signOut: () => invoke("sign_out"),
     openBilling: () => invoke("open_billing"),
     automixPresets: () => invoke("automix_presets"),

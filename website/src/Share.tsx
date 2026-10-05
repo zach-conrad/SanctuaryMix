@@ -1,7 +1,7 @@
-import { Info } from "lucide-react";
+import { CloudOff, Info, Link2Off } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { audioModeLabel, formatClock, serviceDateLabel, timeOfDay } from "../../src/lib/recordings";
-import { connectCloud, type SharedMix } from "./cloud";
+import { connectShareCloud, type SharedMix } from "./cloud";
 import { Footer } from "./components/Footer";
 import { Wordmark } from "./components/Wordmark";
 import { MixPlayer } from "./mix/MixPlayer";
@@ -18,7 +18,7 @@ const GONE: Record<Exclude<SharedMix["status"], "ok">, { title: string; body: st
 
 /** Public playback page for a share link. No sign-in, no account details. */
 export function Share() {
-  const cloud = useMemo(() => connectCloud(ROOT), []);
+  const cloud = useMemo(() => connectShareCloud(ROOT), []);
   const [shared, setShared] = useState<SharedMix | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -52,39 +52,41 @@ export function Share() {
         <div className="site-container">
           {!shared && !failed ? <p className="mix-muted">Opening the mix</p> : null}
           {failed ? (
-            <div className="service__status">
-              <h1 className="account__title">This mix didn't load</h1>
-              <p className="section__lede">Check your connection and reload the page.</p>
+            <div className="empty-state">
+              <CloudOff aria-hidden="true" />
+              <h1 className="text-heading">This mix didn't load</h1>
+              <p className="text-caption mix-muted">Check your connection and reload the page.</p>
             </div>
           ) : null}
           {shared && shared.status !== "ok" ? (
-            <div className="service__status">
-              <h1 className="account__title">{GONE[shared.status].title}</h1>
-              <p className="section__lede">{GONE[shared.status].body}</p>
+            <div className="empty-state">
+              <Link2Off aria-hidden="true" />
+              <h1 className="text-heading">{GONE[shared.status].title}</h1>
+              <p className="text-caption mix-muted">{GONE[shared.status].body}</p>
             </div>
           ) : null}
           {shared?.status === "ok" ? (
             <>
-              <header className="service__head">
-                <p className="text-caption mix-muted">
-                  {shared.orgName} · {serviceDateLabel(shared.recording.serviceDate)} ·{" "}
-                  {timeOfDay(shared.recording.startedAt)} ·{" "}
-                  <span className="text-readout">{formatClock(shared.recording.durationMs)}</span> ·{" "}
-                  {audioModeLabel(shared.recording)}
-                </p>
-                <h1 className="account__title">{shared.recording.title}</h1>
-                {shared.expiresAt ? (
-                  <p className="section__lede">This link works until {dateFormat.format(shared.expiresAt)}.</p>
-                ) : null}
+              <header className="page-header">
+                <div className="page-header__text">
+                  <h1 className="page-title">{shared.recording.title}</h1>
+                  <p className="text-caption mix-muted">
+                    {shared.orgName} · {serviceDateLabel(shared.recording.serviceDate)} ·{" "}
+                    {timeOfDay(shared.recording.startedAt)} ·{" "}
+                    <span className="text-readout">{formatClock(shared.recording.durationMs)}</span> ·{" "}
+                    {audioModeLabel(shared.recording)}
+                    {shared.expiresAt ? ` · Link works until ${dateFormat.format(shared.expiresAt)}` : ""}
+                  </p>
+                </div>
               </header>
-              {shared.previewNote ? (
-                <p className="preview-note text-caption service__note" role="note">
-                  <Info aria-hidden="true" />
-                  {shared.previewNote}
-                </p>
-              ) : null}
               <div className="service__layout">
                 <MixPlayer audioUrl={shared.audioUrl} durationMs={shared.recording.durationMs} events={shared.events} />
+                {shared.previewNote ? (
+                  <p className="section-foot footnote" role="note">
+                    <Info aria-hidden="true" />
+                    {shared.previewNote}
+                  </p>
+                ) : null}
               </div>
             </>
           ) : null}

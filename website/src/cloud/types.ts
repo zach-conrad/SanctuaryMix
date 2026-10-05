@@ -79,7 +79,8 @@ export type SharedMix =
 
 /**
  * The cloud boundary for the website, like `AuthProvider` and `RecordingSync`
- * in the app. Today `DemoCloud` serves the sample account from static files;
+ * in the app. `AccountCloud` serves the signed-in church (no recordings until
+ * they sync from the app); `DemoCloud` serves the share page's sample from static files;
  * a Supabase implementation replaces it without touching the pages.
  */
 export interface RecordingsCloud {

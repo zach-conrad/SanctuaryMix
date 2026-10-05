@@ -33,3 +33,10 @@ tokio.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 tauri = { version = "2", features = [] }
 tauri-plugin-log = "2"
+# Website sign-in returns through sanctuarymix:// links.
+tauri-plugin-deep-link = "2"
+
+# On Windows and Linux a sign-in link starts a second copy; this hands the link
+# to the running app instead. macOS delivers links to the running app itself.
+[target.'cfg(any(windows, target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }

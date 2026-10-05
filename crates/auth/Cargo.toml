@@ -1,6 +1,6 @@
 [package]
 name = "auth"
-description = "User accounts and sessions. Interface only for now; providers come later."
+description = "User accounts, sessions and what each church's plan and role allow. Signs in with Supabase Auth."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,7 +9,20 @@ publish = false
 [dependencies]
 async-trait.workspace = true
 serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
 thiserror.workspace = true
+log.workspace = true
+tokio = { workspace = true }
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+getrandom = "0.3"
+url = "2"
+# The OS TLS stack (Security.framework on macOS, SChannel on Windows): nothing to compile or bundle.
+reqwest = { version = "0.13", default-features = false, features = ["json", "native-tls", "http2", "system-proxy"] }
+# Refresh tokens live in the macOS Keychain or Windows Credential Manager. Other
+# platforms (Linux CI) fall back to keyring's in-memory store.
+keyring = { version = "3", features = ["apple-native", "windows-native"] }
 
 [dev-dependencies]
 tokio.workspace = true

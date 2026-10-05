@@ -421,9 +421,7 @@ pub async fn start_replay(
     channels: Option<Vec<ChannelId>>,
 ) -> CmdResult<ReplayStatus> {
     let session = state.auth.current_session().await;
-    if session.role == auth::Role::Volunteer {
-        return Err("Ask an engineer or admin to send recorded moves to the console.".into());
-    }
+    session.require(auth::Permission::ReplayToConsole)?;
     let recs = state
         .recordings
         .as_ref()

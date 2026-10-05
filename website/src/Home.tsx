@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
 import { Pricing } from "./components/Pricing";
+import { ThemedShot } from "./components/ThemedShot";
 
 const ROOT = "./";
 
@@ -30,6 +31,12 @@ const FEATURES: { icon: ReactNode; title: string; body: string; assist?: boolean
   },
 ];
 
+const PLATFORMS: { icon: ReactNode; title: string; body: string; available?: boolean }[] = [
+  { icon: <Laptop aria-hidden="true" />, title: "macOS", body: "Early access, Apple silicon and Intel", available: true },
+  { icon: <Monitor aria-hidden="true" />, title: "Windows", body: "After the Mac version settles" },
+  { icon: <SlidersVertical aria-hidden="true" />, title: "More consoles", body: "Allen & Heath dLive first, other desks next" },
+];
+
 export function Home() {
   return (
     <>
@@ -49,20 +56,18 @@ export function Home() {
               </a>
               <a className="sm-btn sm-btn--ghost sm-btn--lg" href={`${ROOT}account/`}>
                 <LogIn aria-hidden="true" />
-                Log in to download
+                Sign in to download
               </a>
             </div>
             <p className="hero__note text-caption">Early access for macOS. Windows is planned.</p>
           </div>
           <div className="site-container">
-            <figure className="hero__shot">
-              <img
-                src={`${ROOT}screenshots/sanctuarymix-mix.png`}
-                alt="The SanctuaryMix mixer: twelve channel strips named Pastor, Worship Ld, BGV, Kick, Snare and more, with level meters, faders, mute keys and an assistant panel on the right."
-                width={1440}
-                height={900}
-              />
-            </figure>
+            <ThemedShot
+              root={ROOT}
+              name="sanctuarymix-mixer"
+              className="hero__shot"
+              alt="The SanctuaryMix mixer: a sidebar, channel strips named Pastor, Worship Ld, BGV, Kick and Snare with meters, faders and mute keys, and the channel inspector with an Assist suggestion on the right."
+            />
           </div>
         </section>
 
@@ -103,56 +108,33 @@ export function Home() {
                 </li>
               </ol>
             </div>
-            <figure className="steps__shot">
-              <img
-                src={`${ROOT}screenshots/sanctuarymix-setup.png`}
-                alt="The SanctuaryMix setup screen for choosing a console and Dante device."
-                loading="lazy"
-                width={1440}
-                height={900}
-              />
-            </figure>
+            <ThemedShot
+              root={ROOT}
+              name="sanctuarymix-setup"
+              lazy
+              alt="The SanctuaryMix Setup page: a Console group with the console picked and a Dante audio group with a checkmark on Dante Virtual Soundcard."
+            />
           </div>
         </section>
 
         <section id="platforms" className="section">
           <div className="site-container">
             <h2 className="section__title">Mac first, Windows next</h2>
-            <div className="platforms">
-              <div className="platform">
-                <Laptop aria-hidden="true" />
-                <div>
-                  <h3 className="text-heading">macOS</h3>
-                  <p className="feature__body">Available now in early access for Apple silicon and Intel Macs.</p>
-                </div>
-                <span className="sm-pill sm-pill--ok">
-                  <span className="sm-pill__dot" aria-hidden="true" />
-                  Available
-                </span>
-              </div>
-              <div className="platform">
-                <Monitor aria-hidden="true" />
-                <div>
-                  <h3 className="text-heading">Windows</h3>
-                  <p className="feature__body">The app is built to run on Windows too. We'll release it after the Mac version settles.</p>
-                </div>
-                <span className="sm-pill">
-                  <span className="sm-pill__dot" aria-hidden="true" />
-                  Planned
-                </span>
-              </div>
-              <div className="platform">
-                <SlidersVertical aria-hidden="true" />
-                <div>
-                  <h3 className="text-heading">More consoles</h3>
-                  <p className="feature__body">We're starting with the Allen &amp; Heath dLive. Other desks will follow.</p>
-                </div>
-                <span className="sm-pill">
-                  <span className="sm-pill__dot" aria-hidden="true" />
-                  Planned
-                </span>
-              </div>
-            </div>
+            <ul className="group platforms" aria-label="Platforms and consoles">
+              {PLATFORMS.map((p) => (
+                <li key={p.title} className="row">
+                  <span className="row-icon">{p.icon}</span>
+                  <span className="row-text">
+                    <span>{p.title}</span>
+                    <span className="text-caption">{p.body}</span>
+                  </span>
+                  <span className={`sm-pill${p.available ? " sm-pill--ok" : ""}`}>
+                    <span className="sm-pill__dot" aria-hidden="true" />
+                    {p.available ? "Available" : "Planned"}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 
@@ -164,7 +146,7 @@ export function Home() {
             <div className="cta__actions">
               <a className="sm-btn sm-btn--ghost sm-btn--lg" href={`${ROOT}account/`}>
                 <LogIn aria-hidden="true" />
-                Log in
+                Sign in
               </a>
               <a className="sm-btn sm-btn--primary sm-btn--lg" href="#pricing">
                 Choose a plan

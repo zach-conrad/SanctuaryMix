@@ -1,12 +1,11 @@
-// The browser demo's copy of the sample account in crates/auth/src/sample.rs:
-// test@example.com / 1234 signs in as an admin on Campus, so everything is on.
-// Not secrets; the core's provider is the one the app uses.
+// Sign-in for the browser demo (npm run dev), which has no core, no website
+// round trip and no network. Signing in opens a demo church on a Pro trial, so
+// every screen can be seen; there is no account behind it. The desktop app
+// signs in through the website (crates/auth/src/supabase.rs).
 
 import { accessFor, NO_ACCESS } from "./plans";
 import type { Session } from "./types";
 
-const SAMPLE_EMAIL = "test@example.com";
-const SAMPLE_PASSWORD = "1234";
 const KEY = "sanctuarymix.demoSignedIn";
 
 const LOCAL: Session = {
@@ -17,12 +16,12 @@ const LOCAL: Session = {
   access: NO_ACCESS,
 };
 
-const SAMPLE: Session = {
-  user: { id: "sample-user", displayName: "Test User", email: SAMPLE_EMAIL },
-  activeOrg: { id: "sample-church", name: "Sample Church" },
+const DEMO: Session = {
+  user: { id: "demo-user", displayName: "Demo engineer", email: "demo@example.org" },
+  activeOrg: { id: "demo-church", name: "Demo church" },
   role: "admin",
   authenticated: true,
-  access: accessFor("campus", "active"),
+  access: accessFor("pro", "trialing"),
 };
 
 function load(): boolean {
@@ -44,13 +43,10 @@ function save(on: boolean) {
 
 export function createDemoAuth() {
   let signedIn = load();
-  const session = () => (signedIn ? SAMPLE : LOCAL);
+  const session = () => (signedIn ? DEMO : LOCAL);
   return {
     session,
-    async signIn(email: string, password: string): Promise<Session> {
-      if (email.trim().toLowerCase() !== SAMPLE_EMAIL || password !== SAMPLE_PASSWORD) {
-        throw "That email and password don't match. Check them and try again.";
-      }
+    signIn(): Session {
       signedIn = true;
       save(true);
       return session();

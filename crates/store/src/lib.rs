@@ -25,8 +25,6 @@ pub type Result<T> = std::result::Result<T, StoreError>;
 pub mod keys {
     /// The operator's auto-mix choices ([`automix::AutoMixConfig`]).
     pub const AUTOMIX_CONFIG: &str = "automix.config";
-    /// Whether the sample account was signed in when the app last closed.
-    pub const SIGNED_IN: &str = "auth.signedIn";
 }
 
 /// Schema migrations, applied in order. Never edit one that has shipped; add a new one.

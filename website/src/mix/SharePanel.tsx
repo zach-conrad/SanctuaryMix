@@ -66,20 +66,16 @@ export function SharePanel({ cloud, recordingId, root }: Props) {
   const ended = links.filter((l) => !isLive(l)).slice(0, 3);
 
   return (
-    <section className="panel share" aria-labelledby="share-heading">
-      <div className="panel__head">
-        <Link2 aria-hidden="true" />
+    <section className="share" aria-labelledby="share-heading">
+      <div className="share__head">
         <h2 id="share-heading" className="text-heading">Share this mix</h2>
+        <p className="text-caption mix-muted">Anyone with the link can listen in a browser. They can't change anything.</p>
       </div>
-      <p className="feature__body">
-        Anyone with the link can listen in a browser without an account. They can't change anything or send it to a
-        console.
-      </p>
 
       {allowed ? (
-        <div className="share__form">
-          <div className="share__field">
-            <span className="text-label share__label" id="expiry-label">Link works for</span>
+        <div className="group">
+          <div className="row">
+            <span className="row-text" id="expiry-label">Link works for</span>
             <div className="sm-seg" role="group" aria-labelledby="expiry-label">
               {EXPIRY.map((o) => (
                 <button key={o.label} type="button" aria-pressed={days === o.days} onClick={() => setDays(o.days)}>
@@ -88,61 +84,74 @@ export function SharePanel({ cloud, recordingId, root }: Props) {
               ))}
             </div>
           </div>
-          <label className="share__check">
-            <input type="checkbox" checked={showMoves} onChange={(e) => setShowMoves(e.currentTarget.checked)} />
-            Show fader and mute moves
+          <label className="row">
+            <span className="row-text">Show fader and mute moves</span>
+            <input
+              type="checkbox"
+              className="row-checkbox"
+              checked={showMoves}
+              onChange={(e) => setShowMoves(e.currentTarget.checked)}
+            />
           </label>
-          <button className="sm-btn sm-btn--primary" onClick={create} disabled={busy}>
-            <Link2 aria-hidden="true" />
-            Create link
-          </button>
+          <div className="row row--actions">
+            <button className="sm-btn sm-btn--primary" onClick={create} disabled={busy}>
+              <Link2 aria-hidden="true" />
+              Create link
+            </button>
+          </div>
         </div>
       ) : (
-        <p className="text-caption mix-muted">Ask an Engineer or Admin at your church to make a share link.</p>
+        <p className="section-foot">Ask an Engineer or Admin at your church to make a share link.</p>
       )}
 
-      {live.length > 0 ? (
-        <ul className="share__links" aria-label="Active links">
-          {live.map((l) => (
-            <li key={l.id} className="share__link">
-              <input
-                className="sm-input share__url text-readout"
-                readOnly
-                value={shareUrl(root, l.token)}
-                aria-label="Share link"
-                onFocus={(e) => e.currentTarget.select()}
-              />
-              <div className="share__actions">
+      {live.length + ended.length > 0 ? (
+        <div className="grouped">
+          <div className="section-head">
+            <h3>Links</h3>
+          </div>
+          <ul className="group">
+            {live.map((l) => (
+              <li key={l.id} className="row share__link">
+                <span className="row-text">
+                  <input
+                    className="share__url text-readout"
+                    readOnly
+                    value={shareUrl(root, l.token)}
+                    aria-label="Share link"
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                  <span className="text-caption">{linkStatus(l)}</span>
+                </span>
                 <button className="sm-btn" onClick={() => copy(l)}>
                   {copied === l.id ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
                   {copied === l.id ? "Copied" : "Copy"}
                 </button>
                 {allowed ? (
-                  <button className="sm-btn sm-btn--danger" onClick={() => revoke(l)}>
+                  <button
+                    className="sm-btn sm-btn--danger share__off"
+                    onClick={() => revoke(l)}
+                    aria-label="Turn off link"
+                    title="Turn off link"
+                  >
                     <Link2Off aria-hidden="true" />
-                    Turn off
                   </button>
                 ) : null}
-              </div>
-              <span className="text-caption mix-muted">{linkStatus(l)}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {ended.length > 0 ? (
-        <ul className="share__ended text-caption" aria-label="Links that no longer work">
-          {ended.map((l) => (
-            <li key={l.id}>
-              <span className="text-readout">…{l.token.slice(-6)}</span> {linkStatus(l)}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      <p className="text-caption mix-subtle" role="note">
-        Preview: links are saved in this browser until accounts are connected.
-      </p>
+              </li>
+            ))}
+            {ended.map((l) => (
+              <li key={l.id} className="row share__link share__link--ended">
+                <span className="row-text">
+                  <span className="text-readout">…{l.token.slice(-6)}</span>
+                  <span className="text-caption">{linkStatus(l)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="section-foot">Preview: links are saved in this browser until accounts are connected.</p>
+        </div>
+      ) : (
+        <p className="section-foot">Preview: links are saved in this browser until accounts are connected.</p>
+      )}
     </section>
   );
 }

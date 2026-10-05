@@ -6,7 +6,10 @@
 //! [`automix::AutoMixStatus`] a few times a second) and `automix-adjustment`
 //! (an [`automix::Adjustment`] for every auto-mix move or takeover),
 //! `recording` (recorder status about once a second), `playback` (the
-//! transport about 10x a second) and `replay` (sending recorded moves).
+//! transport about 10x a second), `replay` (sending recorded moves), and
+//! `session` (an [`auth::Session`] whenever sign-in changes outside a command:
+//! website sign-in finishing, or the plan check between services) or
+//! `session-error` (a sentence, when website sign-in fails).
 
 mod commands;
 mod control;
@@ -15,11 +18,25 @@ mod recording;
 mod spl;
 mod state;
 
+use std::time::Duration;
+
 use state::AppState;
-use tauri::Manager;
+use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_deep_link::DeepLinkExt;
+
+/// How often a running app re-checks the account and plan, between services.
+const PLAN_CHECK_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
+/// While a service is on, how soon to look again.
+const PLAN_CHECK_RETRY: Duration = Duration::from_secs(10 * 60);
 
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // Must come first: a second launch from a sign-in link hands the link to
+    // this copy, which the deep-link plugin then delivers.
+    #[cfg(any(windows, target_os = "linux"))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}));
+    builder
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
@@ -28,6 +45,25 @@ pub fn run() {
         .setup(|app| {
             let state = AppState::new(app.handle());
             app.manage(state);
+
+            let handle = app.handle().clone();
+            app.deep_link().on_open_url(move |event| {
+                for url in event.urls() {
+                    if url.scheme() == "sanctuarymix" {
+                        tauri::async_runtime::spawn(finish_sign_in(
+                            handle.clone(),
+                            url.to_string(),
+                        ));
+                    }
+                }
+            });
+            // Windows and Linux need the scheme registered at run time in dev builds.
+            #[cfg(any(windows, target_os = "linux"))]
+            if let Err(e) = app.deep_link().register_all() {
+                log::warn!("couldn't register sanctuarymix:// links: {e}");
+            }
+
+            tauri::async_runtime::spawn(check_plan(app.handle().clone()));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -85,7 +121,6 @@ pub fn run() {
             spl::spl_reading,
             spl::spl_history,
             commands::get_session,
-            commands::sign_in_with_password,
             commands::open_billing,
             commands::begin_sign_in,
             commands::complete_sign_in,
@@ -93,4 +128,41 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running SanctuaryMix");
+}
+
+/// Finishes sign-in from the website's sanctuarymix:// link.
+async fn finish_sign_in(app: AppHandle, url: String) {
+    let result = app.state::<AppState>().auth.complete_sign_in(url).await;
+    match result {
+        Ok(session) => {
+            let _ = app.emit("session", session);
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_focus();
+            }
+        }
+        Err(e) => {
+            let _ = app.emit("session-error", e.to_string());
+        }
+    }
+}
+
+/// Re-checks the account and plan at launch and every few hours, but only
+/// between services: a plan change never lands mid-service. Offline, the last
+/// confirmed plan holds (see `auth::OFFLINE_GRACE_DAYS`).
+async fn check_plan(app: AppHandle) {
+    loop {
+        if commands::in_service(&app).await {
+            tokio::time::sleep(PLAN_CHECK_RETRY).await;
+            continue;
+        }
+        let state = app.state::<AppState>();
+        let before = state.auth.current_session().await;
+        if before.authenticated {
+            let after = state.auth.refresh().await;
+            if after != before {
+                let _ = app.emit("session", after);
+            }
+        }
+        tokio::time::sleep(PLAN_CHECK_EVERY).await;
+    }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accessFor, entitlementsFor, LAPSED, lockReason } from "./plans";
+import { accessFor, can, entitlementsFor, LAPSED, lockReason, NO_ACCESS } from "./plans";
 import type { Session } from "./types";
 
 const session = (access: Session["access"]): Session => ({
@@ -27,5 +27,19 @@ describe("plans", () => {
     expect(lockReason(session(accessFor("essentials", "active")), "autoMix")).toBeNull();
     expect(lockReason(session(accessFor("pro", "canceled")), "autoMix")).toBe("Plan paused");
     expect(lockReason(null, "autoMix")).toBe("Sign in to use");
+  });
+});
+
+describe("can", () => {
+  const as = (role: "admin" | "engineer" | "volunteer") =>
+    ({ user: { id: "u", displayName: "U", email: null }, activeOrg: null, role, authenticated: true, access: NO_ACCESS }) as const;
+
+  it("matches the core's role rules", () => {
+    expect(can(as("admin"), "chooseAdminFeel")).toBe(true);
+    expect(can(as("engineer"), "chooseAdminFeel")).toBe(false);
+    expect(can(as("engineer"), "changeAutoMixSetup")).toBe(true);
+    for (const p of ["changeAutoMixSetup", "chooseAdminFeel", "deleteRecordings", "replayToConsole"] as const) {
+      expect(can(as("volunteer"), p)).toBe(false);
+    }
   });
 });

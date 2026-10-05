@@ -87,6 +87,9 @@ export interface Access {
   entitlements: Entitlements;
 }
 
+/** Things only some roles may do (crates/auth `Permission`). */
+export type Permission = "changeAutoMixSetup" | "chooseAdminFeel" | "deleteRecordings" | "replayToConsole";
+
 export interface Session {
   user: { id: string; displayName: string; email: string | null };
   activeOrg: { id: string; name: string } | null;

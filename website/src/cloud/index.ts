@@ -1,12 +1,19 @@
+import { AccountCloud } from "./account";
 import { DemoCloud } from "./demo";
-import type { RecordingsCloud } from "./types";
+import type { CloudSession, RecordingsCloud } from "./types";
 
 export * from "./types";
 
+/** The signed-in church's cloud, for the account and service pages. */
+export function connectCloud(session: CloudSession): RecordingsCloud {
+  return new AccountCloud(session);
+}
+
 /**
- * The cloud the pages use. `root` is the relative path from the page to the
- * site root. Swap DemoCloud for the Supabase client here when accounts land.
+ * The public share page. Until recordings sync from the app, links play the
+ * bundled sample service. `root` is the relative path from the page to the
+ * site root.
  */
-export function connectCloud(root: string): RecordingsCloud {
+export function connectShareCloud(root: string): RecordingsCloud {
   return new DemoCloud(root);
 }

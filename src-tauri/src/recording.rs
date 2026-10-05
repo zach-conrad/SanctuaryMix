@@ -485,9 +485,11 @@ pub async fn delete_recording(state: State<'_, AppState>, id: String) -> CmdResu
     {
         return Err("This service is still recording. Stop it before deleting.".into());
     }
-    if state.auth.current_session().await.role == auth::Role::Volunteer {
-        return Err("Ask an engineer or admin to delete recordings.".into());
-    }
+    state
+        .auth
+        .current_session()
+        .await
+        .require(auth::Permission::DeleteRecordings)?;
     let store = recs.store.clone();
     tauri::async_runtime::spawn_blocking(move || store.delete_recording(&id).map_err(err))
         .await
@@ -508,9 +510,11 @@ pub async fn disk_usage(state: State<'_, AppState>) -> CmdResult<DiskUsage> {
 
 #[tauri::command]
 pub async fn delete_old_multitracks(state: State<'_, AppState>, days: u32) -> CmdResult<u64> {
-    if state.auth.current_session().await.role == auth::Role::Volunteer {
-        return Err("Ask an engineer or admin to delete recordings.".into());
-    }
+    state
+        .auth
+        .current_session()
+        .await
+        .require(auth::Permission::DeleteRecordings)?;
     let store = recordings(&state)?.store.clone();
     tauri::async_runtime::spawn_blocking(move || {
         store

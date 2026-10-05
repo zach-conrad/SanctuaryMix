@@ -1,85 +1,70 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { useResolvedTheme } from "../components/TopBar";
 import { useMixer } from "../store/mixer";
 
 /**
  * Shown at launch until someone signs in or chooses to mix without an account.
- * Never a lock: the console always works without signing in.
+ * Never a lock: the console always works without signing in. Signing in (and
+ * creating an account, or resetting a password) happens on the website in the
+ * browser, which hands the sign-in back to the app.
  */
 export function SignInView() {
   const theme = useMixer((s) => s.theme);
   const signIn = useMixer((s) => s.signIn);
+  const returnedError = useMixer((s) => s.signInError);
   const workLocally = useMixer((s) => s.workLocally);
   const resolved = useResolvedTheme(theme);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [waiting, setWaiting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const shown = error ?? returnedError;
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
+  const start = async () => {
     setError(null);
     try {
-      await signIn(email, password);
+      await signIn();
+      setWaiting(true);
     } catch (e) {
       setError(String(e));
-      setBusy(false);
     }
   };
 
+  if (waiting && !shown) {
+    return (
+      <div className="signin" data-tauri-drag-region>
+        <div className="signin-card">
+          <img className="signin-wordmark" src={`/brand/wordmark-${resolved}.svg`} alt="SanctuaryMix" />
+          <h1 className="text-title">Finish in your browser</h1>
+          <p className="signin-lede">Sign in on the SanctuaryMix website. The app opens again when you're done.</p>
+          <button className="sm-btn sm-btn--lg" type="button" onClick={() => void start()}>
+            Open the website again
+          </button>
+          <button className="sm-btn sm-btn--ghost sm-btn--lg" type="button" onClick={() => setWaiting(false)}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="signin" data-tauri-drag-region>
-      <form className="signin-card" onSubmit={(e) => void submit(e)} noValidate>
+      <div className="signin-card">
         <img className="signin-wordmark" src={`/brand/wordmark-${resolved}.svg`} alt="SanctuaryMix" />
         <h1 className="text-title">Sign in</h1>
-        <div className="sm-field" data-invalid={error ? "true" : undefined}>
-          <label className="sm-field__label" htmlFor="signin-email">
-            Email
-          </label>
-          <input
-            id="signin-email"
-            className="sm-input"
-            type="email"
-            autoComplete="username"
-            autoFocus
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
-        <div className="sm-field" data-invalid={error ? "true" : undefined}>
-          <label className="sm-field__label" htmlFor="signin-password">
-            Password
-          </label>
-          <input
-            id="signin-password"
-            className="sm-input"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            aria-describedby={error ? "signin-error" : undefined}
-          />
-          {error && (
-            <span className="sm-field__help" id="signin-error" role="alert">
-              {error}
-            </span>
-          )}
-        </div>
-        <button className="sm-btn sm-btn--primary sm-btn--lg" type="submit" disabled={busy || !email || !password}>
-          {busy ? "Signing in" : "Sign in"}
+        <p className="signin-lede">Use your SanctuaryMix account on the website. New here? You can create one there.</p>
+        <button className="sm-btn sm-btn--primary sm-btn--lg" type="button" onClick={() => void start()}>
+          Sign in with your browser
         </button>
-        <div className="signin-or text-caption" aria-hidden>
-          or
-        </div>
-        <button className="sm-btn sm-btn--lg" type="button" disabled title="Coming soon">
-          Continue with Google
-        </button>
+        {shown && (
+          <p className="signin-error text-caption" role="alert">
+            {shown}
+          </p>
+        )}
         <button className="sm-btn sm-btn--ghost sm-btn--lg" type="button" onClick={workLocally}>
           Mix without signing in
         </button>
         <p className="signin-foot text-caption">The console works without an account.</p>
-      </form>
+      </div>
     </div>
   );
 }

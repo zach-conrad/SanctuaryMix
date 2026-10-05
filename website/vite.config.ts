@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// Static pages: the landing page, the sample account page, a recorded service
+// Static pages: the landing page, the account page (sign-in), a recorded service
 // in that account, and the public page a share link opens.
 // Relative base so the build works at a domain root or under a sub-path
 // (for example GitHub Pages at /SanctuaryMix/).

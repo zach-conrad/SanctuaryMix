@@ -3,7 +3,7 @@
 // the church's limits on the session. This copy only feeds the browser demo,
 // so keep the two in step (plans.test.ts checks the numbers).
 
-import type { Access, Entitlements, Feature, Plan, Session, SubscriptionStatus } from "./types";
+import type { Access, Entitlements, Feature, Permission, Plan, Session, SubscriptionStatus } from "./types";
 
 export const PLAN_NAME: Record<Plan, string> = {
   essentials: "Essentials",
@@ -92,7 +92,15 @@ export function lockReason(session: Session | null, feature: Feature): string | 
   if (allows(session, feature)) return null;
   const access = session?.access ?? NO_ACCESS;
   if (!access.plan) return "Sign in to use";
+  if (!access.status) return "Connect to check plan";
   if (access.status && !grantsPlan(access.status)) return "Plan paused";
   const min = FEATURES.find((f) => f.feature === feature)!.minPlan;
   return `Available on ${PLAN_NAME[min]}`;
+}
+
+/** What a role may do; mirrors `Role::can` in crates/auth (the core checks it too). */
+export function can(session: Session | null, permission: Permission): boolean {
+  const role = session?.role ?? "admin";
+  if (permission === "chooseAdminFeel") return role === "admin";
+  return role === "admin" || role === "engineer";
 }

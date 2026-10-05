@@ -3,7 +3,7 @@ import { createDemoAuth } from "./demoAuth";
 import { createDemoAutomix, guessRole } from "./demoAutomix";
 import { createDemoRecorder } from "./demoRecorder";
 import { createDemoSpl } from "./demoSpl";
-import type { Adjustment, AutoMixStatus, ChannelRole, ConsoleEvent, MeterFrame, Sound } from "./types";
+import type { Adjustment, AutoMixStatus, ChannelRole, ConsoleEvent, MeterFrame, Session, Sound } from "./types";
 
 const NAMES = [
   "Pastor", "Worship Ld", "BGV 1", "BGV 2", "Kick", "Snare", "Hat", "Tom 1", "Tom 2",
@@ -45,6 +45,7 @@ export function createDemoBackend(): Backend {
   const mutes = new Map<number, boolean>();
   let connected = false;
   const auth = createDemoAuth();
+  const sessionListeners = new Set<(session: Session) => void>();
   const moveFader = (index: number, db: number | null) => {
     faders.set(index, db);
     emit({ type: "fader", id: { kind: "input", index }, db });
@@ -158,8 +159,17 @@ export function createDemoBackend(): Backend {
     async getSession() {
       return auth.session();
     },
-    async signInWithPassword(email, password) {
-      return auth.signIn(email, password);
+    async beginSignIn() {
+      // No website round trip in the browser demo: open the demo church straight away.
+      const session = auth.signIn();
+      sessionListeners.forEach((cb) => cb(session));
+    },
+    async onSession(cb) {
+      sessionListeners.add(cb);
+      return () => sessionListeners.delete(cb);
+    },
+    async onSessionError() {
+      return () => {};
     },
     async signOut() {
       if (automix.status().engaged) throw "Turn off auto-mix before you sign out.";

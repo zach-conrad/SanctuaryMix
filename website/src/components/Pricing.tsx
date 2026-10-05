@@ -1,4 +1,4 @@
-import { ArrowRight, Check, Gift, Info } from "lucide-react";
+import { ArrowRight, Check, Gift } from "lucide-react";
 import { useState } from "react";
 import {
   FOUNDING_OFFER,
@@ -53,21 +53,21 @@ export function Pricing({ root }: Props) {
           </div>
         </div>
 
-        {PRICES_ARE_PLACEHOLDERS ? (
-          <p className="preview-note text-caption pricing__note" role="note">
-            <Info aria-hidden="true" />
-            Sample prices. Final pricing will be posted before launch.
-          </p>
-        ) : null}
-
         {FOUNDING_OFFER ? (
-          <p className="founding text-caption">
-            <Gift aria-hidden="true" />
-            <span>
-              <strong>Founding church offer.</strong> The first {FOUNDING_OFFER.spots} churches to subscribe get{" "}
-              {FOUNDING_OFFER.percentOff}% off any plan for as long as they stay subscribed.
-            </span>
-          </p>
+          <div className="group founding">
+            <p className="row">
+              <span className="row-icon row-icon--accent">
+                <Gift aria-hidden="true" />
+              </span>
+              <span className="row-text">
+                <span>Founding church offer</span>
+                <span className="text-caption">
+                  The first {FOUNDING_OFFER.spots} churches get {FOUNDING_OFFER.percentOff}% off for as long as they stay
+                  subscribed.
+                </span>
+              </span>
+            </p>
+          </div>
         ) : null}
 
         <ul className="plans">
@@ -109,7 +109,10 @@ export function Pricing({ root }: Props) {
             );
           })}
         </ul>
-        <p className="pricing__foot text-caption">{PRICING_FOOTNOTE}</p>
+        <p className="pricing__foot text-caption">
+          {PRICES_ARE_PLACEHOLDERS ? "Sample prices; final pricing comes before launch. " : ""}
+          {PRICING_FOOTNOTE}
+        </p>
       </div>
     </section>
   );
