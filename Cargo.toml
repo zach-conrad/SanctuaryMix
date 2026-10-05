@@ -20,7 +20,7 @@ listen = { path = "crates/listen" }
 
 anyhow = "1"
 async-trait = "0.1"
-cpal = "0.15"
+cpal = "0.18"
 fs4 = "1"
 hound = "3.5"
 log = "0.4"
