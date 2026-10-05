@@ -60,26 +60,28 @@ export function TopBar() {
         />
         <StatusPill tone={tone(audioStatus)} subject="Dante" meta={danteMeta} onClick={() => setView("setup")} />
         {unconfirmed && <StatusPill tone="warn" subject="Console" meta="Hasn't confirmed a change" />}
-        {isDemo && <StatusPill tone="warn" subject="Demo" meta="Simulated audio and console" />}
+        {isDemo && <StatusPill tone="warn" subject="Demo" meta="Simulated" />}
+        <AssistMode />
       </div>
       <div className="topbar-spacer" data-tauri-drag-region />
-      <RecordControl />
-      <AssistMode />
+      <div className="topbar-actions">
+        <FreezeButton />
+        <RecordControl />
+      </div>
     </header>
   );
 }
 
-/** Assist mode at the right of the top bar. While auto-mix runs, Freeze is always one tap away. */
+/** The Assist or auto-mix badge, at the end of the status pills. */
 function AssistMode() {
   const engaged = useAutoMix((s) => s.status?.engaged ?? false);
   const frozen = useAutoMix((s) => s.status?.frozen ?? false);
-  const { freeze, resume } = useAutoMix();
   const setView = useMixer((s) => s.setView);
   if (!engaged) {
     return (
       <button
         className="sm-assist-badge pill-button"
-        title="Assist suggests changes. Auto-mix is off; turn it on in Assist."
+        title="Auto-mix is off. Turn it on in Assist."
         onClick={() => setView("assist")}
       >
         Assist · Suggest
@@ -87,21 +89,27 @@ function AssistMode() {
     );
   }
   return (
-    <div className="assist-mode">
-      <button className="sm-assist-badge pill-button" onClick={() => setView("assist")}>
-        {frozen ? "Auto-mix · Frozen" : "Auto-mix · On"}
-      </button>
-      {frozen ? (
-        <button className="sm-btn topbar-freeze" onClick={() => void resume()}>
-          <Play />
-          Resume
-        </button>
-      ) : (
-        <button className="sm-btn topbar-freeze" onClick={() => void freeze()} title="Stops every auto-mix move now (Esc)">
-          <Hand />
-          Freeze
-        </button>
-      )}
-    </div>
+    <button className="sm-assist-badge pill-button" onClick={() => setView("assist")}>
+      {frozen ? "Auto-mix · Frozen" : "Auto-mix · On"}
+    </button>
+  );
+}
+
+/** While auto-mix runs, Freeze (or Resume) sits right beside Record service, always one tap away. */
+function FreezeButton() {
+  const engaged = useAutoMix((s) => s.status?.engaged ?? false);
+  const frozen = useAutoMix((s) => s.status?.frozen ?? false);
+  const { freeze, resume } = useAutoMix();
+  if (!engaged) return null;
+  return frozen ? (
+    <button className="sm-btn topbar-freeze" onClick={() => void resume()}>
+      <Play />
+      Resume
+    </button>
+  ) : (
+    <button className="sm-btn topbar-freeze" onClick={() => void freeze()} title="Stop every auto-mix move (Esc)">
+      <Hand />
+      Freeze
+    </button>
   );
 }

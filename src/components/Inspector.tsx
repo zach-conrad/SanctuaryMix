@@ -1,5 +1,5 @@
 import { formatDb } from "../lib/levels";
-import { MODE_DETAIL, ROLE_LABEL, useAutoMix, useChannelAuto } from "../store/automix";
+import { ROLE_LABEL, useAutoMix, useChannelAuto } from "../store/automix";
 import { useMixer } from "../store/mixer";
 import { ChannelActions, FaderChange, ModeWord } from "./AutoMix";
 import { InsightList, useInsights } from "./InsightList";
@@ -39,7 +39,6 @@ export function Inspector() {
           <span className="text-readout">
             <FaderChange status={auto} />
           </span>
-          <p className="text-caption muted">{MODE_DETAIL[auto.mode]}</p>
           <ChannelActions status={auto} undo={undo} resume={resume} />
         </section>
       )}

@@ -1,8 +1,8 @@
-import { Ear, Hand, Play, PowerOff, RotateCcw, Undo2 } from "lucide-react";
+import { ChevronRight, Ear, Hand, Play, PowerOff, RotateCcw, Undo2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getBackend } from "../lib/backend";
 import { formatDb } from "../lib/levels";
-import type { Adjustment, ChannelRole, ChannelStatus, HeardChannel, Nudges } from "../lib/types";
+import type { Adjustment, ChannelRole, ChannelStatus, HeardChannel, Nudges, RoomFeel } from "../lib/types";
 import { MODE_DETAIL, MODE_LABEL, ROLE_LABEL, SOUND_LABEL, useAutoMix } from "../store/automix";
 import { useMixer } from "../store/mixer";
 
@@ -12,7 +12,11 @@ const VOCAL_ROLES: ChannelRole[] = ["speech", "leadVocal", "backingVocal", "choi
 const signed = (db: number) => `${formatDb(db)} dB`;
 
 function time(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
+  return new Date(ms).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 /** Start, stop, freeze and undo-all, with the reason when it can't start. */
@@ -28,31 +32,37 @@ export function AutoMixControls() {
   const frozen = status?.frozen ?? false;
   const count = config?.channels.length ?? 0;
   const blocker = !consoleOn
-    ? "Connect to the console in Setup first."
+    ? "Connect the console in Setup."
     : !audioOn
-      ? "Start Dante audio in Setup first."
+      ? "Start Dante audio in Setup."
       : count === 0
-        ? "Pick at least one channel below."
+        ? "Pick channels below."
         : null;
 
   const state = !engaged
-    ? "Off. Nothing moves until you start it."
+    ? "Off"
     : frozen
-      ? "Frozen. Nothing moves until you resume."
-      : `Riding ${count} ${count === 1 ? "channel" : "channels"}. Move any of them yourself and it lets go of that one. Press Esc to freeze everything.`;
+      ? "Frozen"
+      : `Riding ${count} ${count === 1 ? "channel" : "channels"} · Esc to freeze`;
 
   return (
-    <section className="panel" aria-labelledby="automix-title">
-      <div className="panel-head">
-        <h2 id="automix-title" className="text-heading">
-          Auto-mix
-        </h2>
-        {engaged && <span className="sm-assist-badge">{frozen ? "Frozen" : "Auto"}</span>}
+    <section className="panel automix-panel" aria-labelledby="automix-title">
+      <div className="automix-text">
+        <div className="panel-head">
+          <h2 id="automix-title" className="text-heading">
+            Auto-mix
+          </h2>
+          {engaged && <span className="sm-assist-badge">{frozen ? "Frozen" : "Auto"}</span>}
+        </div>
+        <span
+          className="muted automix-state"
+          role="status"
+          title="Rides only the channels you pick, in small steps. Never mutes. Move a fader to take it back."
+        >
+          {!engaged && blocker ? blocker : state}
+        </span>
+        {error && <p className="error">{error}</p>}
       </div>
-      <p className="muted">
-        Keeps the channels you pick at a steady, balanced level every week. It only moves those faders, in small
-        steps, and never mutes or unmutes anything.
-      </p>
       <div className="automix-actions">
         {!engaged ? (
           <button className="sm-btn sm-btn--primary sm-btn--lg" disabled={!!blocker} onClick={() => void engage(true)}>
@@ -82,63 +92,65 @@ export function AutoMixControls() {
             </button>
           </>
         )}
-        <span className="muted automix-state" role="status">
-          {!engaged && blocker ? blocker : state}
-        </span>
       </div>
-      {error && <p className="error">{error}</p>}
     </section>
   );
 }
 
-/** The six room feels from the research, as cards. */
+/** The six room feels from the research, as a dropdown with the chosen one explained below it. */
 export function RoomFeelPicker() {
   const presets = useAutoMix((s) => s.presets);
   const feel = useAutoMix((s) => s.config?.feel);
   const setFeel = useAutoMix((s) => s.setFeel);
   const isAdmin = useMixer((s) => s.session?.role === "admin");
+  const chosen = presets.find((p) => p.feel === feel);
 
   return (
-    <section className="panel" aria-labelledby="feel-title">
-      <h2 id="feel-title" className="text-heading">
-        How should the room feel?
-      </h2>
-      <div className="feel-grid" role="radiogroup" aria-labelledby="feel-title">
-        {presets.map((p) => {
-          const locked = p.adminOnly && !isAdmin;
-          return (
-            <button
-              key={p.feel}
-              role="radio"
-              aria-checked={feel === p.feel}
-              className="feel-card"
-              disabled={locked}
-              onClick={() => void setFeel(p.feel)}
-            >
-              <span className="text-body-strong">{p.name}</span>
-              <span className="text-caption muted">{p.description}</span>
-              <span className="text-caption muted">
-                Room level {p.roomLevel}
-                {p.adminOnly ? " · Admins only" : ""}
-              </span>
-              {p.warning && feel === p.feel && <span className="text-caption feel-warning">{p.warning}</span>}
-            </button>
-          );
-        })}
+    <section className="section" aria-labelledby="feel-title">
+      <div className="section-head">
+        <h2 id="feel-title">Room feel</h2>
       </div>
-      <NudgeSliders />
-      <p className="text-caption muted">
-        Room levels are a guide. Without a measurement mic, auto-mix keeps the balance between channels and leaves
-        the main fader to you.
-      </p>
+      <div className="group">
+        <label className="row">
+          <span className="row-text">Feel</span>
+          <select
+            className="sm-input"
+            value={feel ?? ""}
+            disabled={presets.length === 0}
+            onChange={(e) => void setFeel(e.target.value as RoomFeel)}
+          >
+            {presets.map((p) => (
+              <option key={p.feel} value={p.feel} disabled={p.adminOnly && !isAdmin}>
+                {p.name}
+                {p.adminOnly ? " (admins only)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <NudgeSliders />
+      </div>
+      {chosen && (
+        <p className="section-foot" title={`Room level ${chosen.roomLevel}`}>
+          {chosen.description}
+        </p>
+      )}
+      {chosen?.warning && <p className="section-foot feel-warning">{chosen.warning}</p>}
     </section>
   );
 }
 
 const NUDGES: { key: keyof Nudges; label: string; help: string }[] = [
-  { key: "loudnessDb", label: "Loudness", help: "Moves the whole mix up or down." },
+  {
+    key: "loudnessDb",
+    label: "Loudness",
+    help: "Moves the whole mix up or down.",
+  },
   { key: "lowEndDb", label: "Low end", help: "More or less kick and bass." },
-  { key: "vocalPresenceDb", label: "Vocal presence", help: "Lifts the voices over the band." },
+  {
+    key: "vocalPresenceDb",
+    label: "Vocal presence",
+    help: "Lifts the voices over the band.",
+  },
 ];
 
 function NudgeSliders() {
@@ -146,13 +158,10 @@ function NudgeSliders() {
   const setNudge = useAutoMix((s) => s.setNudge);
   if (!nudges) return null;
   return (
-    <div className="nudges">
+    <>
       {NUDGES.map(({ key, label, help }) => (
-        <label key={key} className="nudge">
-          <span className="nudge-head">
-            <span className="text-body-strong">{label}</span>
-            <span className="text-readout">{signed(nudges[key])}</span>
-          </span>
+        <label key={key} className="row nudge" title={help}>
+          <span className="nudge-label">{label}</span>
           <input
             type="range"
             min={-3}
@@ -162,10 +171,10 @@ function NudgeSliders() {
             aria-valuetext={signed(nudges[key])}
             onChange={(e) => void setNudge(key, Number(e.target.value))}
           />
-          <span className="text-caption muted">{help}</span>
+          <span className="text-readout nudge-value">{signed(nudges[key])}</span>
         </label>
       ))}
-    </div>
+    </>
   );
 }
 
@@ -181,6 +190,8 @@ export function ChannelPicker() {
   const roleOf = new Map(managed.map((c) => [c.channel, c.role]));
   const statusOf = new Map(statuses.map((c) => [c.channel, c]));
   const heardOf = new Map(scanResults.map((h) => [h.channel, h]));
+  // The live columns stay hidden until auto-mix or a listen has something to put in them.
+  const live = statuses.length > 0 || scanResults.length > 0;
 
   async function pickVoices() {
     const roles = await (await getBackend()).automixGuessRoles(strips.map((s) => s.name));
@@ -189,101 +200,116 @@ export function ChannelPicker() {
   }
 
   return (
-    <section className="panel" aria-labelledby="channels-title">
-      <div className="panel-head">
-        <h2 id="channels-title" className="text-heading">
-          Channels auto-mix may ride
-        </h2>
-        <button className="sm-btn" onClick={() => void pickVoices()}>
-          Select vocals and speech
-        </button>
-        <ListenForRolesButton />
-        <button
-          className="sm-btn sm-btn--ghost"
-          disabled={managed.length === 0}
-          onClick={() => void setManaged(managed.map((c) => c.channel), false)}
-        >
-          Clear
-        </button>
-      </div>
-      <p className="muted">
-        Start with vocals and speech. Leave out room mics and anything you want to ride yourself. Channels you don't
-        pick are never touched.
-      </p>
-      <label className="am-listen">
-        <input type="checkbox" checked={listen} onChange={(e) => void setListen(e.target.checked)} />
-        <span>
-          <span className="text-body-strong">Listen to each mic</span>
-          <span className="text-caption muted">
-            Tells a voice from the band bleeding into a mic, so bleed is never turned up and the band only steps back
-            when someone is really talking. It runs on this computer; nothing is recorded or sent anywhere.
-          </span>
+    <section className="section" aria-labelledby="channels-title">
+      <div className="section-head">
+        <h2 id="channels-title">Channels</h2>
+        <span className="text-caption muted">
+          {managed.length} of {strips.length} picked
         </span>
-      </label>
-      <table className="am-table">
-        <thead>
-          <tr>
-            <th className="text-label">Auto</th>
-            <th className="text-label">Channel</th>
-            <th className="text-label">What it is</th>
-            <th className="text-label">Hears</th>
-            <th className="text-label">Now</th>
-            <th className="text-label">Fader</th>
-            <th>
-              <span className="visually-hidden">Actions</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {strips.map((strip) => {
-            const role = roleOf.get(strip.index);
-            const st = statusOf.get(strip.index);
-            return (
-              <tr key={strip.index} data-managed={role !== undefined}>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={role !== undefined}
-                    aria-label={`Let auto-mix ride ${strip.name}`}
-                    onChange={(e) => void setManaged([strip.index], e.target.checked)}
-                  />
-                </td>
-                <td>
-                  <span className="text-readout muted">Ch {strip.index + 1}</span> {strip.name}
-                </td>
-                <td>
-                  {role !== undefined && (
-                    <select
-                      className="sm-input"
-                      value={role}
-                      aria-label={`What ${strip.name} is`}
-                      onChange={(e) => void setRole(strip.index, e.target.value as ChannelRole)}
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>
-                          {ROLE_LABEL[r]}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </td>
-                <td>
-                  <HeardCell
-                    status={st}
-                    scanned={heardOf.get(strip.index)}
-                    name={strip.name}
-                    role={role}
-                    apply={applySuggestion}
-                  />
-                </td>
-                <td>{st && <ModeWord status={st} />}</td>
-                <td className="text-readout">{st && <FaderChange status={st} />}</td>
-                <td className="am-row-actions">{st && <ChannelActions status={st} undo={undo} resume={resumeChannel} />}</td>
+      </div>
+      <div className="group channels-group">
+        <div className="toolbar">
+          <button className="sm-btn" onClick={() => void pickVoices()}>
+            Select vocals and speech
+          </button>
+          <ListenForRolesButton />
+          <button
+            className="sm-btn sm-btn--ghost"
+            disabled={managed.length === 0}
+            onClick={() =>
+              void setManaged(
+                managed.map((c) => c.channel),
+                false,
+              )
+            }
+          >
+            Clear
+          </button>
+        </div>
+        <label
+          className="am-listen"
+          title="Tells a real voice from band bleed, so bleed is never turned up. Runs on this computer only."
+        >
+          <input type="checkbox" checked={listen} onChange={(e) => void setListen(e.target.checked)} />
+          <span className="text-body-strong">Listen to each mic</span>
+        </label>
+        <div className="am-table-scroll">
+          <table className="am-table">
+            <thead>
+              <tr>
+                <th className="text-label">Auto</th>
+                <th className="text-label">Channel</th>
+                <th className="text-label">What it is</th>
+                {live && (
+                  <>
+                    <th className="text-label">Hears</th>
+                    <th className="text-label">Now</th>
+                    <th className="text-label">Fader</th>
+                    <th>
+                      <span className="visually-hidden">Actions</span>
+                    </th>
+                  </>
+                )}
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              {strips.map((strip) => {
+                const role = roleOf.get(strip.index);
+                const st = statusOf.get(strip.index);
+                return (
+                  <tr key={strip.index} data-managed={role !== undefined}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={role !== undefined}
+                        aria-label={`Let auto-mix ride ${strip.name}`}
+                        onChange={(e) => void setManaged([strip.index], e.target.checked)}
+                      />
+                    </td>
+                    <td>
+                      <span className="text-readout muted">Ch {strip.index + 1}</span> {strip.name}
+                    </td>
+                    <td>
+                      {role !== undefined && (
+                        <select
+                          className="sm-input"
+                          value={role}
+                          aria-label={`What ${strip.name} is`}
+                          onChange={(e) => void setRole(strip.index, e.target.value as ChannelRole)}
+                        >
+                          {ROLES.map((r) => (
+                            <option key={r} value={r}>
+                              {ROLE_LABEL[r]}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+                    {live && (
+                      <>
+                        <td>
+                          <HeardCell
+                            status={st}
+                            scanned={heardOf.get(strip.index)}
+                            name={strip.name}
+                            role={role}
+                            apply={applySuggestion}
+                          />
+                        </td>
+                        <td>{st && <ModeWord status={st} />}</td>
+                        <td className="text-readout">{st && <FaderChange status={st} />}</td>
+                        <td className="am-row-actions">
+                          {st && <ChannelActions status={st} undo={undo} resume={resumeChannel} compact />}
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
   );
 }
@@ -397,10 +423,13 @@ export function ChannelActions({
   status,
   undo,
   resume,
+  compact = false,
 }: {
   status: ChannelStatus;
   undo(channel: number): Promise<void>;
   resume(channel: number): Promise<void>;
+  /** Icon-only Undo, for the channel table where width is tight. */
+  compact?: boolean;
 }) {
   const name = status.name ?? `Ch ${status.channel + 1}`;
   if (status.mode === "heldByOperator" || status.mode === "undone") {
@@ -415,6 +444,18 @@ export function ChannelActions({
   const moved =
     status.faderDb !== null && status.baselineDb !== null && Math.abs(status.faderDb - status.baselineDb) >= 0.25;
   if (!moved || status.mode === "off") return null;
+  if (compact) {
+    return (
+      <button
+        className="sm-btn sm-btn--sm icon-btn-sm"
+        onClick={() => void undo(status.channel)}
+        aria-label={`Undo auto-mix on ${name}`}
+        title="Undo"
+      >
+        <Undo2 />
+      </button>
+    );
+  }
   return (
     <button className="sm-btn sm-btn--sm" onClick={() => void undo(status.channel)}>
       <Undo2 />
@@ -440,12 +481,14 @@ export function ActivityLog({ limit = 40 }: { limit?: number }) {
   const seen = new Set<number>();
 
   return (
-    <section className="panel" aria-labelledby="activity-title">
-      <h2 id="activity-title" className="text-heading">
-        What auto-mix did
-      </h2>
+    <section className="section" aria-labelledby="activity-title">
+      <div className="section-head">
+        <h2 id="activity-title">What auto-mix did</h2>
+      </div>
       {log.length === 0 ? (
-        <p className="empty">Nothing yet. Every move shows up here with the reason, and you can undo it.</p>
+        <div className="group">
+          <div className="row empty">No moves yet.</div>
+        </div>
       ) : (
         <ol className="activity">
           {log.slice(0, limit).map((a, i) => {
@@ -496,11 +539,12 @@ export function RulesList() {
   if (!g) return null;
   const n = (v: number) => formatDb(v).replace("+", "");
   return (
-    <section className="panel" aria-labelledby="rules-title">
-      <h2 id="rules-title" className="text-heading">
-        Rules auto-mix always follows
-      </h2>
-      <ul className="rules">
+    <details className="panel disclosure">
+      <summary>
+        <h2 className="text-heading">Auto-mix rules</h2>
+        <ChevronRight size={20} strokeWidth={1.75} aria-hidden />
+      </summary>
+      <ul className="rules disclosure-body">
         <li>
           Music moves at most {n(g.music.maxStepDb)} dB at a time and {n(g.music.maxRateDbPerSec)} dB a second. Speech
           moves at most {n(g.speech.maxStepDb)} dB at a time and {n(g.speech.maxRateDbPerSec)} dB a second.
@@ -509,16 +553,20 @@ export function RulesList() {
           It stays within {n(g.music.maxCutDb)} dB below and {n(g.music.maxBoostDb)} dB above where you set a music
           channel ({n(g.speech.maxCutDb)} below and {n(g.speech.maxBoostDb)} above for speech).
         </li>
-        <li>It never pushes a fader above 0 dB unless you already had it there, and never pulls one all the way down.</li>
+        <li>
+          It never pushes a fader above 0 dB unless you already had it there, and never pulls one all the way down.
+        </li>
         <li>It never mutes or unmutes, and never touches gain, routing, scenes or channels you didn't pick.</li>
         <li>It never raises a mic nobody is using, and leaves a clipping input for you to fix at the preamp.</li>
         <li>
-          While it listens, a voice mic that only hears the band is left alone: it isn't turned up, and it doesn't
-          make the band step back.
+          While it listens, a voice mic that only hears the band is left alone: it isn't turned up, and it doesn't make
+          the band step back.
         </li>
-        <li>Move a fader it's riding and that channel is yours until you hand it back. Freeze stops everything at once.</li>
+        <li>
+          Move a fader it's riding and that channel is yours until you hand it back. Freeze stops everything at once.
+        </li>
         <li>Every move is logged on this computer with the reason.</li>
       </ul>
-    </section>
+    </details>
   );
 }

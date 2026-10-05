@@ -18,7 +18,7 @@ function NavItem({ view, label, icon: Icon }: (typeof ITEMS)[number]) {
       onClick={() => setView(view)}
       aria-current={current === view ? "page" : undefined}
     >
-      <Icon size={20} strokeWidth={1.75} />
+      <Icon size={20} strokeWidth={1.75} aria-hidden />
       <span>{label}</span>
     </button>
   );

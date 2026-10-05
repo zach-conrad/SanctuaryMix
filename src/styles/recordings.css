@@ -3,7 +3,9 @@
 
 /* ---------- Top bar: record control ---------- */
 .record-control { position: relative; flex: none; display: flex; align-items: center; gap: var(--space-2); }
-.topbar > .sm-assist-badge, .topbar .assist-mode { flex: none; white-space: nowrap; }
+.topbar .sm-assist-badge { flex: none; white-space: nowrap; }
+/* In the status row the Assist badge matches the pills' height. */
+.topbar-pills .sm-assist-badge { height: 28px; padding: 0 var(--space-3); }
 .topbar-btn { height: var(--hit-min); }
 .rec-live {
   display: inline-flex; align-items: center; gap: var(--space-2); height: var(--hit-min); padding: 0 var(--space-3);
@@ -41,51 +43,49 @@
 .dialog-actions .sm-btn { height: var(--hit-min); }
 
 /* ---------- Services list ---------- */
-.page.services-page {
-  max-width: none; display: grid; grid-template-columns: minmax(0, 1fr) 360px; align-items: start; gap: var(--space-5);
+/* One grouped list per date, rows split by hairlines (see .group / .row in global.css). */
+.service-list { list-style: none; margin: 0; padding: 0; }
+.service-list li { position: relative; }
+.service-list li + li::before {
+  content: ""; position: absolute; top: 0; left: var(--space-4); right: 0; height: 1px; background: var(--border);
 }
-.services-main { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
-.services-head { display: flex; flex-direction: column; gap: var(--space-1); }
-.services-side { display: flex; flex-direction: column; gap: var(--space-4); }
-.service-group { display: flex; flex-direction: column; gap: var(--space-2); }
-.service-date { display: flex; align-items: baseline; gap: var(--space-3); }
-.service-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .service-row {
   width: 100%; min-height: calc(var(--space-7) + var(--space-3)); text-align: left;
   display: grid; align-items: center; gap: var(--space-4);
-  grid-template-columns: 5.5rem minmax(0, 1fr) 5rem 9.5rem 4.5rem auto var(--space-5);
+  grid-template-columns: 5.5rem minmax(0, 1fr) auto var(--space-5) var(--space-5);
   padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text);
+  background: none; border: 0; color: var(--text);
   transition: background-color var(--duration-fast) ease-out;
 }
-.service-row:hover { background: var(--surface-raised); border-color: var(--border-strong); }
+.service-row:hover { background: var(--control); }
 .service-title { display: flex; flex-direction: column; min-width: 0; }
 .service-title-line { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
 .service-notes { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.service-duration, .service-size { text-align: right; }
-.service-sync { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
+.service-facts { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
+.service-sync { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); white-space: nowrap; }
 .warning-text { color: var(--warning); }
 
-.disk-stats { margin: 0; display: flex; flex-direction: column; gap: var(--space-2); }
-.disk-stats dd { margin: 0; }
-.disk-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); }
-.folder { font: var(--text-caption); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: text; }
-.disk-action { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
-.disk-action .sm-btn { width: 100%; }
-.mix-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
-.mix-inputs .sm-field { max-width: none; }
+dl.group, dl.group dd { margin: 0; }
+.disk-delete { width: 100%; }
+.folder { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: text; }
 .sm-seg button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* ---------- Service detail ---------- */
-.page.detail-page { max-width: none; gap: var(--space-4); }
+.page.detail-page { gap: var(--space-4); }
 .back-btn { margin-left: calc(-1 * var(--space-3)); height: var(--hit-min); }
-.detail-head { gap: var(--space-3); }
+.detail-head { display: flex; flex-direction: column; gap: var(--space-4); }
 .detail-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
-.detail-fields { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(320px, 2fr) auto; gap: var(--space-4); align-items: start; }
-.detail-fields .sm-field { max-width: none; }
-.title-field .sm-input { height: var(--control-lg); font: var(--text-heading); }
+.notes-field { max-width: none; }
+/* The title reads as the page title and edits in place: the outline shows on hover and focus. */
+.title-input {
+  height: var(--control-lg); margin-left: calc(-1 * var(--space-3)); width: calc(100% + var(--space-3));
+  font: var(--text-title); letter-spacing: var(--text-title-tracking);
+  background: transparent; border-color: transparent;
+}
+.title-input:hover { border-color: var(--border-strong); }
+.title-input:focus { background: var(--surface-raised); border-color: var(--border-strong); }
 .notes-input { height: auto; min-height: var(--control-lg); padding: var(--space-2) var(--space-3); resize: vertical; user-select: text; }
-.delete-btn { margin-top: calc(var(--space-5) - var(--space-1)); height: var(--control-lg); }
+.delete-btn { margin-left: auto; }
 textarea.sm-input { font: var(--text-body); }
 
 .transport { gap: var(--space-3); padding: var(--space-4) var(--space-5); }

@@ -96,57 +96,62 @@ function DetailHeader() {
   };
 
   return (
-    <section className="panel detail-head">
-      <div className="detail-meta">
-        <span className="text-caption muted">
-          {serviceDateLabel(detail.serviceDate)} · {timeOfDay(detail.startedAt)} ·{" "}
-          <span className="text-readout">{formatClock(detail.durationMs)}</span> · {audioModeLabel(detail)} ·{" "}
-          {formatBytes(detail.bytesOnDisk)} · Local only
-        </span>
-        {detail.status === "interrupted" && (
-          <span className="sm-pill sm-pill--warn">
-            <span className="sm-pill__dot" aria-hidden />
-            Interrupted
-            <span className="sm-pill__meta">The app stopped before Stop was pressed</span>
-          </span>
-        )}
-      </div>
-      <div className="detail-fields">
-        <label className="sm-field title-field">
-          <span className="sm-field__label">Title</span>
-          <input
-            className="sm-input"
-            value={title}
-            onChange={(e) => {
-              setTitle(e.target.value);
-              setSaved(false);
-            }}
-            onBlur={() => void commit()}
-            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-          />
-        </label>
-        <label className="sm-field notes-field">
-          <span className="sm-field__label">Notes</span>
-          <textarea
-            className="sm-input notes-input"
-            value={notes}
-            rows={2}
-            placeholder="Guest speaker, what went well, what to fix next week"
-            onChange={(e) => {
-              setNotes(e.target.value);
-              setSaved(false);
-            }}
-            onBlur={() => void commit()}
-          />
-          <span className="sm-field__help">{saved ? "Saved." : "Saved when you click away."}</span>
-        </label>
+    <section className="detail-head" aria-label="Service">
+      <div className="page-head">
+        <div className="page-head-text">
+          <div className="detail-meta">
+            <span className="text-caption muted">
+              {serviceDateLabel(detail.serviceDate)} · {timeOfDay(detail.startedAt)} ·{" "}
+              <span className="text-readout">{formatClock(detail.durationMs)}</span> · {audioModeLabel(detail)} ·{" "}
+              {formatBytes(detail.bytesOnDisk)} · Local only
+            </span>
+            {detail.status === "interrupted" && (
+              <span className="sm-pill sm-pill--warn">
+                <span className="sm-pill__dot" aria-hidden />
+                Interrupted
+                <span className="sm-pill__meta">The app stopped before Stop was pressed</span>
+              </span>
+            )}
+          </div>
+          <label className="title-field">
+            <span className="visually-hidden">Title</span>
+            <input
+              className="sm-input title-input"
+              value={title}
+              title="Click to rename"
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setSaved(false);
+              }}
+              onBlur={() => void commit()}
+              onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+            />
+          </label>
+        </div>
         {canDelete && (
-          <button className="sm-btn sm-btn--danger delete-btn" onClick={() => setConfirmDelete(true)}>
-            <Trash2 />
-            Delete service
-          </button>
+          <div className="page-head-actions">
+            <button className="sm-btn sm-btn--danger" onClick={() => setConfirmDelete(true)}>
+              <Trash2 />
+              Delete service
+            </button>
+          </div>
         )}
       </div>
+      <label className="sm-field notes-field">
+        <span className="sm-field__label">Notes</span>
+        <textarea
+          className="sm-input notes-input"
+          value={notes}
+          rows={2}
+          placeholder="Guest speaker, what went well, what to fix next week"
+          onChange={(e) => {
+            setNotes(e.target.value);
+            setSaved(false);
+          }}
+          onBlur={() => void commit()}
+        />
+        {saved && <span className="sm-field__help">Saved</span>}
+      </label>
       {confirmDelete && (
         <Dialog
           title="Delete this service?"
@@ -243,9 +248,7 @@ function Transport({ lanes }: { lanes: Lane[] }) {
       </div>
       <div className="transport-foot">
         <span className="text-caption muted">
-          {playback && !playback.hasAudio
-            ? "No audio in this recording. The timeline and the mixer below still play."
-            : "To play it in the room, choose Dante Virtual Soundcard and patch it to the PA."}
+          {playback && !playback.hasAudio ? "No audio in this recording." : null}
         </span>
         <SendMoves lanes={lanes} />
       </div>
@@ -442,7 +445,6 @@ function MixerPanel({ state, lanes, positionMs }: { state: ChannelState[]; lanes
           </button>
         </div>
       </div>
-      <p className="text-caption muted">Read only. Nothing here goes to the console.</p>
       <MiniMixer state={state} moved={lanes} all={all} />
     </section>
   );

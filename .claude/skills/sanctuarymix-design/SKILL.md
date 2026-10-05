@@ -38,7 +38,7 @@ If the shared folder isn't available (for example, working on the user's own mac
 
 ## Surfaces
 
-`--bg` (app background) → `--surface` (panels) → `--surface-raised` (strips, cards, dialogs) → `--control` / `--control-hover` (things you press). Panels use borders, not shadows; only popovers and dialogs use `--shadow-overlay`. Meters sit in a `--meter-track` well that is dark in both themes.
+`--bg` (app background) → `--surface` (top bar, sidebar, inspector) → `--surface-raised` (panels, groups, strips, dialogs) → `--control` / `--control-hover` (things you press and row hover). Panels and groups are separated by fill, not outlines: a border always means something (focus, selection, AI blue, danger, or a control's own outline). Only popovers and dialogs use `--shadow-overlay`. Meters sit in a `--meter-track` well that is dark in both themes.
 
 ## Type
 
@@ -53,7 +53,15 @@ If the shared folder isn't available (for example, working on the user's own mac
 
 ## Layout
 
-Window minimum 1280 × 800. Top bar 56px (logo, status pills, Assist mode), left nav rail 72px (Mixer, Scenes, Assist, Setup), mixer bay on `--bg` scrolling horizontally inside its own region, inspector 320px on the right.
+The app follows macOS conventions (System Settings, Finder, Mail): hierarchy, harmony, consistency. See `/mnt/project-files/design/apple-direction.md` (in the repo: `.claude/skills/sanctuarymix-design/apple-direction.md`) for the reasoning.
+
+Window minimum 1280 × 800. Top bar 56px (logo, status pills: console, Dante, warnings, then the Assist mode badge last; Freeze while auto-mix runs and Record service together at the right). Source-list sidebar `--sidebar-width` (200px, icon + name; Mixer, Scenes, Services, Assist, Setup, Settings pinned at the bottom), folding to a 72px icon rail below 1440px. Mixer bay on `--bg` scrolling horizontally inside its own region, inspector `--inspector-width` on the right.
+
+Other pages open with a page header (title only), center their content at `--page-max` (forms and settings: one column at `--page-narrow`), and put supporting sections in a `--side-width` column on the right.
+
+**Grouped lists, everywhere a page has settings or records.** `.section` > `.section-head` (small bold heading outside the box, optional count or icon button at right) > `.group` (rounded `--surface-raised` box) > `.row` (label left in regular weight with an optional caption under it, control at the right edge, hairline between rows, row min height 52px). Actions for a group go in a final `.row--actions` row (state on the left, button on the right). At most one `.section-foot` line under a group. Records (services, later scenes) are one group per date or category with hairline rows, never a card per item.
+
+**Choosing.** One from a short list (devices): rows with a teal checkmark on the chosen one, no radio circles. Two to four options: a SegmentedControl. Five or more, or options that need explaining: a dropdown, with the chosen option described in the section footnote. Reference text goes in a collapsed disclosure. Empty pages: centered symbol, one title, one line.
 
 ## Components
 
@@ -61,7 +69,7 @@ Build these from `components.css` and the guidelines; don't invent parallel vers
 
 ## Voice
 
-A calm, experienced sound tech helping a first-timer. Buttons are verbs ("Connect", "Recall scene", "Apply"), never "OK". Errors say what happened and what to do. Assist explains itself in one sentence a volunteer can check by ear. No emoji, no exclamation marks.
+A calm, experienced sound tech helping a first-timer. Fewer words: labels of one to three words, at most one footnote line per group, explanations in tooltips, states as a word or two. Buttons are verbs ("Connect", "Recall scene", "Apply"), never "OK". Errors say what happened and what to do. Assist explains itself in one sentence a volunteer can check by ear. No emoji, no exclamation marks.
 
 ## Icons
 
@@ -80,3 +88,5 @@ Change `tokens.json` first, run `build_tokens.py`, check contrast in both themes
 - [ ] Numbers in mono with real minus signs and units
 - [ ] Copy is plain, verb-first, no jargon beyond the console's own
 - [ ] Anything AI-driven is blue-outlined and undoable
+- [ ] Settings and records use grouped lists (section, group, rows), not bordered cards
+- [ ] No decorative borders; at most one footnote per group, the rest in tooltips
