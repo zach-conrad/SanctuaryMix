@@ -10,10 +10,12 @@ import { RecordingsView } from "./views/RecordingsView";
 import { ScenesView } from "./views/ScenesView";
 import { SettingsView } from "./views/SettingsView";
 import { SetupView } from "./views/SetupView";
+import { SignInView } from "./views/SignInView";
 
 export default function App() {
   const view = useMixer((s) => s.view);
   const init = useMixer((s) => s.init);
+  const needsSignIn = useMixer((s) => s.session !== null && !s.session.authenticated && !s.workingLocally);
   useEffect(() => {
     void init()
       .then(() => useAutoMix.getState().init())
@@ -29,6 +31,8 @@ export default function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  if (needsSignIn) return <SignInView />;
 
   return (
     <div className="app">

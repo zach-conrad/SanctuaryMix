@@ -166,8 +166,9 @@ pub async fn start_recording(
         return Err("A service is already recording. Stop it first.".into());
     }
 
-    let settings = load_settings(&state);
     let session = state.auth.current_session().await;
+    session.access.require(auth::Feature::RecordServices)?;
+    let settings = load_settings(&state);
     let (org_id, created_by) = recorder::owner_from_session(&session);
     let console_model = match state.console.lock().await.as_ref() {
         Some(adapter) => serde_json::to_value(adapter.model())

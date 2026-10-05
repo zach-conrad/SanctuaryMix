@@ -1,4 +1,5 @@
 import { Circle, Square, X } from "lucide-react";
+import { lockReason } from "../lib/plans";
 import { audioModeLabel, formatBytes, formatClock } from "../lib/recordings";
 import { useMixer } from "../store/mixer";
 import { useRecordings } from "../store/recordings";
@@ -13,6 +14,7 @@ export function RecordControl() {
   const replaying = useRecordings((s) => s.replay?.state === "running");
   const replayId = useRecordings((s) => s.replay?.recordingId ?? null);
   const { startRecording, stopRecording, dismissSaved, open } = useRecordings();
+  const locked = useMixer((s) => lockReason(s.session, "recordServices"));
   const ready = recorder !== null;
   const active = recorder?.active ?? null;
 
@@ -38,9 +40,11 @@ export function RecordControl() {
         <button
           className="sm-btn topbar-btn"
           onClick={() => void startRecording()}
-          disabled={!ready || busy || replaying}
+          disabled={!ready || busy || replaying || locked !== null}
           title={
-            replaying
+            locked
+              ? `${locked}. Playback still works.`
+              : replaying
               ? "Stop sending moves to the console before recording."
               : "Records the main mix and every fader and mute move"
           }
