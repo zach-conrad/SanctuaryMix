@@ -9,7 +9,7 @@ const tone = (s: "off" | "connecting" | "on" | "error"): PillTone =>
   s === "on" ? "ok" : s === "connecting" ? "warn" : s === "error" ? "error" : "neutral";
 
 /** Which wordmark to show: the dark-ground file on dark themes. */
-function useResolvedTheme(theme: Theme): "dark" | "light" {
+export function useResolvedTheme(theme: Theme): "dark" | "light" {
   const query = "(prefers-color-scheme: light)";
   const [osLight, setOsLight] = useState(() => window.matchMedia?.(query).matches ?? false);
   useEffect(() => {

@@ -50,6 +50,12 @@ export interface Backend {
   setFader(id: ChannelId, db: number | null): Promise<void>;
   setMute(id: ChannelId, muted: boolean): Promise<void>;
   getSession(): Promise<Session>;
+  /** Email and password from the sign-in screen. Rejects with a sentence to show. */
+  signInWithPassword(email: string, password: string): Promise<Session>;
+  /** Back to the local session. Refused mid-service (recording or auto-mix on). */
+  signOut(): Promise<Session>;
+  /** Opens the website account page, where billing lives. */
+  openBilling(): Promise<void>;
 
   // Auto-mix. The guardrails are enforced in the Rust core; these only ask.
   automixPresets(): Promise<Preset[]>;
@@ -148,6 +154,9 @@ async function createTauriBackend(): Promise<Backend> {
     setFader: (id, db) => invoke("set_fader", { id, db }),
     setMute: (id, muted) => invoke("set_mute", { id, muted }),
     getSession: () => invoke("get_session"),
+    signInWithPassword: (email, password) => invoke("sign_in_with_password", { email, password }),
+    signOut: () => invoke("sign_out"),
+    openBilling: () => invoke("open_billing"),
     automixPresets: () => invoke("automix_presets"),
     automixGuessRoles: (names) => invoke("automix_guess_roles", { names }),
     automixGetConfig: () => invoke("automix_get_config"),

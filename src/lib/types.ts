@@ -56,11 +56,43 @@ export interface MeteringInfo {
 
 export type Role = "admin" | "engineer" | "volunteer";
 
+// Plans (crates/auth/src/plan.rs).
+export type Plan = "essentials" | "pro" | "campus";
+export type SubscriptionStatus =
+  | "trialing"
+  | "active"
+  | "pastDue"
+  | "paused"
+  | "canceled"
+  | "unpaid"
+  | "incompleteExpired";
+export type Feature = "autoMix" | "recordServices" | "cloudSync" | "mixReports" | "aiEq";
+
+export interface Entitlements {
+  maxAiChannels: number;
+  autoMix: boolean;
+  recordServices: boolean;
+  cloudSync: boolean;
+  mixReports: boolean;
+  aiEq: boolean;
+  /** null is unlimited. */
+  teamLogins: number | null;
+  rooms: number;
+}
+
+export interface Access {
+  /** null when signed out. */
+  plan: Plan | null;
+  status: SubscriptionStatus | null;
+  entitlements: Entitlements;
+}
+
 export interface Session {
   user: { id: string; displayName: string; email: string | null };
   activeOrg: { id: string; name: string } | null;
   role: Role;
   authenticated: boolean;
+  access: Access;
 }
 
 // Auto-mix (crates/automix).

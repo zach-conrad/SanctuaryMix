@@ -17,6 +17,8 @@ interface MixerState {
   view: View;
   isDemo: boolean;
   session: Session | null;
+  /** Chose "Mix without signing in" this launch; the sign-in screen stays away. */
+  workingLocally: boolean;
 
   audioStatus: LinkStatus;
   audio: MeteringInfo | null;
@@ -39,6 +41,11 @@ interface MixerState {
   select(index: number): void;
   setTheme(theme: Theme): void;
   init(): Promise<void>;
+  /** Rejects with a sentence to show under the form. */
+  signIn(email: string, password: string): Promise<void>;
+  /** Rejects with a sentence to show (refused mid-service). */
+  signOut(): Promise<void>;
+  workLocally(): void;
   startAudio(device: string | null): Promise<void>;
   stopAudio(): Promise<void>;
   connectConsole(config: ConsoleConfig): Promise<void>;
@@ -98,6 +105,7 @@ export const useMixer = create<MixerState>((set, get) => ({
   view: "mixer",
   isDemo: false,
   session: null,
+  workingLocally: false,
   audioStatus: "off",
   audio: null,
   audioError: null,
@@ -136,6 +144,26 @@ export const useMixer = create<MixerState>((set, get) => ({
       await get().connectConsole(DEFAULT_CONFIG);
     }
   },
+
+  async signIn(email, password) {
+    const backend = await getBackend();
+    try {
+      set({ session: await backend.signInWithPassword(email, password), workingLocally: false });
+    } catch (e) {
+      throw reportError(e);
+    }
+  },
+
+  async signOut() {
+    const backend = await getBackend();
+    try {
+      set({ session: await backend.signOut(), workingLocally: false });
+    } catch (e) {
+      throw reportError(e);
+    }
+  },
+
+  workLocally: () => set({ workingLocally: true }),
 
   async startAudio(device) {
     set({ audioStatus: "connecting", audioError: null });
