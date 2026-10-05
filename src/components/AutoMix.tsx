@@ -4,6 +4,7 @@ import { getBackend } from "../lib/backend";
 import { formatDb } from "../lib/levels";
 import type { Adjustment, ChannelRole, ChannelStatus, HeardChannel, Nudges, RoomFeel } from "../lib/types";
 import { MODE_DETAIL, MODE_LABEL, ROLE_LABEL, SOUND_LABEL, useAutoMix } from "../store/automix";
+import { lockReason } from "../lib/plans";
 import { useMixer } from "../store/mixer";
 
 const ROLES = Object.keys(ROLE_LABEL) as ChannelRole[];
@@ -27,17 +28,26 @@ export function AutoMixControls() {
   const { engage, freeze, resume, undoAll } = useAutoMix();
   const consoleOn = useMixer((s) => s.consoleStatus === "on");
   const audioOn = useMixer((s) => s.audioStatus === "on");
+  const session = useMixer((s) => s.session);
+  const maxChannels = session?.access.entitlements.maxAiChannels ?? 0;
 
   const engaged = status?.engaged ?? false;
   const frozen = status?.frozen ?? false;
   const count = config?.channels.length ?? 0;
-  const blocker = !consoleOn
+  const locked = lockReason(session, "autoMix");
+  const blocker = locked
+    ? locked === "Sign in to use"
+      ? "Sign in to use auto-mix."
+      : `${locked}. See Settings.`
+    : !consoleOn
     ? "Connect the console in Setup."
     : !audioOn
       ? "Start Dante audio in Setup."
       : count === 0
         ? "Pick channels below."
-        : null;
+        : count > maxChannels
+          ? `Your plan covers ${maxChannels} channels. Remove ${count - maxChannels}.`
+          : null;
 
   const state = !engaged
     ? "Off"

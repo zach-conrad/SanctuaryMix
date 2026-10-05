@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use audio_engine::MeterHandle;
-use auth::{AuthProvider, LocalGuest};
+use auth::{AuthProvider, SampleAccount};
 use automix::{Adjustment, AutoMixConfig, AutoMixHandle, AutoMixStatus, FaderSink, Observer};
 use console::{ConsoleAdapter, ConsoleError};
 use listen::{ListenTarget, Listener, Models};
@@ -49,6 +49,13 @@ impl AppState {
                 None
             })
             .unwrap_or_default();
+        let signed_in = store
+            .lock()
+            .unwrap()
+            .get_setting::<bool>(store::keys::SIGNED_IN)
+            .ok()
+            .flatten()
+            .unwrap_or(false);
         let spl = Spl::new(crate::spl::load_config(&store.lock().unwrap()));
         let targets = listen_targets(&config);
         let (automix, task) = automix::start(
@@ -65,7 +72,7 @@ impl AppState {
             metering: Mutex::new(None),
             console: tokio::sync::Mutex::new(None),
             console_forwarder: Mutex::new(None),
-            auth: Box::new(LocalGuest),
+            auth: Box::new(SampleAccount::new(signed_in)),
             store,
             automix,
             listener,

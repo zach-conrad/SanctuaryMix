@@ -1,4 +1,5 @@
 import type { Backend } from "./backend";
+import { createDemoAuth } from "./demoAuth";
 import { createDemoAutomix, guessRole } from "./demoAutomix";
 import { createDemoRecorder } from "./demoRecorder";
 import { createDemoSpl } from "./demoSpl";
@@ -43,6 +44,7 @@ export function createDemoBackend(): Backend {
   const faders = new Map<number, number | null>();
   const mutes = new Map<number, boolean>();
   let connected = false;
+  const auth = createDemoAuth();
   const moveFader = (index: number, db: number | null) => {
     faders.set(index, db);
     emit({ type: "fader", id: { kind: "input", index }, db });
@@ -154,12 +156,18 @@ export function createDemoBackend(): Backend {
       emit({ type: "mute", id, muted });
     },
     async getSession() {
-      return {
-        user: { id: "local", displayName: "Local operator", email: null },
-        activeOrg: null,
-        role: "admin",
-        authenticated: false,
-      };
+      return auth.session();
+    },
+    async signInWithPassword(email, password) {
+      return auth.signIn(email, password);
+    },
+    async signOut() {
+      if (automix.status().engaged) throw "Turn off auto-mix before you sign out.";
+      if ((await recorder.recorderStatus()).active) throw "Stop recording the service before you sign out.";
+      return auth.signOut();
+    },
+    async openBilling() {
+      window.open("https://sanctuarymix.vercel.app/account/", "_blank", "noopener");
     },
     async automixPresets() {
       return automix.presets();
@@ -174,6 +182,10 @@ export function createDemoBackend(): Backend {
       return automix.setConfig(config);
     },
     async automixEngage(on) {
+      const { entitlements } = auth.session().access;
+      if (on && !entitlements.autoMix) throw "Auto-mix needs a SanctuaryMix plan. Sign in in Settings.";
+      if (on && automix.getConfig().channels.length > entitlements.maxAiChannels)
+        throw `Your plan covers up to ${entitlements.maxAiChannels} channels under auto-mix.`;
       automix.engage(on);
     },
     async automixFreeze() {
@@ -245,5 +257,10 @@ export function createDemoBackend(): Backend {
       return spl.listen(cb);
     },
     ...recorder,
+    async startRecording(title) {
+      if (!auth.session().access.entitlements.recordServices)
+        throw "Recording services needs a SanctuaryMix plan. Sign in in Settings.";
+      return recorder.startRecording(title);
+    },
   };
 }

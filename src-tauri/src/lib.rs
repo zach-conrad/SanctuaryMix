@@ -85,6 +85,8 @@ pub fn run() {
             spl::spl_reading,
             spl::spl_history,
             commands::get_session,
+            commands::sign_in_with_password,
+            commands::open_billing,
             commands::begin_sign_in,
             commands::complete_sign_in,
             commands::sign_out,
