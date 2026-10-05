@@ -37,7 +37,7 @@ The timeline and recording helpers are shared with the desktop app: `src/lib/rec
 
 ## Design
 
-Uses the SanctuaryMix design system: `src/styles/tokens.css` and `components.css` are copies of `design/tokens.css` and `design/components.css`, fonts are bundled with `@fontsource`, and the logos in `public/brand` are the supplied wordmark files. Dark theme is the default (`data-theme` on `<html>`).
+Uses the SanctuaryMix design system: `src/styles/tokens.css` and `components.css` are copies of `design/tokens.css` and `design/components.css`, fonts are bundled with `@fontsource`, and the logos in `public/brand` are the supplied wordmark files. Dark theme is the default (`data-theme` on `<html>`). Pages follow the app's Apple-style rules: panels separated by fill rather than outlines, settings and records as grouped lists (`.grouped` > `.section-head` > `.group` > `.row`, one group per service date), one footnote line per group, and centered empty states. App screenshots in `public/screenshots` come in `-dark` and `-light` pairs and follow the page theme.
 
 Hosting isn't decided yet. The build uses a relative base, so `dist/` works at a domain root or under a sub-path such as GitHub Pages.
 

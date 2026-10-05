@@ -1,4 +1,4 @@
-import { ArrowLeft, Info, Link2, X } from "lucide-react";
+import { ArrowLeft, CloudOff, Info, Link2, Music, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { audioModeLabel, formatClock, serviceDateLabel, timeOfDay } from "../../src/lib/recordings";
 import { connectCloud, type CloudRecording, type RecordedEvent } from "./cloud";
@@ -55,43 +55,44 @@ export function Service() {
 
           {load.status === "loading" ? <p className="mix-muted service__status">Loading the service</p> : null}
           {load.status === "missing" ? (
-            <div className="service__status">
-              <h1 className="account__title">Service not found</h1>
-              <p className="section__lede">It may have been deleted. Go back to your services and pick another.</p>
+            <div className="empty-state">
+              <Music aria-hidden="true" />
+              <h1 className="text-heading">Service not found</h1>
+              <p className="text-caption mix-muted">It may have been deleted. Pick another from your services.</p>
             </div>
           ) : null}
           {load.status === "error" ? (
-            <div className="service__status">
-              <h1 className="account__title">This service didn't load</h1>
-              <p className="section__lede">{load.message}. Check your connection and reload the page.</p>
+            <div className="empty-state">
+              <CloudOff aria-hidden="true" />
+              <h1 className="text-heading">This service didn't load</h1>
+              <p className="text-caption mix-muted">{load.message}. Check your connection and reload the page.</p>
             </div>
           ) : null}
 
           {load.status === "ok" ? (
             <>
-              <header className="service__head">
-                <p className="text-caption mix-muted">
-                  {serviceDateLabel(load.recording.serviceDate)} · {timeOfDay(load.recording.startedAt)} ·{" "}
-                  <span className="text-readout">{formatClock(load.recording.durationMs)}</span> ·{" "}
-                  {audioModeLabel(load.recording)}
-                </p>
-                <div className="service__title-row">
-                  <h1 className="account__title">{load.recording.title}</h1>
-                  <button className="sm-btn sm-btn--lg" onClick={() => shareDialog.current?.showModal()}>
-                    <Link2 aria-hidden="true" />
-                    Share
-                  </button>
+              <header className="page-header page-header--action">
+                <div className="page-header__text">
+                  <h1 className="page-title">{load.recording.title}</h1>
+                  <p className="text-caption mix-muted">
+                    {serviceDateLabel(load.recording.serviceDate)} · {timeOfDay(load.recording.startedAt)} ·{" "}
+                    <span className="text-readout">{formatClock(load.recording.durationMs)}</span> ·{" "}
+                    {audioModeLabel(load.recording)}
+                  </p>
                 </div>
-                {load.recording.notes ? <p className="section__lede">{load.recording.notes}</p> : null}
+                <button className="sm-btn sm-btn--lg" onClick={() => shareDialog.current?.showModal()}>
+                  <Link2 aria-hidden="true" />
+                  Share
+                </button>
               </header>
-
-              <p className="preview-note text-caption service__note" role="note">
-                <Info aria-hidden="true" />
-                Playback only. To send these moves to a console, open the service in the SanctuaryMix app.
-              </p>
+              {load.recording.notes ? <p className="service__notes mix-muted">{load.recording.notes}</p> : null}
 
               <div className="service__layout">
                 <MixPlayer audioUrl={load.audioUrl} durationMs={load.recording.durationMs} events={load.events} />
+                <p className="section-foot footnote">
+                  <Info aria-hidden="true" />
+                  Playback only. To send these moves to a console, open the service in the app.
+                </p>
               </div>
 
               <dialog

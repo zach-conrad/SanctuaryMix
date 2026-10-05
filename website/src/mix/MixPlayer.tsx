@@ -95,10 +95,10 @@ export function MixPlayer({ audioUrl, durationMs, events }: Props) {
             <div className="panel__head">
               <h2 id="moves-heading" className="text-heading">Moves</h2>
               <span className="text-caption mix-muted">
-                {rows.length} changes on {lanes.length} channels. Click the timeline to jump there.
+                {rows.length} changes · {lanes.length} channels
               </span>
             </div>
-            <div className="mix-timeline__scroll">
+            <div className="mix-timeline__scroll" title="Click the timeline to jump there">
               <Timeline lanes={lanes} durationMs={durationMs} positionMs={p.positionMs} onSeek={p.seek} />
             </div>
           </section>

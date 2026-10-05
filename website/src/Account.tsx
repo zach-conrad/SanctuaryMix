@@ -38,131 +38,143 @@ export function Account() {
     return () => ctrl.abort();
   }, []);
 
+  const plan = choice ? `${choice.plan.name}, ${choice.billing}` : "Early access";
+  const afterTrial = choice
+    ? choice.billing === "yearly"
+      ? `${formatPrice(choice.plan.yearly)} a year`
+      : `${formatPrice(choice.plan.monthly)} a month`
+    : "";
+  const founding = choice && FOUNDING_OFFER
+    ? formatPrice(foundingPrice(choice.billing === "yearly" ? choice.plan.yearly : choice.plan.monthly))
+    : null;
+  const versionLine = release
+    ? [
+        `Version ${release.version}`,
+        release.publishedAt ? dateFormat.format(release.publishedAt) : null,
+        release.mac.size ? formatSize(release.mac.size) : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : notYet
+      ? "Coming soon"
+      : "Checking for the latest version";
+
   return (
     <>
       <Header root={ROOT} signedIn />
-      <main className="section">
-        <div className="site-container account">
-          <p className="preview-note text-caption" role="note">
-            <Info aria-hidden="true" />
-            This is a preview account page. Sign-in isn't built yet, so everyone sees this sample account.
-          </p>
+      <main className="section section--tight">
+        <div className="site-container">
+          <header className="page-header">
+            <h1 className="page-title">{choice ? "Welcome, Alex" : "Welcome back, Alex"}</h1>
+          </header>
 
           {choice ? (
-            <section className="plan-picked" aria-labelledby="picked-heading">
-              <CircleCheck aria-hidden="true" />
-              <div>
-                <h2 id="picked-heading" className="text-heading">
-                  Your {TRIAL_DAYS}-day {choice.plan.name} trial has started
-                </h2>
-                <p className="feature__body">
-                  After the trial it's{" "}
-                  {choice.billing === "yearly"
-                    ? `${formatPrice(choice.plan.yearly)} a year`
-                    : `${formatPrice(choice.plan.monthly)} a month`}
-                  {FOUNDING_OFFER
-                    ? `, or ${formatPrice(
-                        foundingPrice(choice.billing === "yearly" ? choice.plan.yearly : choice.plan.monthly),
-                      )} with the founding church offer`
-                    : ""}
-                  . Checkout isn't built yet, so nothing is charged. <a href={`${ROOT}#pricing`}>Change plan</a>
-                </p>
+            <section className="grouped" aria-labelledby="picked-heading">
+              <div className="group">
+                <div className="row">
+                  <span className="row-icon row-icon--accent">
+                    <CircleCheck aria-hidden="true" />
+                  </span>
+                  <span className="row-text">
+                    <span id="picked-heading">
+                      {choice.plan.name} trial started · {TRIAL_DAYS} days
+                    </span>
+                    <span className="text-caption">
+                      Then {afterTrial}
+                      {founding ? `, or ${founding} with the founding church offer` : ""}. Nothing is charged yet.
+                    </span>
+                  </span>
+                  <a className="sm-btn" href={`${ROOT}#pricing`}>
+                    Change plan
+                  </a>
+                </div>
               </div>
             </section>
           ) : null}
 
-          <h1 className="account__title">{choice ? "Welcome, Alex" : "Welcome back, Alex"}</h1>
-          <p className="section__lede">Download SanctuaryMix for your booth computer, and listen back to your services.</p>
-
-          <div className="account__grid">
-            <section className="panel panel--download" aria-labelledby="mac-heading">
-              <div className="panel__head">
-                <Laptop aria-hidden="true" />
-                <h2 id="mac-heading" className="text-heading">SanctuaryMix for macOS</h2>
-              </div>
-              <p className="feature__body">Universal app for Apple silicon and Intel Macs, macOS 12 or later.</p>
-              <dl className="release-meta">
-                <div>
-                  <dt className="text-label">Version</dt>
-                  <dd className={release ? "text-readout" : undefined}>{release ? release.version : notYet ? "Coming soon" : "Checking"}</dd>
+          <div className="page-split">
+            <div className="page-main">
+              <section className="grouped" aria-labelledby="download-heading">
+                <div className="section-head">
+                  <h2 id="download-heading">Download</h2>
                 </div>
-                {release?.publishedAt ? (
-                  <div>
-                    <dt className="text-label">Released</dt>
-                    <dd className="text-readout">{dateFormat.format(release.publishedAt)}</dd>
+                <ul className="group">
+                  <li className="row">
+                    <span className="row-icon">
+                      <Laptop aria-hidden="true" />
+                    </span>
+                    <span className="row-text">
+                      <span>macOS</span>
+                      <span className="text-caption">{versionLine}</span>
+                    </span>
+                    {release ? (
+                      <a className="sm-btn sm-btn--primary sm-btn--lg" href={downloadUrl(ROOT, release.mac.file)} download>
+                        <Download aria-hidden="true" />
+                        Download
+                      </a>
+                    ) : (
+                      <button className="sm-btn sm-btn--primary sm-btn--lg" disabled>
+                        <Download aria-hidden="true" />
+                        Download
+                      </button>
+                    )}
+                  </li>
+                  <li className="row">
+                    <span className="row-icon">
+                      <Monitor aria-hidden="true" />
+                    </span>
+                    <span className="row-text">
+                      <span>Windows</span>
+                      <span className="text-caption">After the Mac version settles</span>
+                    </span>
+                    <span className="sm-pill">
+                      <span className="sm-pill__dot" aria-hidden="true" />
+                      Planned
+                    </span>
+                  </li>
+                </ul>
+                <p className="section-foot">
+                  {release
+                    ? "Early builds aren't signed yet. The first time, Control-click the app and choose Open."
+                    : notYet
+                      ? "The button turns on when the first build is published."
+                      : "Universal app for Apple silicon and Intel Macs, macOS 12 or later."}
+                </p>
+              </section>
+
+              <Services />
+            </div>
+
+            <aside className="page-side">
+              <section className="grouped" aria-labelledby="acct-heading">
+                <div className="section-head">
+                  <h2 id="acct-heading">Account</h2>
+                </div>
+                <dl className="group">
+                  <div className="row">
+                    <dt className="row-text">Name</dt>
+                    <dd className="row-value">Alex Rivera</dd>
                   </div>
-                ) : null}
-                {release?.mac.size ? (
-                  <div>
-                    <dt className="text-label">Size</dt>
-                    <dd className="text-readout">{formatSize(release.mac.size)}</dd>
+                  <div className="row">
+                    <dt className="row-text">Church</dt>
+                    <dd className="row-value">Grace Community Church</dd>
                   </div>
-                ) : null}
-              </dl>
-              {release ? (
-                <>
-                  <a className="sm-btn sm-btn--primary sm-btn--lg" href={downloadUrl(ROOT, release.mac.file)} download>
-                    <Download aria-hidden="true" />
-                    Download for Mac
-                  </a>
-                  <p className="text-caption panel__foot">
-                    Open the .dmg and drag SanctuaryMix to Applications. Early builds aren't signed yet: the first
-                    time, Control-click the app and choose Open.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <button className="sm-btn sm-btn--primary sm-btn--lg" disabled>
-                    <Download aria-hidden="true" />
-                    Download for Mac
-                  </button>
-                  {notYet ? (
-                    <p className="text-caption panel__foot">
-                      The first build is on its way. This button turns on as soon as it's published.
-                    </p>
-                  ) : null}
-                </>
-              )}
-            </section>
-
-            <section className="panel" aria-labelledby="win-heading">
-              <div className="panel__head">
-                <Monitor aria-hidden="true" />
-                <h2 id="win-heading" className="text-heading">SanctuaryMix for Windows</h2>
-              </div>
-              <p className="feature__body">Planned after the Mac version settles. We'll let you know here when it's ready.</p>
-              <span className="sm-pill">
-                <span className="sm-pill__dot" aria-hidden="true" />
-                Planned
-              </span>
-            </section>
-
-            <section className="panel" aria-labelledby="acct-heading">
-              <h2 id="acct-heading" className="text-heading">Your account</h2>
-              <dl className="account-details">
-                <div>
-                  <dt className="text-caption">Name</dt>
-                  <dd>Alex Rivera</dd>
-                </div>
-                <div>
-                  <dt className="text-caption">Church</dt>
-                  <dd>Grace Community Church</dd>
-                </div>
-                <div>
-                  <dt className="text-caption">Role</dt>
-                  <dd>Engineer</dd>
-                </div>
-                <div>
-                  <dt className="text-caption">Plan</dt>
-                  <dd>
-                    {choice ? `${choice.plan.name}, ${choice.billing} (trial)` : "Early access"}
-                  </dd>
-                </div>
-              </dl>
-            </section>
+                  <div className="row">
+                    <dt className="row-text">Role</dt>
+                    <dd className="row-value">Engineer</dd>
+                  </div>
+                  <div className="row">
+                    <dt className="row-text">Plan</dt>
+                    <dd className="row-value">{choice ? `${plan} (trial)` : plan}</dd>
+                  </div>
+                </dl>
+                <p className="section-foot footnote">
+                  <Info aria-hidden="true" />
+                  Preview account. Sign-in isn't built yet.
+                </p>
+              </section>
+            </aside>
           </div>
-
-          <Services />
         </div>
       </main>
       <Footer />
@@ -181,38 +193,54 @@ function Services() {
     cloud.listRecordings().then(setList, () => setError(true));
   }, []);
 
+  const days = groupByDate(list ?? []);
+
   return (
     <section id="services" className="services" aria-labelledby="services-heading">
-      <div className="services__head">
-        <h2 id="services-heading" className="section__title">Recorded services</h2>
-        <p className="feature__body">
-          Mixes from your booth, with every fader and mute move. Listen back here or share a link.
-        </p>
+      <div className="section-head">
+        <h2 id="services-heading">Recorded services</h2>
+        {list ? <span className="text-caption mix-muted">{list.length}</span> : null}
       </div>
-      {error ? <p className="mix-muted">Your services didn't load. Reload the page to try again.</p> : null}
+      {error ? <p className="section-foot">Your services didn't load. Reload the page to try again.</p> : null}
       {list && list.length === 0 ? (
-        <p className="mix-muted">No services yet. Recordings appear here after the booth computer uploads them.</p>
+        <div className="empty-state">
+          <Music aria-hidden="true" />
+          <p className="text-heading">No services yet</p>
+          <p className="text-caption mix-muted">They appear here after the booth computer uploads them.</p>
+        </div>
       ) : null}
-      {list && list.length > 0 ? (
-        <ul className="services__list">
-          {list.map((r) => (
-            <li key={r.id}>
-              <a className="service-row" href={`${ROOT}account/service/?id=${encodeURIComponent(r.id)}`}>
-                <Music aria-hidden="true" />
-                <span className="service-row__main">
-                  <span className="text-body-strong">{r.title}</span>
-                  <span className="text-caption mix-muted">
-                    {serviceDateLabel(r.serviceDate)} · {timeOfDay(r.startedAt)} · {audioModeLabel(r)} ·{" "}
-                    {r.eventCount} moves
+      {days.map(([date, items]) => (
+        <section key={date} className="grouped" aria-label={serviceDateLabel(date)}>
+          <div className="section-head section-head--sub">
+            <h3>{serviceDateLabel(date)}</h3>
+          </div>
+          <ul className="group">
+            {items.map((r) => (
+              <li key={r.id}>
+                <a className="row row--link" href={`${ROOT}account/service/?id=${encodeURIComponent(r.id)}`}>
+                  <span className="row-text">
+                    <span>{r.title}</span>
+                    <span className="text-caption">
+                      {timeOfDay(r.startedAt)} · {audioModeLabel(r)} · {r.eventCount} moves
+                    </span>
                   </span>
-                </span>
-                <span className="text-readout mix-muted">{formatClock(r.durationMs)}</span>
-                <ChevronRight aria-hidden="true" />
-              </a>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+                  <span className="text-readout mix-muted">{formatClock(r.durationMs)}</span>
+                  <ChevronRight aria-hidden="true" className="row-chevron" />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
     </section>
   );
+}
+
+/** One group per service date, newest first, as the app's Services page does (groupByServiceDate). */
+function groupByDate(list: CloudRecording[]): [string, CloudRecording[]][] {
+  const days = new Map<string, CloudRecording[]>();
+  for (const r of [...list].sort((a, b) => b.startedAt - a.startedAt)) {
+    days.set(r.serviceDate, [...(days.get(r.serviceDate) ?? []), r]);
+  }
+  return [...days.entries()].sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0));
 }
