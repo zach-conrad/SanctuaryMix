@@ -10,6 +10,7 @@ import "./styles/components.css"; // copy of design/components.css (sm- classes)
 import "./styles/global.css"; // app layout
 import "./styles/recordings.css"; // Mix Manager and the record control
 import "./styles/auth.css"; // sign-in and plans
+import "./styles/aieq.css"; // AI EQ: graph, panel, banner, soundcheck
 import App from "./App";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

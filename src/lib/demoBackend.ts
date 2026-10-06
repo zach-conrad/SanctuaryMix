@@ -1,9 +1,21 @@
 import type { Backend } from "./backend";
+import { eqSnapshot } from "./aieq";
+import { createDemoAiEq } from "./demoAiEq";
 import { createDemoAuth } from "./demoAuth";
 import { createDemoAutomix, guessRole } from "./demoAutomix";
 import { createDemoRecorder } from "./demoRecorder";
 import { createDemoSpl } from "./demoSpl";
-import type { Adjustment, AutoMixStatus, ChannelRole, ConsoleEvent, MeterFrame, Session, Sound } from "./types";
+import type {
+  Adjustment,
+  AiEqStatus,
+  AutoMixStatus,
+  ChannelRole,
+  ConsoleEvent,
+  EqLogEntry,
+  MeterFrame,
+  Session,
+  Sound,
+} from "./types";
 
 const NAMES = [
   "Pastor", "Worship Ld", "BGV 1", "BGV 2", "Kick", "Snare", "Hat", "Tom 1", "Tom 2",
@@ -25,6 +37,9 @@ function demoSound(ch: number): Sound | null {
   if (ch === 26) return "music"; // "Lapel 1": nobody is wearing it, it only hears the band
   return SOUND_OF_ROLE[guessRole(NAMES[ch] ?? "")];
 }
+
+/** Picked for AI when the demo opens, so auto-mix and AI EQ have channels to show. */
+const DEMO_PICKS = [0, 1, 2, 3, 11, 13, 20];
 
 /** Rough "typical level" per channel so the demo looks like a real service. */
 function baseLevel(ch: number): number {
@@ -83,6 +98,50 @@ export function createDemoBackend(): Backend {
       return on;
     },
   });
+  automix.setConfig({
+    ...automix.getConfig(),
+    channels: DEMO_PICKS.map((channel) => ({ channel, role: guessRole(NAMES[channel]) })),
+  });
+  // AI EQ: soundcheck proposals, feedback notches and speech tone keeping (docs/AIEQ.md).
+  const aieqListeners = new Set<(s: AiEqStatus) => void>();
+  const aieqLogListeners = new Set<(e: EqLogEntry) => void>();
+  const aieq = createDemoAiEq({
+    name: (ch) => NAMES[ch] ?? `Ch ${ch + 1}`,
+    picked: () => automix.getConfig().channels,
+    consoleOnline: () => connected,
+    inService: () => automix.status().engaged || recording,
+    allowed: () => auth.session().access.entitlements.aiEq,
+    role: () => auth.session().role,
+    fader: (ch) => (connected ? (faders.get(ch) ?? null) : null),
+    // The feedback guard's fader cut is an AI move, not a person's, so auto-mix doesn't let go of the channel.
+    setFader: (ch, db) => {
+      faders.set(ch, db);
+      emit({ type: "fader", id: { kind: "input", index: ch }, db });
+      recorder.noteChange("assist", { kind: "input", index: ch }, { db });
+    },
+    deskEq: (ch, change) => {
+      if (connected) emit({ type: "eq", id: { kind: "input", index: ch }, change });
+    },
+    status: (s) => aieqListeners.forEach((cb) => cb(s)),
+    log: (e) => aieqLogListeners.forEach((cb) => cb(e)),
+    recording: async (id) => {
+      try {
+        const r = await recorder.getRecording(id);
+        return { startedAt: r.startedAt, durationMs: r.durationMs, title: r.title };
+      } catch {
+        return null;
+      }
+    },
+  });
+  let recording = false;
+  void recorder.onRecorder((s) => {
+    recording = s.active !== null;
+  });
+  // Handy in `npm run dev`: trigger feedback or skip ahead from the browser console.
+  (window as unknown as Record<string, unknown>).sanctuaryDemo = {
+    feedback: (channel = 0, hz = 2500) => aieq.triggerFeedback(channel, hz),
+    fastForward: (seconds = 20) => aieq.fastForward(seconds),
+  };
   const spl = createDemoSpl();
   let timer: ReturnType<typeof setInterval> | null = null;
   let channels = 0;
@@ -140,6 +199,7 @@ export function createDemoBackend(): Backend {
         // A desk someone already set up: most faders a little under unity.
         if (!faders.has(i)) faders.set(i, i < 30 ? -5 : 0);
         emit({ type: "fader", id: { kind: "input", index: i }, db: faders.get(i)! });
+        for (const change of eqSnapshot(aieq.deskEq(i))) emit({ type: "eq", id: { kind: "input", index: i }, change });
       }
     },
     async disconnectConsole() {
@@ -198,11 +258,14 @@ export function createDemoBackend(): Backend {
         throw `Your plan covers up to ${entitlements.maxAiChannels} channels under auto-mix.`;
       automix.engage(on);
     },
+    // One freeze for every AI move, levels and EQ, like the core.
     async automixFreeze() {
       automix.freeze();
+      aieq.freeze();
     },
     async automixResume() {
       automix.resume();
+      aieq.resume();
     },
     async automixResumeChannel(channel) {
       automix.resumeChannel(channel);
@@ -230,6 +293,83 @@ export function createDemoBackend(): Backend {
     async onAutomixAdjustment(cb) {
       adjustmentListeners.add(cb);
       return () => adjustmentListeners.delete(cb);
+    },
+    async aieqGetConfig() {
+      return aieq.getConfig();
+    },
+    async aieqSetConfig(config) {
+      return aieq.setConfig(config);
+    },
+    async aieqStatus() {
+      return aieq.status();
+    },
+    async onAiEq(cb) {
+      aieqListeners.add(cb);
+      return () => aieqListeners.delete(cb);
+    },
+    async onAiEqLog(cb) {
+      aieqLogListeners.add(cb);
+      return () => aieqLogListeners.delete(cb);
+    },
+    async aieqLog(limit) {
+      return aieq.log(limit);
+    },
+    async aieqSoundcheckStart() {
+      aieq.soundcheckStart();
+    },
+    async aieqSoundcheckStop() {
+      aieq.soundcheckStop();
+    },
+    async aieqApply(channel) {
+      aieq.apply(channel);
+    },
+    async aieqApplyAll() {
+      aieq.applyAll();
+    },
+    async aieqSkip(channel) {
+      aieq.skip(channel);
+    },
+    async aieqKeepMyEq() {
+      aieq.keepMyEq();
+    },
+    async aieqUndo(channel) {
+      aieq.undo(channel);
+    },
+    async aieqUndoAll() {
+      aieq.undoAll();
+    },
+    async aieqHandBack(channel) {
+      aieq.handBack(channel);
+    },
+    async aieqSetEq(channel, eq) {
+      aieq.setEq(channel, eq);
+    },
+    async aieqCompare(channel, side) {
+      aieq.compare(channel, side);
+    },
+    async aieqRestoreProfile() {
+      aieq.restoreProfile();
+    },
+    async aieqDismissProfile() {
+      aieq.dismissProfile();
+    },
+    async aieqRingOutStart() {
+      aieq.ringOutStart();
+    },
+    async aieqRingOutStop() {
+      aieq.ringOutStop();
+    },
+    async aieqDismissFeedback() {
+      aieq.dismissFeedback();
+    },
+    async aieqIdeas(recordingId) {
+      return aieq.ideas(recordingId);
+    },
+    async aieqSetIdea(id, state) {
+      return aieq.setIdea(id, state);
+    },
+    async aieqAudit(recordingId) {
+      return aieq.audit(recordingId);
     },
     async onMeters(cb) {
       meterListeners.add(cb);

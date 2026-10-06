@@ -1,8 +1,9 @@
 import { create } from "zustand";
+import { applyEqChange } from "../lib/aieq";
 import { getBackend } from "../lib/backend";
-import type { ChannelId, ConsoleConfig, ConsoleEvent, MeterFrame, MeteringInfo, Session } from "../lib/types";
+import type { ChannelEq, ChannelId, ConsoleConfig, ConsoleEvent, MeterFrame, MeteringInfo, Session } from "../lib/types";
 
-export type View = "mixer" | "scenes" | "recordings" | "assist" | "setup" | "settings";
+export type View = "mixer" | "scenes" | "recordings" | "assist" | "eqSoundcheck" | "setup" | "settings";
 export type Theme = "dark" | "light" | "system";
 type LinkStatus = "off" | "connecting" | "on" | "error";
 
@@ -11,6 +12,8 @@ export interface Strip {
   name: string;
   faderDb: number | null;
   muted: boolean;
+  /** The desk's input EQ, once the console has sent it. */
+  eq: ChannelEq | null;
 }
 
 interface MixerState {
@@ -69,7 +72,7 @@ const input = (index: number): ChannelId => ({ kind: "input", index });
 function makeStrips(count: number, existing: Strip[] = []): Strip[] {
   return Array.from(
     { length: count },
-    (_, i) => existing[i] ?? { index: i, name: `Ch ${i + 1}`, faderDb: 0, muted: false },
+    (_, i) => existing[i] ?? { index: i, name: `Ch ${i + 1}`, faderDb: 0, muted: false, eq: null },
   );
 }
 
@@ -277,6 +280,12 @@ function applyConsoleEvent(event: ConsoleEvent, set: Set, get: () => MixerState)
     case "name":
       if (event.id.kind === "input" && event.id.index < get().strips.length) {
         updateStrip(set, event.id.index, { name: event.name || `Ch ${event.id.index + 1}` });
+      }
+      break;
+    case "eq":
+      if (event.id.kind === "input") {
+        const strip = get().strips[event.id.index];
+        if (strip) updateStrip(set, event.id.index, { eq: applyEqChange(strip.eq, event.change) });
       }
       break;
   }

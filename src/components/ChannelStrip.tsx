@@ -2,6 +2,7 @@ import { memo } from "react";
 import { formatDb } from "../lib/levels";
 import { isAutoChanged, MODE_DETAIL, useChannelAuto } from "../store/automix";
 import { useMixer, type Strip } from "../store/mixer";
+import { EqTag } from "./EqTag";
 import { Fader } from "./Fader";
 import { Meter } from "./Meter";
 import { MuteKey } from "./MuteKey";
@@ -25,6 +26,7 @@ export const ChannelStrip = memo(function ChannelStrip({ strip, disabled }: { st
       <div className="sm-strip__name" title={strip.name}>
         <span className="sm-strip__num">{strip.index + 1}</span>
         <span className="sm-strip__label">{strip.name}</span>
+        <EqTag channel={strip.index} />
       </div>
       <div className="sm-strip__bay">
         <Meter channel={strip.index} />

@@ -4,6 +4,14 @@
 
 import type {
   Adjustment,
+  AiEqConfig,
+  AiEqStatus,
+  ChannelEq,
+  CompareSide,
+  EqAudit,
+  EqIdea,
+  EqLogEntry,
+  IdeaState,
   AudioDeviceInfo,
   AutoMixConfig,
   AutoMixStatus,
@@ -83,6 +91,46 @@ export interface Backend {
   automixHeard(names: string[]): Promise<HeardChannel[]>;
   onAutomix(cb: (status: AutoMixStatus) => void): Promise<Unlisten>;
   onAutomixAdjustment(cb: (adjustment: Adjustment) => void): Promise<Unlisten>;
+
+  // AI EQ (docs/AIEQ.md). Hard limits live in the Rust core; these only ask.
+  aieqGetConfig(): Promise<AiEqConfig>;
+  /** Engineers and Admins for tone keeping and the tap point; anyone for on/off. */
+  aieqSetConfig(config: AiEqConfig): Promise<AiEqConfig>;
+  aieqStatus(): Promise<AiEqStatus>;
+  onAiEq(cb: (status: AiEqStatus) => void): Promise<Unlisten>;
+  onAiEqLog(cb: (entry: EqLogEntry) => void): Promise<Unlisten>;
+  /** Newest first. */
+  aieqLog(limit?: number): Promise<EqLogEntry[]>;
+  /** Starts listening to every picked channel for soundcheck. Refused mid-service. */
+  aieqSoundcheckStart(): Promise<void>;
+  aieqSoundcheckStop(): Promise<void>;
+  /** Applies a channel's soundcheck proposal to the desk. */
+  aieqApply(channel: number): Promise<void>;
+  aieqApplyAll(): Promise<void>;
+  aieqSkip(channel: number): Promise<void>;
+  /** Adopts the desk's EQ as it is; AI EQ only keeps band 4 for feedback. Engineers and Admins. */
+  aieqKeepMyEq(): Promise<void>;
+  /** Puts a channel's EQ back to its soundcheck EQ and holds it there. */
+  aieqUndo(channel: number): Promise<void>;
+  aieqUndoAll(): Promise<void>;
+  aieqHandBack(channel: number): Promise<void>;
+  /** A person's own EQ edit from the EQ panel. Marks the channel's EQ as theirs. */
+  aieqSetEq(channel: number, eq: ChannelEq): Promise<void>;
+  /** Flips the desk between the EQ before and after the last apply. Not during a service. */
+  aieqCompare(channel: number, side: CompareSide | null): Promise<void>;
+  /** Puts last Sunday's EQ back on the channels that differ. */
+  aieqRestoreProfile(): Promise<void>;
+  aieqDismissProfile(): Promise<void>;
+  /** Feedback check: Engineers and Admins; the UI asks first, every time. */
+  aieqRingOutStart(): Promise<void>;
+  aieqRingOutStop(): Promise<void>;
+  aieqDismissFeedback(): Promise<void>;
+  /** Ideas for next week; `recordingId` null for every waiting idea. */
+  aieqIdeas(recordingId: string | null): Promise<EqIdea[]>;
+  /** Keep or dismiss an idea. Engineers and Admins. */
+  aieqSetIdea(id: string, state: IdeaState): Promise<EqIdea[]>;
+  /** Every EQ change around a recorded service, plus its ideas. */
+  aieqAudit(recordingId: string): Promise<EqAudit>;
 
   onMeters(cb: (frame: MeterFrame) => void): Promise<Unlisten>;
   onConsole(cb: (event: ConsoleEvent) => void): Promise<Unlisten>;
@@ -179,6 +227,31 @@ async function createTauriBackend(): Promise<Backend> {
     automixHeard: (names) => invoke("automix_heard", { names }),
     onAutomix: (cb) => listen<AutoMixStatus>("automix", (e) => cb(e.payload)),
     onAutomixAdjustment: (cb) => listen<Adjustment>("automix-adjustment", (e) => cb(e.payload)),
+    aieqGetConfig: () => invoke("aieq_get_config"),
+    aieqSetConfig: (config) => invoke("aieq_set_config", { config }),
+    aieqStatus: () => invoke("aieq_status"),
+    onAiEq: (cb) => listen<AiEqStatus>("aieq", (e) => cb(e.payload)),
+    onAiEqLog: (cb) => listen<EqLogEntry>("aieq-log", (e) => cb(e.payload)),
+    aieqLog: (limit) => invoke("aieq_log", { limit: limit ?? null }),
+    aieqSoundcheckStart: () => invoke("aieq_soundcheck_start"),
+    aieqSoundcheckStop: () => invoke("aieq_soundcheck_stop"),
+    aieqApply: (channel) => invoke("aieq_apply", { channel }),
+    aieqApplyAll: () => invoke("aieq_apply_all"),
+    aieqSkip: (channel) => invoke("aieq_skip", { channel }),
+    aieqKeepMyEq: () => invoke("aieq_keep_my_eq"),
+    aieqUndo: (channel) => invoke("aieq_undo", { channel }),
+    aieqUndoAll: () => invoke("aieq_undo_all"),
+    aieqHandBack: (channel) => invoke("aieq_hand_back", { channel }),
+    aieqSetEq: (channel, eq) => invoke("aieq_set_eq", { channel, eq }),
+    aieqCompare: (channel, side) => invoke("aieq_compare", { channel, side }),
+    aieqRestoreProfile: () => invoke("aieq_restore_profile"),
+    aieqDismissProfile: () => invoke("aieq_dismiss_profile"),
+    aieqRingOutStart: () => invoke("aieq_ring_out_start"),
+    aieqRingOutStop: () => invoke("aieq_ring_out_stop"),
+    aieqDismissFeedback: () => invoke("aieq_dismiss_feedback"),
+    aieqIdeas: (recordingId) => invoke("aieq_ideas", { recordingId }),
+    aieqSetIdea: (id, state) => invoke("aieq_set_idea", { id, state }),
+    aieqAudit: (recordingId) => invoke("aieq_audit", { recordingId }),
     onMeters: (cb) => listen<MeterFrame>("meters", (e) => cb(e.payload)),
     onConsole: (cb) => listen<ConsoleEvent>("console", (e) => cb(e.payload)),
 

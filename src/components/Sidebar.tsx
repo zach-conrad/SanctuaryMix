@@ -10,7 +10,8 @@ const ITEMS: { view: View; label: string; icon: typeof Cable }[] = [
 ];
 
 function NavItem({ view, label, icon: Icon }: (typeof ITEMS)[number]) {
-  const current = useMixer((s) => s.view);
+  // The EQ soundcheck page belongs to Assist.
+  const current = useMixer((s) => (s.view === "eqSoundcheck" ? "assist" : s.view));
   const setView = useMixer((s) => s.setView);
   return (
     <button

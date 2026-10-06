@@ -25,7 +25,41 @@ export type ConsoleEvent =
   | { type: "disconnected"; reason: string | null }
   | { type: "fader"; id: ChannelId; db: number | null }
   | { type: "mute"; id: ChannelId; muted: boolean }
-  | { type: "name"; id: ChannelId; name: string };
+  | { type: "name"; id: ChannelId; name: string }
+  | { type: "eq"; id: ChannelId; change: EqChange };
+
+// ---- Channel EQ (crates/mix-core/src/eq.rs) ----
+
+/** Band shape. Bands 1 and 2 (0-based) are always bells; band 0 can also be a
+ * low shelf or high-pass, band 3 a high shelf or low-pass. */
+export type EqBandKind = "bell" | "lowShelf" | "highShelf" | "lowPass" | "highPass";
+
+export interface EqBand {
+  kind: EqBandKind;
+  freqHz: number;
+  /** Bandwidth in octaves, as the desk labels it (1.5 wide to 1/9 narrow). */
+  width: number;
+  gainDb: number;
+}
+
+export interface Hpf {
+  on: boolean;
+  freqHz: number;
+}
+
+/** Bands are 0-3 here and shown as 1-4. Band 3 (shown as 4) is kept for feedback notches. */
+export interface ChannelEq {
+  hpf: Hpf;
+  bands: [EqBand, EqBand, EqBand, EqBand];
+}
+
+export type EqChange =
+  | { param: "bandKind"; band: number; kind: EqBandKind }
+  | { param: "bandFreq"; band: number; hz: number }
+  | { param: "bandWidth"; band: number; width: number }
+  | { param: "bandGain"; band: number; db: number }
+  | { param: "hpfOn"; on: boolean }
+  | { param: "hpfFreq"; hz: number };
 
 export type ConsoleModel = "dlive" | "simulated";
 
@@ -434,4 +468,166 @@ export interface SplPoint {
   t: number;
   a: number;
   c: number;
+}
+
+// ---- AI EQ (crates/tonal/src/types.rs, docs/AIEQ.md) ----
+
+export type TapPoint = "beforeEq" | "afterEq";
+
+export interface AiEqConfig {
+  /** AI EQ's own on/off, separate from auto-mix. Channels and roles are auto-mix's. */
+  enabled: boolean;
+  /** Small, slow tone moves on speech mics during the service (Engineers and Admins). */
+  toneKeeping: boolean;
+  tap: TapPoint;
+}
+
+export type EqMode =
+  | "off"
+  | "consoleOffline"
+  | "notSupported"
+  | "reading"
+  | "frozen"
+  | "notChecked"
+  | "set"
+  | "keeping"
+  | "notch"
+  | "yours"
+  | "undone";
+
+export interface EqProposal {
+  title: string;
+  reason: string;
+  /** The whole EQ as it would be on the desk. */
+  eq: ChannelEq;
+  /** Each change as shown, e.g. "320 Hz  0.0 → −2.0 dB". */
+  changes: string[];
+}
+
+export interface Notch {
+  hz: number;
+  gainDb: number;
+  atMs: number;
+}
+
+export interface EqChannelStatus {
+  channel: number;
+  name: string | null;
+  role: ChannelRole;
+  mode: EqMode;
+  eq: ChannelEq | null;
+  baseline: ChannelEq | null;
+  proposal: EqProposal | null;
+  notch: Notch | null;
+  toneOffsetDb: number | null;
+  /** What the mic hears: 60 values, 1/6 octave from 20 Hz (see SPECTRUM_FREQS), dB relative to its average. */
+  spectrum: number[] | null;
+  heardSecs: number;
+  differsFromProfile: boolean;
+}
+
+export type SoundcheckState =
+  | "upNext"
+  | "listening"
+  | "done"
+  | "soundsGood"
+  | "noSound"
+  | "applied"
+  | "skipped";
+
+export interface SoundcheckChannel {
+  channel: number;
+  state: SoundcheckState;
+  heardSecs: number;
+  changes: number;
+}
+
+export interface SoundcheckStatus {
+  running: boolean;
+  channels: SoundcheckChannel[];
+}
+
+export type CompareSide = "before" | "after";
+
+export interface FeedbackEvent {
+  id: number;
+  atMs: number;
+  channel: number;
+  channelName: string;
+  hz: number;
+  /** Null when band 4 was already holding a notch (fader only). */
+  notchDb: number | null;
+  faderCutDb: number;
+  countToday: number;
+}
+
+export interface RingResult {
+  channel: number;
+  hz: number | null;
+  ceilingDb: number | null;
+}
+
+export interface RingOutStatus {
+  running: boolean;
+  channel: number | null;
+  results: RingResult[];
+}
+
+export interface AiEqStatus {
+  enabled: boolean;
+  frozen: boolean;
+  consoleOnline: boolean;
+  eqSupported: boolean;
+  audioOk: boolean;
+  toneKeeping: boolean;
+  /** Recording or auto-mix on: soundcheck changes and Before | After wait. */
+  inService: boolean;
+  soundcheck: SoundcheckStatus | null;
+  compare: { channel: number; side: CompareSide } | null;
+  ringOut: RingOutStatus | null;
+  feedback: FeedbackEvent | null;
+  profileDiffers: number[];
+  channels: EqChannelStatus[];
+}
+
+/** Matches eq_audit.action in docs/supabase/eq_audit.sql. */
+export type EqAction = "soundcheck" | "feedback" | "tone" | "undo" | "person" | "handBack";
+
+export interface EqActor {
+  kind: "ai" | "person";
+  role: Role | null;
+  name: string | null;
+  userId: string | null;
+  where: "app" | "desk" | null;
+}
+
+export interface EqLogEntry {
+  atMs: number;
+  channel: number;
+  channelName: string;
+  action: EqAction;
+  changes: string[];
+  reason: string | null;
+  by: EqActor;
+  appliedBy: EqActor | null;
+}
+
+export type IdeaState = "waiting" | "kept" | "dismissed";
+
+export interface EqIdea {
+  id: string;
+  recordingId: string | null;
+  atMs: number;
+  channel: number;
+  channelName: string;
+  title: string;
+  change: string;
+  reason: string;
+  state: IdeaState;
+}
+
+/** A service's EQ changes and ideas, as the website shows them. */
+export interface EqAudit {
+  entries: (EqLogEntry & { tMs: number | null })[];
+  ideas: EqIdea[];
 }
