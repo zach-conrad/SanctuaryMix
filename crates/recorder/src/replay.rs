@@ -12,12 +12,7 @@ use crate::RecordedEvent;
 
 /// The channel an event is about, if any.
 pub fn channel_of(event: &ConsoleEvent) -> Option<ChannelId> {
-    match event {
-        ConsoleEvent::Fader { id, .. }
-        | ConsoleEvent::Mute { id, .. }
-        | ConsoleEvent::Name { id, .. } => Some(*id),
-        ConsoleEvent::Connected { .. } | ConsoleEvent::Disconnected { .. } => None,
-    }
+    event.channel()
 }
 
 /// Mixer state at `t_ms`: the snapshot plus every event up to and including
@@ -50,8 +45,8 @@ pub fn state_at(events: &[RecordedEvent], t_ms: u64) -> Vec<ChannelState> {
 }
 
 /// Moves to send as a replay clock goes from `from_ms` to `to_ms`: events with
-/// `from_ms < t_ms <= to_ms`, fader and mute only (no snapshot rows, names or
-/// connection events), optionally limited to `channels`.
+/// `from_ms < t_ms <= to_ms`: fader, mute and EQ changes (no snapshot rows,
+/// names or connection events), optionally limited to `channels`.
 pub fn moves_between<'a>(
     events: &'a [RecordedEvent],
     from_ms: u64,
@@ -67,7 +62,9 @@ pub fn moves_between<'a>(
                 return false;
             }
             let id = match &e.event {
-                ConsoleEvent::Fader { id, .. } | ConsoleEvent::Mute { id, .. } => *id,
+                ConsoleEvent::Fader { id, .. }
+                | ConsoleEvent::Mute { id, .. }
+                | ConsoleEvent::Eq { id, .. } => *id,
                 _ => return false,
             };
             channels.is_none_or(|set| set.contains(&id))

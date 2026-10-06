@@ -833,6 +833,7 @@ fn encode_event(event: &ConsoleEvent) -> Result<(Option<ChannelId>, &'static str
         ConsoleEvent::Fader { id, db } => (Some(*id), "fader", serde_json::to_string(db)?),
         ConsoleEvent::Mute { id, muted } => (Some(*id), "mute", serde_json::to_string(muted)?),
         ConsoleEvent::Name { id, name } => (Some(*id), "name", serde_json::to_string(name)?),
+        ConsoleEvent::Eq { id, change } => (Some(*id), "eq", serde_json::to_string(change)?),
         ConsoleEvent::Connected { model } => (None, "connected", serde_json::to_string(model)?),
         ConsoleEvent::Disconnected { reason } => {
             (None, "disconnected", serde_json::to_string(reason)?)
@@ -855,6 +856,10 @@ fn decode_event(kind: &str, channel: Option<ChannelId>, value: &str) -> Result<C
         "name" => ConsoleEvent::Name {
             id: need_channel()?,
             name: serde_json::from_str(value)?,
+        },
+        "eq" => ConsoleEvent::Eq {
+            id: need_channel()?,
+            change: serde_json::from_str(value)?,
         },
         "connected" => ConsoleEvent::Connected {
             model: serde_json::from_str(value)?,
@@ -956,6 +961,15 @@ mod tests {
                         ChangeSource::Console,
                         ConsoleEvent::Disconnected { reason: None },
                     ),
+                    ev(
+                        4,
+                        400,
+                        ChangeSource::Assist,
+                        ConsoleEvent::Eq {
+                            id: ch,
+                            change: mix_core::eq::EqChange::BandGain { band: 3, db: -6.0 },
+                        },
+                    ),
                 ],
             )
             .unwrap();
@@ -968,10 +982,11 @@ mod tests {
         assert_eq!(list[0].id, b.id, "newest first");
         assert_eq!(list[1].status, RecordingStatus::Complete);
         assert_eq!(list[1].duration_ms, 60_000);
-        assert_eq!(list[1].event_count, 3, "snapshot rows are not counted");
+        assert_eq!(list[1].event_count, 4, "snapshot rows are not counted");
 
         let events = store.events(&a.id).unwrap();
-        assert_eq!(events.len(), 4);
+        assert_eq!(events.len(), 5);
+        assert!(matches!(events[4].event, ConsoleEvent::Eq { .. }));
         assert_eq!(events[1].event, ConsoleEvent::Fader { id: ch, db: None });
         assert_eq!(store.events_between(&a.id, 100, 300).unwrap().len(), 2);
 

@@ -9,13 +9,32 @@
 //! - Fader level (NRPN): `BN 63 CH  BN 62 17  BN 06 LV`
 //! - Get channel name: `F0 00 00 1A 50 10 01 00 0N 01 CH F7`
 //! - Name reply: `F0 00 00 1A 50 10 01 00 0N 02 CH <ascii> F7`
+//! - Input PEQ and HPF (NRPN, firmware 1.9+): `BN 63 CH  BN 62 PP  BN 06 VV`,
+//!   PP = `1A`..`29` (band 0-3 x type, frequency, width, gain), `30` HPF
+//!   frequency, `31` HPF on/off. Value grids are in [`mix_core::eq::grid`].
+//! - Get a parameter: `F0 00 00 1A 50 10 01 00 0N 05 0B PP CH F7`; the desk
+//!   answers with the matching NRPN message (fader `17`, EQ, HPF).
 
+use mix_core::eq::{grid, EqChange};
 use mix_core::{ChannelId, ChannelKind, ConsoleEvent};
 
 const SYSEX_HEADER: [u8; 7] = [0x00, 0x00, 0x1A, 0x50, 0x10, 0x01, 0x00];
 const NRPN_FADER: u8 = 0x17;
 const SYSEX_GET_NAME: u8 = 0x01;
 const SYSEX_NAME_REPLY: u8 = 0x02;
+const SYSEX_GET: [u8; 2] = [0x05, 0x0B];
+/// First PEQ parameter (band 0 type); each band has four, in the order type,
+/// frequency, width, gain.
+const NRPN_PEQ_FIRST: u8 = 0x1A;
+const NRPN_PEQ_LAST: u8 = 0x29;
+const NRPN_HPF_FREQ: u8 = 0x30;
+const NRPN_HPF_ON: u8 = 0x31;
+
+/// Every EQ parameter on an input, in the order a full read asks for them.
+pub const EQ_PARAMS: [u8; 18] = [
+    0x30, 0x31, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
+    0x28, 0x29,
+];
 
 /// The console's "MIDI channel" setting. dLive uses it and the next four
 /// MIDI channels, so valid bases are 0..=11 (1-12 on the surface).
@@ -103,6 +122,92 @@ pub fn fader(base: MidiBase, id: ChannelId, db: Option<f32>) -> Option<Vec<u8>> 
         0x06,
         db_to_level(db),
     ])
+}
+
+/// The NRPN parameter and 7-bit value for one EQ change, or `None` for a
+/// band shape the desk can't put on that band.
+pub fn eq_param(change: &EqChange) -> Option<(u8, u8)> {
+    let peq = |band: u8, field: u8| -> Option<u8> {
+        (band < 4).then_some(NRPN_PEQ_FIRST + band * 4 + field)
+    };
+    Some(match *change {
+        EqChange::BandKind { band, kind } => {
+            if !kind.allowed_on(band) {
+                return None;
+            }
+            (peq(band, 0)?, grid::kind_value(kind))
+        }
+        EqChange::BandFreq { band, hz } => (peq(band, 1)?, grid::freq_value(hz)),
+        EqChange::BandWidth { band, width } => (peq(band, 2)?, grid::width_value(width)),
+        EqChange::BandGain { band, db } => (peq(band, 3)?, grid::gain_value(db)),
+        EqChange::HpfFreq { hz } => (NRPN_HPF_FREQ, grid::hpf_value(hz)),
+        EqChange::HpfOn { on } => (NRPN_HPF_ON, if on { 0x7F } else { 0x00 }),
+    })
+}
+
+/// The EQ change an NRPN parameter and value stand for.
+pub fn eq_change(param: u8, value: u8) -> Option<EqChange> {
+    Some(match param {
+        NRPN_PEQ_FIRST..=NRPN_PEQ_LAST => {
+            let band = (param - NRPN_PEQ_FIRST) / 4;
+            match (param - NRPN_PEQ_FIRST) % 4 {
+                0 => EqChange::BandKind {
+                    band,
+                    kind: grid::kind_from_value(value)?,
+                },
+                1 => EqChange::BandFreq {
+                    band,
+                    hz: grid::freq_from_value(value),
+                },
+                2 => EqChange::BandWidth {
+                    band,
+                    width: grid::width_from_value(value),
+                },
+                _ => EqChange::BandGain {
+                    band,
+                    db: grid::gain_from_value(value),
+                },
+            }
+        }
+        NRPN_HPF_FREQ => EqChange::HpfFreq {
+            hz: grid::hpf_from_value(value),
+        },
+        NRPN_HPF_ON => EqChange::HpfOn { on: value >= 0x40 },
+        _ => return None,
+    })
+}
+
+/// Sets one EQ parameter on an input. Bands 1 and 2 are always bells, so a
+/// shape change there is skipped (returns an empty message).
+pub fn eq(base: MidiBase, id: ChannelId, change: &EqChange) -> Option<Vec<u8>> {
+    if id.kind != ChannelKind::Input {
+        return None;
+    }
+    let (offset, ch) = address(id)?;
+    let Some((param, value)) = eq_param(change) else {
+        // Bells on bands 1 and 2 have no shape message at all.
+        return matches!(change, EqChange::BandKind { band: 1 | 2, kind } if *kind == mix_core::eq::EqBandKind::Bell)
+            .then(Vec::new);
+    };
+    let status = 0xB0 | midi_channel(base, offset);
+    Some(vec![
+        status, 0x63, ch, status, 0x62, param, status, 0x06, value,
+    ])
+}
+
+/// Asks the desk for one parameter (fader `0x17`, or one of [`EQ_PARAMS`]).
+pub fn get_request(base: MidiBase, id: ChannelId, param: u8) -> Option<Vec<u8>> {
+    let (offset, ch) = address(id)?;
+    let mut msg = vec![0xF0];
+    msg.extend_from_slice(&SYSEX_HEADER);
+    msg.push(midi_channel(base, offset));
+    msg.extend_from_slice(&SYSEX_GET);
+    msg.extend_from_slice(&[param, ch, 0xF7]);
+    Some(msg)
+}
+
+pub fn fader_request(base: MidiBase, id: ChannelId) -> Option<Vec<u8>> {
+    get_request(base, id, NRPN_FADER)
 }
 
 pub fn name_request(base: MidiBase, id: ChannelId) -> Option<Vec<u8>> {
@@ -199,12 +304,19 @@ impl Decoder {
                     0x63 => state.0 = Some(d2),
                     0x62 => state.1 = Some(d2),
                     0x06 => {
-                        if let (Some(ch), Some(NRPN_FADER)) = *state {
-                            let id = channel_from_address(offset, ch)?;
+                        let (Some(ch), Some(param)) = *state else {
+                            return None;
+                        };
+                        let id = channel_from_address(offset, ch)?;
+                        if param == NRPN_FADER {
                             return Some(ConsoleEvent::Fader {
                                 id,
                                 db: level_to_db(d2),
                             });
+                        }
+                        if id.kind == ChannelKind::Input {
+                            let change = eq_change(param, d2)?;
+                            return Some(ConsoleEvent::Eq { id, change });
                         }
                     }
                     _ => {}
@@ -259,6 +371,106 @@ mod tests {
             index: 0,
         };
         assert_eq!(mute(BASE, dca, true).unwrap()[..2], [0x94, 0x36]);
+    }
+
+    #[test]
+    fn encodes_eq() {
+        let id = ChannelId::input(9);
+        // Band 1 gain 0 dB: param 0x21, value 0x3F.
+        assert_eq!(
+            eq(BASE, id, &EqChange::BandGain { band: 1, db: 0.0 }).unwrap(),
+            [0xB0, 0x63, 0x09, 0xB0, 0x62, 0x21, 0xB0, 0x06, 0x3F]
+        );
+        // Band 3 frequency 1 kHz: param 0x27, value 0x47.
+        assert_eq!(
+            eq(
+                BASE,
+                id,
+                &EqChange::BandFreq {
+                    band: 3,
+                    hz: 1_000.0
+                }
+            )
+            .unwrap()[5..],
+            [0x27, 0xB0, 0x06, 0x47]
+        );
+        assert_eq!(
+            eq(BASE, id, &EqChange::HpfOn { on: true }).unwrap()[5..],
+            [0x31, 0xB0, 0x06, 0x7F]
+        );
+        // A high-pass shape only exists on band 0.
+        let hp = mix_core::eq::EqBandKind::HighPass;
+        assert!(eq(BASE, id, &EqChange::BandKind { band: 3, kind: hp }).is_none());
+        assert_eq!(
+            eq(BASE, id, &EqChange::BandKind { band: 0, kind: hp }).unwrap()[5..],
+            [0x1A, 0xB0, 0x06, 0x04]
+        );
+        // EQ is for inputs only.
+        let aux = ChannelId {
+            kind: ChannelKind::Aux,
+            index: 0,
+        };
+        assert!(eq(BASE, aux, &EqChange::HpfOn { on: true }).is_none());
+    }
+
+    #[test]
+    fn encodes_get_requests() {
+        assert_eq!(
+            fader_request(BASE, ChannelId::input(4)).unwrap(),
+            [0xF0, 0x00, 0x00, 0x1A, 0x50, 0x10, 0x01, 0x00, 0x00, 0x05, 0x0B, 0x17, 0x04, 0xF7]
+        );
+        assert_eq!(
+            get_request(BASE, ChannelId::input(0), 0x30).unwrap()[11],
+            0x30
+        );
+    }
+
+    #[test]
+    fn decodes_eq_from_the_desk() {
+        let mut d = Decoder::new(BASE);
+        let events = d.feed(&[0xB0, 0x63, 0x02, 0xB0, 0x62, 0x29, 0xB0, 0x06, 0x3F]);
+        assert_eq!(
+            events,
+            [ConsoleEvent::Eq {
+                id: ChannelId::input(2),
+                change: EqChange::BandGain { band: 3, db: 0.0 }
+            }]
+        );
+        // Running status: the next parameter without repeating the status byte.
+        let events = d.feed(&[0x62, 0x31, 0x06, 0x00]);
+        assert_eq!(
+            events,
+            [ConsoleEvent::Eq {
+                id: ChannelId::input(2),
+                change: EqChange::HpfOn { on: false }
+            }]
+        );
+    }
+
+    #[test]
+    fn every_eq_param_round_trips() {
+        for &param in &EQ_PARAMS {
+            for value in [0u8, 1, 4, 24, 63, 100, 126] {
+                let Some(change) = eq_change(param, value) else {
+                    continue;
+                };
+                // A shape that band can't take (a high-pass on band 1).
+                let Some((p, v)) = eq_param(&change) else {
+                    continue;
+                };
+                assert_eq!(p, param);
+                if param != NRPN_HPF_ON {
+                    assert_eq!(
+                        v,
+                        value.min(if param <= 0x29 && (param - 0x1A) % 4 == 2 {
+                            24
+                        } else {
+                            126
+                        })
+                    );
+                }
+            }
+        }
     }
 
     #[test]

@@ -359,6 +359,10 @@ async fn send(state: &AppState, event: &ConsoleEvent) -> CmdResult<()> {
     match *event {
         ConsoleEvent::Fader { id, db } => adapter.set_fader(id, db).await.map_err(err)?,
         ConsoleEvent::Mute { id, muted } => adapter.set_mute(id, muted).await.map_err(err)?,
+        // Recorded EQ moves go back too, on a desk that takes EQ.
+        ConsoleEvent::Eq { id, change } if adapter.supports_eq() => {
+            adapter.set_eq(id, change).await.map_err(err)?
+        }
         _ => return Ok(()),
     }
     state.control.publish(ChangeSource::Replay, event.clone());

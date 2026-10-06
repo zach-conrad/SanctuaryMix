@@ -11,6 +11,7 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 
+use mix_core::eq::EqChange;
 use mix_core::{ChangeSource, ChannelId, ChannelState, ConsoleEvent, ControlChange};
 
 use crate::{ChannelName, FileKind, RecordedEvent, Recording, RecordingStatus, Result, Store};
@@ -32,6 +33,7 @@ pub const MANIFEST_FILE: &str = "manifest.json";
 enum SentValue {
     Fader(Option<f32>),
     Mute(bool),
+    Eq(EqChange),
 }
 
 impl SentValue {
@@ -42,6 +44,7 @@ impl SentValue {
                 (a - b).abs() <= ECHO_FADER_TOLERANCE_DB
             }
             (Self::Mute(a), Self::Mute(b)) => a == b,
+            (Self::Eq(a), Self::Eq(b)) => a.same_value(&b),
             _ => false,
         }
     }
@@ -59,6 +62,7 @@ fn control_value(event: &ConsoleEvent) -> Option<(ChannelId, SentValue)> {
     match event {
         ConsoleEvent::Fader { id, db } => Some((*id, SentValue::Fader(*db))),
         ConsoleEvent::Mute { id, muted } => Some((*id, SentValue::Mute(*muted))),
+        ConsoleEvent::Eq { id, change } => Some((*id, SentValue::Eq(*change))),
         _ => None,
     }
 }
