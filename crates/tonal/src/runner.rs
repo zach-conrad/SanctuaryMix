@@ -36,7 +36,8 @@ const REREAD_AFTER: Duration = Duration::from_secs(5);
 /// Where EQ (and feedback-check fader) messages go.
 #[async_trait]
 pub trait DeskSink: Send + Sync + 'static {
-    async fn set_eq(&self, channel: u16, change: EqChange) -> Result<(), String>;
+    /// `by_ai`: AI EQ's own move; otherwise a person asked for it (recordings show which).
+    async fn set_eq(&self, channel: u16, change: EqChange, by_ai: bool) -> Result<(), String>;
     /// Asks the desk for every EQ parameter on `channel`.
     async fn request_eq(&self, channel: u16) -> Result<(), String>;
     /// Feedback check only.
@@ -210,7 +211,7 @@ impl<S: DeskSink, O: Observer> Runner<S, O> {
                 continue;
             }
             self.budget -= 1;
-            if let Err(e) = self.sink.set_eq(s.channel, s.change).await {
+            if let Err(e) = self.sink.set_eq(s.channel, s.change, s.by_ai).await {
                 log::warn!("AI EQ couldn't set input {}: {e}", s.channel + 1);
             }
         }
@@ -329,7 +330,7 @@ mod tests {
 
     #[async_trait]
     impl DeskSink for Desk {
-        async fn set_eq(&self, channel: u16, change: EqChange) -> Result<(), String> {
+        async fn set_eq(&self, channel: u16, change: EqChange, _: bool) -> Result<(), String> {
             self.eq_msgs.lock().unwrap().push((channel, change));
             Ok(())
         }

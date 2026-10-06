@@ -359,6 +359,9 @@ impl AiEq {
 
     /// The channels the runner should read EQ from (picked and not yet read).
     pub fn unread(&self) -> Vec<u16> {
+        if !self.console_online || !self.eq_supported {
+            return Vec::new();
+        }
         self.picks
             .iter()
             .map(|p| p.channel)

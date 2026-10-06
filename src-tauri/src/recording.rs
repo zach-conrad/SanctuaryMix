@@ -105,6 +105,11 @@ impl Recordings {
         self.active.lock().await.is_some()
     }
 
+    /// The recording under way, if any.
+    pub async fn active_id(&self) -> Option<String> {
+        self.active.lock().await.as_ref().map(|a| a.id.clone())
+    }
+
     fn folder(&self) -> PathBuf {
         self.store.root().to_path_buf()
     }

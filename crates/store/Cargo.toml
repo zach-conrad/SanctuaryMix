@@ -1,6 +1,6 @@
 [package]
 name = "store"
-description = "Local SQLite store: settings, presets and the auto-mix activity log. Works offline."
+description = "Local SQLite store: settings, presets, the auto-mix log and the EQ log. Works offline."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 automix.workspace = true
+tonal.workspace = true
 rusqlite = { version = "0.37", features = ["bundled"] }
 serde.workspace = true
 serde_json.workspace = true
