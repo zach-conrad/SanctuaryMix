@@ -2,7 +2,7 @@ import { ArrowLeft, CloudOff, Info, Link2, LogIn, Music, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react";
 import { audioModeLabel, formatClock, serviceDateLabel, timeOfDay } from "../../src/lib/recordings";
 import { cloudSession, signOut, useAccount } from "./auth/useAccount";
-import { connectCloud, type CloudRecording, type RecordedEvent, type RecordingsCloud } from "./cloud";
+import { connectCloud, type CloudRecording, type EqAudit, type RecordedEvent, type RecordingsCloud } from "./cloud";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
 import { MixPlayer } from "./mix/MixPlayer";
@@ -14,7 +14,7 @@ type Load =
   | { status: "loading" }
   | { status: "missing" }
   | { status: "error"; message: string }
-  | { status: "ok"; recording: CloudRecording; events: RecordedEvent[]; audioUrl: string | null };
+  | { status: "ok"; recording: CloudRecording; events: RecordedEvent[]; audioUrl: string | null; eq: EqAudit };
 
 /** One recorded service from the church's cloud library: listen, watch the moves, share. */
 export function Service() {
@@ -62,8 +62,12 @@ function ServiceView({ cloud }: { cloud: RecordingsCloud }) {
     (async () => {
       const recording = id ? await cloud.getRecording(id) : null;
       if (!recording) return { status: "missing" } as const;
-      const [events, audioUrl] = await Promise.all([cloud.getEvents(recording), cloud.listenUrl(recording)]);
-      return { status: "ok", recording, events, audioUrl } as const;
+      const [events, audioUrl, eq] = await Promise.all([
+        cloud.getEvents(recording),
+        cloud.listenUrl(recording),
+        cloud.getEqAudit(recording),
+      ]);
+      return { status: "ok", recording, events, audioUrl, eq } as const;
     })()
       .catch((e: unknown) => ({ status: "error", message: e instanceof Error ? e.message : String(e) }) as const)
       .then((r) => {
@@ -120,7 +124,12 @@ function ServiceView({ cloud }: { cloud: RecordingsCloud }) {
               {load.recording.notes ? <p className="service__notes mix-muted">{load.recording.notes}</p> : null}
 
               <div className="service__layout">
-                <MixPlayer audioUrl={load.audioUrl} durationMs={load.recording.durationMs} events={load.events} />
+                <MixPlayer
+                  audioUrl={load.audioUrl}
+                  durationMs={load.recording.durationMs}
+                  events={load.events}
+                  eq={load.eq.entries.length ? { audit: load.eq, audience: "church" } : null}
+                />
                 <p className="section-foot footnote">
                   <Info aria-hidden="true" />
                   Playback only. To send these moves to a console, open the service in the app.
@@ -136,7 +145,7 @@ function ServiceView({ cloud }: { cloud: RecordingsCloud }) {
                   if (e.target === e.currentTarget) e.currentTarget.close();
                 }}
               >
-                <SharePanel cloud={cloud} recordingId={load.recording.id} root={ROOT} />
+                <SharePanel cloud={cloud} recordingId={load.recording.id} hasEq={load.eq.entries.length > 0} root={ROOT} />
                 <button
                   className="sm-btn sm-btn--ghost dialog__close"
                   onClick={() => shareDialog.current?.close()}

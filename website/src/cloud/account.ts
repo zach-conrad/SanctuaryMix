@@ -6,6 +6,7 @@
 import type {
   CloudRecording,
   CloudSession,
+  EqAudit,
   RecordedEvent,
   RecordingsCloud,
   ShareLink,
@@ -33,6 +34,10 @@ export class AccountCloud implements RecordingsCloud {
 
   async listenUrl(): Promise<string | null> {
     return null;
+  }
+
+  async getEqAudit(): Promise<EqAudit> {
+    return { entries: [], ideas: [] };
   }
 
   async listShareLinks(): Promise<ShareLink[]> {

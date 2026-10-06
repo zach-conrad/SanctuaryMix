@@ -5,6 +5,8 @@ import { canShare, isLive, shareUrl, type RecordingsCloud, type ShareLink } from
 interface Props {
   cloud: RecordingsCloud;
   recordingId: string;
+  /** False when nothing touched EQ in this service; the option is then disabled. */
+  hasEq: boolean;
   root: string;
 }
 
@@ -20,15 +22,18 @@ function linkStatus(l: ShareLink): string {
   if (l.revokedAt !== null) return `Turned off ${dateFormat.format(l.revokedAt)}`;
   if (l.expiresAt !== null && l.expiresAt <= Date.now()) return `Ended ${dateFormat.format(l.expiresAt)}`;
   const until = l.expiresAt === null ? "until you turn it off" : `until ${dateFormat.format(l.expiresAt)}`;
-  return `Works ${until}${l.showMoves ? ", with moves" : ", audio only"}`;
+  const parts = [l.showMoves ? "moves" : null, l.showEq ? "EQ" : null].filter(Boolean);
+  return `Works ${until}, ${parts.length ? `with ${parts.join(" and ")}` : "audio only"}`;
 }
 
 /** Make a link anyone can open to listen, and turn links off again. */
-export function SharePanel({ cloud, recordingId, root }: Props) {
+export function SharePanel({ cloud, recordingId, hasEq, root }: Props) {
   const allowed = canShare(cloud.session().role);
   const [links, setLinks] = useState<ShareLink[]>([]);
   const [days, setDays] = useState<number | null>(7);
   const [showMoves, setShowMoves] = useState(true);
+  // Off by default: EQ notes and reasons are for the church unless someone chooses to share them.
+  const [showEq, setShowEq] = useState(false);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -39,7 +44,7 @@ export function SharePanel({ cloud, recordingId, root }: Props) {
   const create = async () => {
     setBusy(true);
     try {
-      const link = await cloud.createShareLink(recordingId, { expiresInDays: days, showMoves });
+      const link = await cloud.createShareLink(recordingId, { expiresInDays: days, showMoves, showEq: hasEq && showEq });
       setLinks(await cloud.listShareLinks(recordingId));
       copy(link);
     } finally {
@@ -73,33 +78,60 @@ export function SharePanel({ cloud, recordingId, root }: Props) {
       </div>
 
       {allowed ? (
-        <div className="group">
-          <div className="row">
-            <span className="row-text" id="expiry-label">Link works for</span>
-            <div className="sm-seg" role="group" aria-labelledby="expiry-label">
-              {EXPIRY.map((o) => (
-                <button key={o.label} type="button" aria-pressed={days === o.days} onClick={() => setDays(o.days)}>
-                  {o.label}
-                </button>
-              ))}
+        <>
+          <div className="group">
+            <div className="row">
+              <span className="row-text" id="expiry-label">Link works for</span>
+              <div className="sm-seg" role="group" aria-labelledby="expiry-label">
+                {EXPIRY.map((o) => (
+                  <button key={o.label} type="button" aria-pressed={days === o.days} onClick={() => setDays(o.days)}>
+                    {o.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          <label className="row">
-            <span className="row-text">Show fader and mute moves</span>
-            <input
-              type="checkbox"
-              className="row-checkbox"
-              checked={showMoves}
-              onChange={(e) => setShowMoves(e.currentTarget.checked)}
-            />
-          </label>
-          <div className="row row--actions">
-            <button className="sm-btn sm-btn--primary" onClick={create} disabled={busy}>
-              <Link2 aria-hidden="true" />
-              Create link
-            </button>
+          <div className="grouped share__include">
+            <div className="section-head">
+              <h3>They can see</h3>
+            </div>
+            <div className="group">
+              <div className="row">
+                <span className="row-text">Audio</span>
+                <span className="row-value">Always</span>
+              </div>
+              <label className="row">
+                <span className="row-text">Fader and mute moves</span>
+                <input
+                  type="checkbox"
+                  className="row-checkbox"
+                  checked={showMoves}
+                  onChange={(e) => setShowMoves(e.currentTarget.checked)}
+                />
+              </label>
+              <label
+                className="row"
+                aria-disabled={!hasEq}
+                title={hasEq ? undefined : "Nothing changed EQ in this service"}
+              >
+                <span className="row-text">EQ changes</span>
+                <input
+                  type="checkbox"
+                  className="row-checkbox"
+                  checked={hasEq && showEq}
+                  disabled={!hasEq}
+                  onChange={(e) => setShowEq(e.currentTarget.checked)}
+                />
+              </label>
+              <div className="row row--actions">
+                <button className="sm-btn sm-btn--primary" onClick={create} disabled={busy}>
+                  <Link2 aria-hidden="true" />
+                  Create link
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        </>
       ) : (
         <p className="section-foot">Ask an Engineer or Admin at your church to make a share link.</p>
       )}

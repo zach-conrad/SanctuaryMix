@@ -532,3 +532,29 @@ label.row:hover { background: var(--control); }
   .share .sm-seg { width: 100%; }
   .share .sm-seg button { flex: 1; padding-inline: var(--space-2); }
 }
+
+/* EQ audit: every EQ change around a service (soundcheck, live, ideas for next week) */
+.eq-audit .group { background: var(--control); }
+.eq-row {
+  position: relative; display: grid; align-items: start; gap: var(--space-1) var(--space-4);
+  grid-template-columns: 9ch 12ch minmax(0, 1fr) auto;
+  padding: var(--space-3) var(--space-4);
+}
+.eq-row + .eq-row::before { content: ""; position: absolute; top: 0; left: var(--space-4); right: 0; height: 1px; background: var(--border); }
+.eq-row[aria-current="true"] { background: var(--accent-subtle); }
+.eq-row__time { min-height: var(--control-sm); display: flex; align-items: center; }
+.eq-row__channel { display: grid; min-width: 0; }
+.eq-row__what { display: grid; gap: var(--space-1); min-width: 0; }
+.eq-row__changes { display: flex; flex-wrap: wrap; gap: 0 var(--space-2); white-space: pre; color: var(--text); }
+.eq-row__changes--ai { color: var(--assist); }
+.eq-row__by { display: grid; justify-items: end; gap: var(--space-1); text-align: right; }
+@media (max-width: 720px) {
+  .eq-row { grid-template-columns: 9ch minmax(0, 1fr); }
+  .eq-row__what, .eq-row__by { grid-column: 2; }
+  .eq-row__by { justify-items: start; text-align: left; }
+}
+.share__include .row-value { font: var(--text-caption); }
+label.row[aria-disabled="true"] { cursor: default; }
+label.row[aria-disabled="true"]:hover { background: none; }
+label.row[aria-disabled="true"] .row-text { color: var(--text-muted); }
+.eq-row__sep { margin-right: var(--space-2); color: var(--text-subtle); }
