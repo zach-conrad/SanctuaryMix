@@ -14,9 +14,11 @@
 //! - [`model`]: the desk's EQ curves, shared with the UI's drawing.
 
 pub mod analyser;
+pub mod engine;
 pub mod feedback;
 pub mod guardrails;
 pub mod model;
+pub mod runner;
 pub mod solver;
 pub mod targets;
 pub mod text;
