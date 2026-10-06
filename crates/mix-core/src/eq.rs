@@ -318,6 +318,18 @@ pub mod grid {
             .clamp(0.0, 127.0) as u8
     }
 
+    /// The desk gain nearest `db` that stays inside `lo..=hi`.
+    pub fn gain_within(db: f32, lo: f32, hi: f32) -> f32 {
+        let mut v = gain_value(db.clamp(lo, hi));
+        while v > 0 && gain_from_value(v) > hi + 1e-4 {
+            v -= 1;
+        }
+        while v < 126 && gain_from_value(v) < lo - 1e-4 {
+            v += 1;
+        }
+        gain_from_value(v)
+    }
+
     pub fn gain_from_value(value: u8) -> f32 {
         (value.min(126) as f32 * 30.0 / 126.0 - 15.0).clamp(MIN_GAIN_DB, MAX_GAIN_DB)
     }
@@ -397,6 +409,10 @@ mod tests {
         for v in 0..=126u8 {
             assert_eq!(grid::gain_value(grid::gain_from_value(v)), v);
         }
+        let g = grid::gain_within(3.0, -6.0, 3.0);
+        assert!(g <= 3.0 && g > 2.7, "{g}");
+        let g = grid::gain_within(-9.0, -6.0, 3.0);
+        assert!((-6.0..-5.7).contains(&g), "{g}");
     }
 
     #[test]
