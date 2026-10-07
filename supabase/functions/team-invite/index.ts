@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(req) });
   if (req.method !== "POST") return reply(req, 405, { msg: "Use POST" });
 
-  const caller = await getCaller(req);
+  const caller = getCaller(req);
   if (!caller) return reply(req, 401, { msg: "Sign in again" });
 
   let orgId: unknown, email: unknown, role: unknown;
@@ -30,7 +30,10 @@ Deno.serve(async (req) => {
   const address = email.trim().toLowerCase();
 
   const { error: checkError } = await caller.asCaller.rpc("team_invite_check", { org: orgId });
-  if (checkError) return reply(req, 403, { msg: checkError.message });
+  if (checkError) {
+    console.error("team_invite_check failed", checkError.code, checkError.message);
+    return reply(req, 403, { msg: checkError.message });
+  }
 
   const admin = serviceClient();
   const add = () => admin.rpc("team_add_member", { org: orgId, member_email: address, new_role: role, actor: caller.id });

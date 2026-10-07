@@ -36,17 +36,36 @@ export interface Caller {
   asCaller: SupabaseClient;
 }
 
-/** The signed-in caller, or null when the token is missing or invalid. */
-export async function getCaller(req: Request): Promise<Caller | null> {
+/** The JWT's claims. Only read after the gateway has verified the signature (verify_jwt on). */
+function claims(token: string): { sub?: string; role?: string } | null {
+  try {
+    const part = token.split(".")[1] ?? "";
+    return JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(part.length / 4) * 4, "=")));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The signed-in caller, or null when the token is missing. The gateway has
+ * already verified the token (these functions deploy with verify_jwt on), so
+ * the user id comes from its claims; every database call below still runs
+ * with the token itself, so PostgREST checks it again. The caller client uses
+ * the API key the browser sent (the project's publishable key), which works
+ * with the project's current signing keys.
+ */
+export function getCaller(req: Request): Caller | null {
   const authorization = req.headers.get("authorization") ?? "";
-  if (!/^Bearer\s+\S+$/i.test(authorization)) return null;
-  const asCaller = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    global: { headers: { authorization } },
+  const token = authorization.match(/^Bearer\s+(\S+)$/i)?.[1];
+  if (!token) return null;
+  const payload = claims(token);
+  if (!payload?.sub || payload.role !== "authenticated") return null;
+  const apikey = req.headers.get("apikey") || Deno.env.get("SUPABASE_ANON_KEY")!;
+  const asCaller = createClient(Deno.env.get("SUPABASE_URL")!, apikey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { data, error } = await asCaller.auth.getUser(authorization.replace(/^Bearer\s+/i, ""));
-  if (error || !data.user) return null;
-  return { id: data.user.id, asCaller };
+  return { id: payload.sub, asCaller };
 }
 
 export function serviceClient(): SupabaseClient {
