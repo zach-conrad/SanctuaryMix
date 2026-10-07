@@ -9,8 +9,11 @@
 //! transport about 10x a second), `replay` (sending recorded moves), and
 //! `session` (an [`auth::Session`] whenever sign-in changes outside a command:
 //! website sign-in finishing, or the plan check between services) or
-//! `session-error` (a sentence, when website sign-in fails).
+//! `session-error` (a sentence, when website sign-in fails), `aieq` (a
+//! [`tonal::AiEqStatus`] a few times a second) and `aieq-log` (a
+//! [`tonal::EqLogEntry`] for every EQ change, with who made it).
 
+mod aieq;
 mod commands;
 mod control;
 mod playback;
@@ -64,6 +67,7 @@ pub fn run() {
             }
 
             tauri::async_runtime::spawn(check_plan(app.handle().clone()));
+            tauri::async_runtime::spawn(aieq::watch_service(app.handle().clone()));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -92,6 +96,29 @@ pub fn run() {
             commands::automix_log,
             commands::automix_listen_scan,
             commands::automix_heard,
+            aieq::aieq_get_config,
+            aieq::aieq_set_config,
+            aieq::aieq_status,
+            aieq::aieq_log,
+            aieq::aieq_soundcheck_start,
+            aieq::aieq_soundcheck_stop,
+            aieq::aieq_apply,
+            aieq::aieq_apply_all,
+            aieq::aieq_skip,
+            aieq::aieq_keep_my_eq,
+            aieq::aieq_undo,
+            aieq::aieq_undo_all,
+            aieq::aieq_hand_back,
+            aieq::aieq_set_eq,
+            aieq::aieq_compare,
+            aieq::aieq_restore_profile,
+            aieq::aieq_dismiss_profile,
+            aieq::aieq_ring_out_start,
+            aieq::aieq_ring_out_stop,
+            aieq::aieq_dismiss_feedback,
+            aieq::aieq_ideas,
+            aieq::aieq_set_idea,
+            aieq::aieq_audit,
             recording::get_recording_settings,
             recording::set_recording_settings,
             recording::start_recording,

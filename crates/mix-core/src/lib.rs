@@ -4,6 +4,7 @@
 //! here so that adding a new console (or a Windows build) never touches the
 //! shared vocabulary. All types serialize to camelCase JSON for the frontend.
 
+pub mod eq;
 pub mod hearing;
 pub mod level;
 pub mod spl;
@@ -74,11 +75,42 @@ pub struct MeterFrame {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum ConsoleEvent {
-    Connected { model: String },
-    Disconnected { reason: Option<String> },
-    Fader { id: ChannelId, db: Option<f32> },
-    Mute { id: ChannelId, muted: bool },
-    Name { id: ChannelId, name: String },
+    Connected {
+        model: String,
+    },
+    Disconnected {
+        reason: Option<String>,
+    },
+    Fader {
+        id: ChannelId,
+        db: Option<f32>,
+    },
+    Mute {
+        id: ChannelId,
+        muted: bool,
+    },
+    Name {
+        id: ChannelId,
+        name: String,
+    },
+    /// One EQ parameter on an input (see [`eq`]).
+    Eq {
+        id: ChannelId,
+        change: eq::EqChange,
+    },
+}
+
+impl ConsoleEvent {
+    /// The channel this event is about, if any.
+    pub fn channel(&self) -> Option<ChannelId> {
+        match self {
+            Self::Fader { id, .. }
+            | Self::Mute { id, .. }
+            | Self::Name { id, .. }
+            | Self::Eq { id, .. } => Some(*id),
+            Self::Connected { .. } | Self::Disconnected { .. } => None,
+        }
+    }
 }
 
 /// Who made a control change. Recordings keep this so a replay can show

@@ -3,6 +3,7 @@ import { ROLE_LABEL, useAutoMix, useChannelAuto } from "../store/automix";
 import { useMixer } from "../store/mixer";
 import { ChannelActions, FaderChange, ModeWord } from "./AutoMix";
 import { InsightList, useInsights } from "./InsightList";
+import { InspectorEq } from "./InspectorEq";
 import { MuteKey } from "./MuteKey";
 import { SplReadout } from "./SplMeter";
 
@@ -29,6 +30,7 @@ export function Inspector() {
           <MuteKey index={strip.index} disabled={!consoleOn} large />
         </section>
       )}
+      {strip && <InspectorEq channel={strip.index} />}
       {auto && auto.mode !== "off" && (
         <section className="inspector-section inspector-auto" aria-label="Auto-mix on this channel">
           <span className="inspector-auto-head">

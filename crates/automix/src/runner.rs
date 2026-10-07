@@ -59,6 +59,8 @@ enum Command {
     ResumeChannel(u16),
     Undo(u16),
     UndoAll,
+    FeedbackPull { channel: u16, cut_db: f32, hz: f32 },
+    SetCeilings(Vec<(u16, f32)>),
     Status(oneshot::Sender<AutoMixStatus>),
 }
 
@@ -136,6 +138,21 @@ impl AutoMixHandle {
         self.send(Command::UndoAll).await
     }
 
+    /// AI EQ heard `channel` ringing: pull its fader down `cut_db`. Works
+    /// whether or not auto-mix is on; nothing moves while frozen.
+    pub fn feedback_pull(&self, channel: u16, cut_db: f32, hz: f32) {
+        let _ = self.tx.try_send(Input::Command(Command::FeedbackPull {
+            channel,
+            cut_db,
+            hz,
+        }));
+    }
+
+    /// Feedback ceilings (channel, fader dB) from the soundcheck feedback check.
+    pub async fn set_feedback_ceilings(&self, ceilings: Vec<(u16, f32)>) -> Result<(), Stopped> {
+        self.send(Command::SetCeilings(ceilings)).await
+    }
+
     pub async fn status(&self) -> Result<AutoMixStatus, Stopped> {
         let (tx, rx) = oneshot::channel();
         self.send(Command::Status(tx)).await?;
@@ -176,7 +193,10 @@ impl<S: FaderSink, O: Observer> Runner<S, O> {
 
     async fn send_moves(&mut self, moves: Vec<FaderMove>) {
         for mv in moves {
-            let automatic = mv.record.kind == AdjustmentKind::Auto;
+            let automatic = matches!(
+                mv.record.kind,
+                AdjustmentKind::Auto | AdjustmentKind::Feedback
+            );
             // Checked per move: a freeze lands between two moves of the same tick.
             if automatic && (self.frozen.load(Ordering::SeqCst) || self.mix.is_frozen()) {
                 continue;
@@ -216,6 +236,20 @@ impl<S: FaderSink, O: Observer> Runner<S, O> {
                 let moves = self.mix.undo_all();
                 self.send_moves(moves).await;
             }
+            Command::FeedbackPull {
+                channel,
+                cut_db,
+                hz,
+            } => {
+                let now = self.now();
+                let moves = self
+                    .mix
+                    .feedback_pull(channel, cut_db, hz, now)
+                    .into_iter()
+                    .collect();
+                self.send_moves(moves).await;
+            }
+            Command::SetCeilings(ceilings) => self.mix.set_feedback_ceilings(&ceilings),
             Command::Status(reply) => {
                 let _ = reply.send(self.mix.status(self.now()));
             }

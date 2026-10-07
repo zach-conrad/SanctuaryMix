@@ -4,6 +4,9 @@
 //! Surface) at port 51328. We speak that protocol directly, so no A&H MIDI
 //! Control app or driver is needed on the Mac. Audio does NOT travel this way;
 //! it arrives separately over Dante (see the `audio-engine` crate).
+//!
+//! A&H's protocol document lists 51325 as the MixRack's port and 51328 as a
+//! Surface's; the Setup screen offers both.
 
 pub mod protocol;
 
@@ -12,6 +15,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use mix_core::eq::EqChange;
 use mix_core::{ChannelId, ConsoleEvent};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::OwnedWriteHalf;
@@ -22,8 +26,10 @@ use tokio::task::JoinHandle;
 use crate::{ConsoleAdapter, ConsoleConfig, ConsoleError, ConsoleModel, Result};
 use protocol::{Decoder, MidiBase};
 
-/// Unencrypted MIDI-over-TCP port on dLive MixRacks and Surfaces.
+/// Unencrypted MIDI-over-TCP port on a dLive Surface (the default, as before).
 pub const DEFAULT_PORT: u16 = 51328;
+/// Unencrypted MIDI-over-TCP port on a dLive MixRack.
+pub const MIXRACK_PORT: u16 = 51325;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 
 pub struct DliveAdapter {
@@ -154,6 +160,45 @@ impl ConsoleAdapter for DliveAdapter {
         let msg =
             protocol::name_request(self.base, id).ok_or(ConsoleError::UnsupportedChannel(id))?;
         self.send(&msg).await
+    }
+
+    /// The desk answers with the fader's NRPN message (firmware 1.9+).
+    async fn request_fader(&self, id: ChannelId) -> Result<()> {
+        let msg =
+            protocol::fader_request(self.base, id).ok_or(ConsoleError::UnsupportedChannel(id))?;
+        self.send(&msg).await
+    }
+
+    fn supports_eq(&self) -> bool {
+        true
+    }
+
+    async fn set_eq(&self, id: ChannelId, change: EqChange) -> Result<()> {
+        let msg =
+            protocol::eq(self.base, id, &change).ok_or(ConsoleError::UnsupportedChannel(id))?;
+        if !msg.is_empty() {
+            self.send(&msg).await?;
+        }
+        // Report the value the desk will hold, snapped to its grid.
+        let change = protocol::eq_param(&change)
+            .and_then(|(p, v)| protocol::eq_change(p, v))
+            .unwrap_or(change);
+        let _ = self.events.send(ConsoleEvent::Eq { id, change });
+        Ok(())
+    }
+
+    async fn request_eq(&self, id: ChannelId) -> Result<()> {
+        if id.kind != mix_core::ChannelKind::Input {
+            return Err(ConsoleError::UnsupportedChannel(id));
+        }
+        let mut bytes = Vec::new();
+        for param in protocol::EQ_PARAMS {
+            bytes.extend(
+                protocol::get_request(self.base, id, param)
+                    .ok_or(ConsoleError::UnsupportedChannel(id))?,
+            );
+        }
+        self.send(&bytes).await
     }
 
     fn subscribe(&self) -> broadcast::Receiver<ConsoleEvent> {

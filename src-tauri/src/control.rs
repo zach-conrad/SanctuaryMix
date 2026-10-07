@@ -65,6 +65,8 @@ impl ControlBus {
             ConsoleEvent::Fader { id, db } => (*id, &|s| s.fader_db = *db),
             ConsoleEvent::Mute { id, muted } => (*id, &|s| s.muted = *muted),
             ConsoleEvent::Name { id, name } => (*id, &|s| s.name = name.clone()),
+            // EQ lives with AI EQ, which keeps its own copy of the desk's EQ.
+            ConsoleEvent::Eq { .. } => return,
             ConsoleEvent::Disconnected { .. } => return mirror.clear(),
             ConsoleEvent::Connected { .. } => return,
         };

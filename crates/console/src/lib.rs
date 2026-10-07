@@ -8,6 +8,7 @@ pub mod dlive;
 pub mod simulated;
 
 use async_trait::async_trait;
+use mix_core::eq::EqChange;
 use mix_core::{ChannelId, ConsoleEvent};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
@@ -22,6 +23,8 @@ pub enum ConsoleError {
     Io(#[from] std::io::Error),
     #[error("timed out connecting to {0}")]
     Timeout(String),
+    #[error("this console can't {0} from SanctuaryMix")]
+    Unsupported(&'static str),
 }
 
 pub type Result<T> = std::result::Result<T, ConsoleError>;
@@ -69,6 +72,18 @@ pub trait ConsoleAdapter: Send + Sync {
     /// Ask the console where a fader sits; the answer arrives as [`ConsoleEvent::Fader`].
     /// Consoles that can't be asked report faders only when they move.
     async fn request_fader(&self, _id: ChannelId) -> Result<()> {
+        Ok(())
+    }
+    /// Whether input EQ (high-pass and parametric bands) can be read and set.
+    fn supports_eq(&self) -> bool {
+        false
+    }
+    /// Sets one EQ parameter on an input. Confirmed as [`ConsoleEvent::Eq`].
+    async fn set_eq(&self, _id: ChannelId, _change: EqChange) -> Result<()> {
+        Err(ConsoleError::Unsupported("change EQ"))
+    }
+    /// Asks for every EQ parameter on an input; answers arrive as [`ConsoleEvent::Eq`].
+    async fn request_eq(&self, _id: ChannelId) -> Result<()> {
         Ok(())
     }
     /// Every change the console reports. Lagging receivers drop old events.

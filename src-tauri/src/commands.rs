@@ -71,6 +71,7 @@ pub async fn start_metering(app: AppHandle, device: Option<String>) -> CmdResult
         let emitter = app.clone();
         let automix = state.automix.clone();
         let listener = state.listener.clone();
+        let analyser = state.analyser.clone();
         let audio_app = app.clone();
         let handle = audio_engine::start_metering(
             device,
@@ -89,6 +90,7 @@ pub async fn start_metering(app: AppHandle, device: Option<String>) -> CmdResult
                 if let Some(listener) = &listener {
                     listener.push_audio(block.channels, block.sample_rate, block.samples);
                 }
+                analyser.push_audio(block.channels, block.sample_rate, block.samples);
             },
         )
         .map_err(err)?;
@@ -130,12 +132,14 @@ pub async fn connect_console(
     let mut adapter = console::create_adapter(config);
     let mut events = adapter.subscribe();
     let automix = state.automix.clone();
+    let aieq = state.aieq.clone();
     let forwarder = tauri::async_runtime::spawn(async move {
         use tokio::sync::broadcast::error::RecvError;
         loop {
             match events.recv().await {
                 Ok(event) => {
                     automix.push_console(event.clone());
+                    aieq.push_console(event.clone());
                     let _ = app.emit("console", &event);
                     app.state::<AppState>()
                         .control
@@ -151,6 +155,13 @@ pub async fn connect_console(
     }
 
     adapter.connect().await.map_err(err)?;
+    // AI EQ reads the picked channels' EQ itself, paced under its message budget.
+    let supports_eq = adapter.supports_eq();
+    state
+        .aieq
+        .call(move |e, _, _| e.set_eq_supported(supports_eq))
+        .await
+        .map_err(err)?;
     for index in 0..input_count {
         let id = ChannelId {
             kind: ChannelKind::Input,
@@ -352,6 +363,7 @@ pub async fn automix_set_config(app: AppHandle, config: AutoMixConfig) -> CmdRes
     if let Some(listener) = &app.state::<AppState>().listener {
         listener.set_targets(crate::state::listen_targets(&applied));
     }
+    crate::aieq::set_picks(&app.state::<AppState>().aieq, &applied);
     let saved = applied.clone();
     blocking(move || {
         app.state::<AppState>()
@@ -377,16 +389,18 @@ pub async fn automix_engage(app: AppHandle, on: bool) -> CmdResult<()> {
     state.automix.engage(on).await.map_err(err)
 }
 
-/// Stops every automatic move immediately.
+/// Stops every automatic move immediately: faders and AI EQ alike.
 #[tauri::command]
 pub async fn automix_freeze(state: State<'_, AppState>) -> CmdResult<()> {
     state.automix.freeze();
+    state.aieq.freeze();
     Ok(())
 }
 
 #[tauri::command]
 pub async fn automix_resume(state: State<'_, AppState>) -> CmdResult<()> {
-    state.automix.unfreeze().await.map_err(err)
+    state.automix.unfreeze().await.map_err(err)?;
+    state.aieq.unfreeze().await.map_err(err)
 }
 
 #[tauri::command]

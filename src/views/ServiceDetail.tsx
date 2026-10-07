@@ -2,6 +2,7 @@ import { ArrowLeft, Pause, Play, RotateCcw, RotateCw, Send, Trash2, TriangleAler
 import { can } from "../lib/plans";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "../components/Dialog";
+import { ReportEq } from "../components/ReportEq";
 import { useConsoleName, useIsRecording } from "../components/RecordControl";
 import { Timeline } from "../components/Timeline";
 import { dbToFader, formatDb } from "../lib/levels";
@@ -70,6 +71,7 @@ export function ServiceDetail() {
               <EventList rows={rows} positionMs={positionMs} onSeek={(ms) => void seek(ms)} />
             </section>
           </div>
+          {detail.status !== "recording" && <ReportEq recordingId={detail.id} />}
         </>
       )}
       {!detail && !error && <p className="empty">Opening the service…</p>}

@@ -58,6 +58,10 @@ const SETTLE_DB: f32 = 0.5;
 const ECHO_TOLERANCE_DB: f32 = 0.3;
 /// Listening results older than this are ignored (the models stopped or fell behind).
 const HEARING_STALE: Duration = Duration::from_millis(1500);
+/// After an EQ change on a channel, its level estimate settles for this long first.
+const AFTER_EQ_CHANGE: Duration = Duration::from_secs(3);
+/// After feedback, no channel is raised for this long.
+const FEEDBACK_RAISE_FREEZE: Duration = Duration::from_secs(10);
 /// Most input channels a console can have (dLive has 128).
 pub const MAX_CHANNELS: u16 = 128;
 
@@ -168,6 +172,8 @@ pub enum AdjustmentKind {
     Resumed,
     /// The operator handed a held channel back to auto-mix.
     ChannelResumed,
+    /// AI EQ heard feedback and pulled this fader down.
+    Feedback,
 }
 
 /// One entry in the auto-mix activity log.
@@ -279,6 +285,13 @@ struct Track {
     last_move_at: Option<Duration>,
     /// Last value we sent and haven't seen come back yet.
     pending: Option<f32>,
+    /// Where the fader was when this mic rang: never raised above it again
+    /// this service.
+    ring_cap: Option<f32>,
+    /// Feedback ceiling from the soundcheck feedback check.
+    ceiling: Option<f32>,
+    /// Last EQ change on this channel (anyone's).
+    eq_changed_at: Option<Duration>,
 }
 
 impl Track {
@@ -327,6 +340,8 @@ pub struct AutoMix {
     last_meter_at: Option<Duration>,
     tracks: BTreeMap<u16, Track>,
     log: Vec<Adjustment>,
+    /// No raises anywhere until then (just after feedback).
+    raise_freeze_until: Duration,
 }
 
 impl AutoMix {
@@ -339,6 +354,7 @@ impl AutoMix {
             last_meter_at: None,
             tracks: BTreeMap::new(),
             log: Vec::new(),
+            raise_freeze_until: Duration::ZERO,
         }
     }
 
@@ -392,6 +408,8 @@ impl AutoMix {
                 t.hold = None;
                 t.converging = false;
                 t.last_move_at = None;
+                // A new service: last service's ring levels no longer apply.
+                t.ring_cap = None;
             }
             self.log.push(Adjustment::note(
                 AdjustmentKind::Engaged,
@@ -482,6 +500,76 @@ impl AutoMix {
     pub fn undo_all(&mut self) -> Vec<FaderMove> {
         let channels: Vec<u16> = self.config.channels.iter().map(|c| c.channel).collect();
         channels.into_iter().filter_map(|c| self.undo(c)).collect()
+    }
+
+    /// Feedback ceilings from the soundcheck feedback check (channel, fader dB).
+    /// Auto-mix never raises those faders above them.
+    pub fn set_feedback_ceilings(&mut self, ceilings: &[(u16, f32)]) {
+        for t in self.tracks.values_mut() {
+            t.ceiling = None;
+        }
+        for &(ch, db) in ceilings {
+            if ch < MAX_CHANNELS && db.is_finite() {
+                self.tracks.entry(ch).or_default().ceiling = Some(db);
+            }
+        }
+    }
+
+    /// AI EQ heard `channel` ringing at `hz`: pulls its fader down `cut_db`
+    /// (whether or not auto-mix is on), holds every raise for 10 s and never
+    /// raises this fader above where it rang for the rest of the service.
+    /// Nothing moves while frozen: Freeze stops every AI move.
+    pub fn feedback_pull(
+        &mut self,
+        channel: u16,
+        cut_db: f32,
+        hz: f32,
+        now: Duration,
+    ) -> Option<FaderMove> {
+        if self.frozen || !self.console_online || channel >= MAX_CHANNELS {
+            return None;
+        }
+        let cut = if cut_db.is_finite() {
+            cut_db.clamp(0.0, crate::guardrails::hard::MAX_CUT_DB)
+        } else {
+            return None;
+        };
+        self.raise_freeze_until = self.raise_freeze_until.max(now + FEEDBACK_RAISE_FREEZE);
+        let t = self.tracks.get_mut(&channel)?;
+        let current = t.known_fader()?;
+        t.ring_cap = Some(t.ring_cap.map_or(current, |c| c.min(current)));
+        t.converging = false;
+        let floor = t
+            .baseline
+            .map(|b| b - crate::guardrails::hard::MAX_CUT_DB)
+            .unwrap_or(f32::MIN)
+            .max(crate::guardrails::hard::ABSOLUTE_FLOOR_DB);
+        let to_db = (current - cut).max(floor);
+        if current - to_db < 0.25 {
+            return None;
+        }
+        let hz_text = if hz >= 1_000.0 {
+            format!("{:.1} kHz", hz / 1_000.0)
+        } else {
+            format!("{} Hz", hz.round() as i32)
+        };
+        Some(FaderMove {
+            channel,
+            to_db,
+            limited_by: None,
+            record: Adjustment {
+                at_ms: 0,
+                kind: AdjustmentKind::Feedback,
+                channel: Some(channel),
+                channel_name: Some(t.label(channel)),
+                from_db: Some(current),
+                to_db: Some(to_db),
+                reason: format!(
+                    "Feedback at {hz_text}, so it came down {:.1} dB. It won't go back above where it rang.",
+                    current - to_db
+                ),
+            },
+        })
     }
 
     /// Takes the latest listening results.
@@ -586,6 +674,11 @@ impl AutoMix {
             ConsoleEvent::Name { id, name } if id.kind == ChannelKind::Input => {
                 self.tracks.entry(id.index).or_default().name =
                     (!name.is_empty()).then(|| name.clone());
+            }
+            // EQ changes the level a little; let the estimate settle first.
+            ConsoleEvent::Eq { id, .. } if id.kind == ChannelKind::Input => {
+                let t = self.tracks.entry(id.index).or_default();
+                t.eq_changed_at = Some(now);
             }
             _ => {}
         }
@@ -770,6 +863,11 @@ impl AutoMix {
             let Some(t) = self.tracks.get(&c.channel) else {
                 continue;
             };
+            if t.eq_changed_at
+                .is_some_and(|at| now.saturating_sub(at) < AFTER_EQ_CHANGE)
+            {
+                continue;
+            }
             if !matches!(
                 self.mode(t, c.role, &refs, now),
                 ChannelMode::Riding | ChannelMode::AtLimit | ChannelMode::Settled
@@ -812,9 +910,26 @@ impl AutoMix {
                     .unwrap_or(f32::MAX),
                 peak_dbfs: t.peak_dbfs,
             };
-            let Some(limited) = guardrails.limit(&ctx, fader + error) else {
+            let Some(mut limited) = guardrails.limit(&ctx, fader + error) else {
                 continue;
             };
+            if limited.to_db > fader {
+                // Just after feedback nothing goes up, and a mic that rang (or
+                // has a feedback ceiling) never goes back above that level.
+                if now < self.raise_freeze_until {
+                    continue;
+                }
+                let cap = [t.ring_cap, t.ceiling]
+                    .into_iter()
+                    .flatten()
+                    .reduce(f32::min);
+                if let Some(cap) = cap {
+                    if fader >= cap - 1e-3 {
+                        continue;
+                    }
+                    limited.to_db = limited.to_db.min(cap);
+                }
+            }
             let up = limited.to_db > fader;
             let step = (limited.to_db - fader).abs();
             let ducking = refs
@@ -1417,6 +1532,64 @@ mod tests {
         rig.run(5.0);
         assert_eq!(rig.fader(0), -10.0, "an undone channel stays put");
         assert_eq!(rig.mode(0), ChannelMode::Undone);
+    }
+
+    #[test]
+    fn feedback_pulls_the_fader_even_when_auto_mix_is_off() {
+        let mut rig = Rig::new(&[(0, ChannelRole::Speech)], -5.0);
+        let mv = rig
+            .mix
+            .feedback_pull(0, 3.0, 2_500.0, rig.now)
+            .expect("pulls the fader");
+        assert_eq!(mv.to_db, -8.0);
+        assert_eq!(mv.record.kind, AdjustmentKind::Feedback);
+        assert!(mv.record.reason.contains("2.5 kHz"), "{}", mv.record.reason);
+        rig.apply(mv);
+        rig.mix.freeze();
+        assert!(rig.mix.feedback_pull(0, 3.0, 2_500.0, rig.now).is_none());
+    }
+
+    #[test]
+    fn a_rung_fader_never_goes_back_above_where_it_rang() {
+        let mut rig = Rig::new(&[(0, ChannelRole::LeadVocal)], -10.0);
+        rig.mix.set_engaged(true);
+        rig.rms.insert(0, -30.0);
+        rig.run(2.0);
+        let rang_at = rig.fader(0);
+        let mv = rig.mix.feedback_pull(0, 3.0, 800.0, rig.now).unwrap();
+        rig.apply(mv);
+        // Raises wait 10 s, then stop at where it rang.
+        rig.run(9.0);
+        assert_eq!(rig.fader(0), rang_at - 3.0);
+        rig.run(20.0);
+        assert!(rig.fader(0) <= rang_at + 1e-4, "{}", rig.fader(0));
+    }
+
+    #[test]
+    fn soundcheck_ceilings_cap_raises() {
+        let mut rig = Rig::new(&[(0, ChannelRole::LeadVocal)], -10.0);
+        rig.mix.set_feedback_ceilings(&[(0, -8.0)]);
+        rig.mix.set_engaged(true);
+        rig.rms.insert(0, -30.0);
+        rig.run(20.0);
+        assert!(rig.fader(0) <= -8.0 + 1e-4, "{}", rig.fader(0));
+    }
+
+    #[test]
+    fn waits_after_an_eq_change() {
+        let mut rig = Rig::new(&[(0, ChannelRole::LeadVocal)], -10.0);
+        rig.mix.set_engaged(true);
+        rig.rms.insert(0, -30.0);
+        rig.run(1.0);
+        rig.console(ConsoleEvent::Eq {
+            id: ChannelId::input(0),
+            change: mix_core::eq::EqChange::BandGain { band: 1, db: -2.0 },
+        });
+        let before = rig.moves_on(0);
+        rig.run(2.5);
+        assert_eq!(rig.moves_on(0), before);
+        rig.run(3.0);
+        assert!(rig.moves_on(0) > before);
     }
 
     #[test]

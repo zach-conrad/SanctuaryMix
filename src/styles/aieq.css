@@ -1,0 +1,187 @@
+/* AI EQ styles (from the approved design mockup, aieq/design/mockup/aieq.css). Tokens only, no literal colors.
+   Curve colors: the console's EQ draws in --text, the AI's proposal in --assist (dashed),
+   the live spectrum is a soft --text-subtle fill. Selection (a grabbed band) is --accent. */
+
+/* ---------- EQ graph ---------- */
+.eq-graph { display: block; width: 100%; height: auto; border-radius: var(--radius-md); background: var(--bg); }
+.eq-graph .grid { stroke: var(--border); stroke-width: 1; }
+.eq-graph .grid-zero { stroke: var(--border-strong); stroke-width: 1; }
+.eq-graph .axis { fill: var(--text-subtle); font: 500 11px/1 var(--font-mono); font-variant-numeric: tabular-nums; }
+.eq-graph .spectrum { fill: color-mix(in srgb, var(--text-subtle) 22%, transparent); stroke: none; }
+.eq-graph .curve-now { fill: none; stroke: var(--text); stroke-width: 2; }
+.eq-graph .curve-ai { fill: none; stroke: var(--assist); stroke-width: 2; stroke-dasharray: 6 4; }
+.eq-graph .curve-ai-fill { fill: color-mix(in srgb, var(--assist) 14%, transparent); stroke: none; }
+.eq-graph .ring { fill: none; stroke: var(--warning); stroke-width: 2; stroke-dasharray: 2 3; }
+.eq-graph .handle circle.dot { fill: var(--control); stroke: var(--border-strong); stroke-width: 1.5; }
+.eq-graph .handle text { pointer-events: none; fill: var(--text); font: 600 11px/1 var(--font-sans); text-anchor: middle; dominant-baseline: central; }
+.eq-graph .handle.is-ai circle.dot { fill: var(--assist-subtle); stroke: var(--assist); stroke-width: 2; }
+.eq-graph .handle.is-selected circle.dot { stroke: var(--accent); stroke-width: 2.5; }
+.eq-graph .handle-hit { fill: transparent; stroke: none; } /* 44px invisible target around each 22px handle */
+
+.eq-legend { display: flex; align-items: center; gap: var(--space-4); font: var(--text-caption); color: var(--text-muted); }
+.eq-legend span { display: inline-flex; align-items: center; gap: var(--space-2); }
+.eq-legend i { display: inline-block; width: 20px; height: 0; border-top: 2px solid var(--text); }
+.eq-legend i.ai { border-top: 2px dashed var(--assist); }
+.eq-legend i.ring { border-top: 2px dotted var(--warning); }
+.eq-legend i.spec { height: 10px; border: 0; border-radius: 2px; background: color-mix(in srgb, var(--text-subtle) 40%, transparent); }
+
+/* ---------- Strip: an EQ suggestion is waiting ---------- */
+.strip-eq {
+  position: absolute; top: var(--space-1); right: var(--space-1); height: 18px; padding: 0 var(--space-1);
+  border: 1px solid var(--assist); border-radius: var(--radius-sm); color: var(--assist);
+  font: var(--text-label); letter-spacing: var(--text-label-tracking);
+}
+
+/* ---------- Inspector EQ section ---------- */
+.insp-eq-head { display: flex; align-items: center; gap: var(--space-2); }
+.insp-eq-head h2 { flex: 1; }
+.insp-eq-head .state { font: var(--text-caption); color: var(--text-muted); }
+.insp-eq-head .icon-btn, .eq-ch-row .icon-btn { width: var(--hit-min); height: var(--hit-min); padding: 0; }
+.sm-assist--compact { max-width: none; gap: var(--space-2); padding: var(--space-3); }
+.sm-assist--compact .sm-assist__title { font: var(--text-body-strong); }
+.sm-assist--compact .sm-assist__why { font: var(--text-caption); }
+.sm-assist__change-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+
+/* ---------- Wide EQ panel (takes the inspector's place, wider; the bay keeps scrolling) ---------- */
+.eq-panel {
+  width: calc(var(--inspector-width) * 2); flex: none; overflow-y: auto;
+  background: var(--surface); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4);
+}
+.eq-panel-head { display: flex; align-items: center; gap: var(--space-3); }
+.eq-panel-head .who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.eq-graph-wrap { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-lg); background: var(--surface-raised); }
+
+/* Band table: one grouped row per band. Changed values read "now → suggested" in --assist. */
+.band-row { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) 8.5rem 9rem 3.5rem; align-items: center; gap: var(--space-3); }
+.band-row .num {
+  width: 24px; height: 24px; border-radius: var(--radius-pill); display: grid; place-items: center;
+  background: var(--control); border: 1px solid var(--border-strong); font: 600 12px/1 var(--font-sans);
+}
+.band-row .val { font: var(--text-readout); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.band-row .val.is-ai { color: var(--assist); }
+.band-row .kind { display: flex; flex-direction: column; }
+.band-row .kind .text-caption { color: var(--text-muted); }
+.band-head { min-height: auto; padding-block: var(--space-2) 0; color: var(--text-muted); }
+.band-head .val { font: var(--text-label); letter-spacing: var(--text-label-tracking); text-transform: uppercase; color: var(--text-muted); }
+.row.is-ai { background: var(--assist-subtle); }
+.row.is-ai .num { background: var(--assist-subtle); border-color: var(--assist); color: var(--assist); }
+
+/* ---------- Mixer banner for an automatic feedback notch ---------- */
+.banner--assist { border-color: var(--assist); background: var(--assist-subtle); color: var(--text); }
+.banner--assist .sm-assist-badge { flex: none; }
+.banner--assist .word { flex: none; color: var(--warning); font: var(--text-body-strong); }
+.banner--assist .what { flex: 1; }
+.banner--assist .mono { font: var(--text-readout); color: var(--assist); }
+
+/* ---------- Assist page: Levels | EQ ---------- */
+.eq-mode-panel { flex-direction: row; align-items: center; gap: var(--space-5); padding: var(--space-4) var(--space-5); }
+.eq-thumb { flex: none; width: 128px; }
+.eq-thumb .eq-graph { background: var(--bg); }
+.eq-ch-row .row-text .text-caption { color: var(--text-muted); }
+.eq-ch-row .state { font: var(--text-caption); white-space: nowrap; }
+.eq-ch-row .state.is-ai { color: var(--assist); }
+.eq-ch-row .state.is-warn { color: var(--warning); }
+.eq-ch-row .chev { color: var(--text-subtle); flex: none; }
+.ch-num { font: var(--text-readout); color: var(--text-subtle); width: 2.5rem; flex: none; }
+.check-box { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
+.limit-value { font: var(--text-readout); color: var(--text); white-space: nowrap; }
+
+/* ---------- Tune EQ (soundcheck) ---------- */
+.tune-panel { flex-direction: row; align-items: center; gap: var(--space-5); padding: var(--space-4) var(--space-5); }
+.tune-progress { height: 6px; border-radius: var(--radius-pill); background: var(--control); overflow: hidden; }
+.tune-progress > span { display: block; height: 100%; width: var(--p, 0%); background: var(--assist); }
+.listen-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--assist); flex: none; }
+
+/* ---------- Additions after lining up with behavior.md ---------- */
+.strip-eq.is-manual { border-color: var(--border-strong); color: var(--text-muted); }
+.sm-assist--wide { max-width: none; }
+.state-ai { color: var(--assist); }
+.eq-ch-row .state.is-manual { color: var(--text-muted); }
+.insp-rows .row { min-height: var(--hit-min); padding-inline: var(--space-3); gap: var(--space-3); }
+.insp-rows .row + .row::before { left: var(--space-3); }
+.band-row.is-reserved .kind > span:first-child { color: var(--text-muted); }
+.band-row.is-reserved .num { border-style: dashed; color: var(--text-muted); }
+.back-link { align-self: flex-start; margin-left: calc(-1 * var(--space-3)); }
+.row-btn { flex: none; width: 6rem; display: flex; justify-content: flex-end; }
+.report-time { flex: none; width: 5.5rem; }
+
+/* ---------- Build additions (React app) ---------- */
+/* Graph: handles are focusable and draggable; the focus ring goes on the visible dot. */
+.eq-graph .handle { cursor: grab; outline: none; }
+.eq-graph .handle.is-static { cursor: default; }
+.eq-graph .handle:focus-visible circle.dot { stroke: var(--focus-ring); stroke-width: 3; }
+.eq-graph .handle.is-reserved circle.dot { stroke-dasharray: 3 2; }
+.eq-graph.is-dragging, .eq-graph.is-dragging .handle { cursor: grabbing; }
+.eq-graph { touch-action: none; }
+.eq-empty { display: grid; place-items: center; min-height: 84px; border-radius: var(--radius-md); background: var(--bg); color: var(--text-muted); font: var(--text-caption); text-align: center; padding: var(--space-3); }
+
+/* Strip: the EQ tag sits in the name block, top right. */
+.strip-eq { display: inline-flex; align-items: center; text-transform: uppercase; background: var(--control); }
+.sm-strip[aria-selected="true"] .strip-eq { background: var(--accent-subtle); }
+
+/* Inspector EQ rows */
+.insp-rows .row { gap: var(--space-2); }
+.insp-rows .row-text { flex: 1; }
+.insp-rows .text-readout { white-space: nowrap; }
+.insp-eq .sm-assist__actions .sm-btn { height: var(--control-sm); }
+
+/* Wide panel */
+.eq-panel-head h2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.eq-panel .sm-seg button { height: 36px; }
+.eq-panel-note { display: flex; align-items: center; gap: var(--space-3); }
+.eq-panel-note .row-text { flex: 1; }
+.eq-panel .section-head .text-caption { color: var(--text-muted); }
+
+/* Band table values: tap to type. */
+.band-row .val-btn {
+  border: 1px solid transparent; border-radius: var(--radius-sm); background: none; padding: var(--space-1) var(--space-2);
+  margin-right: calc(-1 * var(--space-2)); min-height: var(--control-sm); font: inherit; color: inherit; cursor: text;
+}
+.band-row .val-btn:hover { border-color: var(--border-strong); background: var(--control); }
+.band-row .val-input {
+  width: 100%; height: var(--control-sm); padding: 0 var(--space-2); text-align: right;
+  font: var(--text-readout); font-variant-numeric: tabular-nums;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--text);
+}
+.band-row .num { flex: none; }
+.band-row .val.muted { color: var(--text-muted); }
+.band-row.is-selected .num { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+/* Feedback banner */
+.banner--assist { padding-block: var(--space-2); }
+.banner--assist .what { color: var(--text); font: var(--text-caption); }
+.banner--assist .count { color: var(--text-muted); }
+
+/* Assist EQ tab */
+.eq-mode-panel .panel-head h2 { flex: none; }
+.eq-mode-panel .panel-head { gap: var(--space-3); }
+.eq-off-badge {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 var(--space-2); border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong); color: var(--text-muted);
+  font: var(--text-label); letter-spacing: var(--text-label-tracking); text-transform: uppercase;
+}
+.eq-ch-row { gap: var(--space-3); }
+.eq-ch-row .row-text { flex: 1; }
+.eq-ch-row .state { text-align: right; }
+.eq-ch-row .state.is-muted { color: var(--text-muted); }
+.eq-ch-row .sm-btn--sm { flex: none; }
+.eq-ch-row .chev-btn { color: var(--text-subtle); }
+.eq-ch-row.is-open { cursor: pointer; }
+.eq-ch-row.is-open:hover { background: var(--control); }
+.check-row { cursor: pointer; }
+.check-row:has(input:disabled) { cursor: not-allowed; }
+.check-box:disabled { cursor: not-allowed; opacity: 0.45; }
+
+/* EQ soundcheck */
+.tune-panel .automix-text { gap: var(--space-1); }
+.tune-panel .panel-head h2 { flex: none; }
+.tune-panel .panel-head { gap: var(--space-3); }
+.tune-head-big { font: var(--text-title); letter-spacing: var(--text-title-tracking); }
+.ring-result { display: flex; flex-direction: column; }
+
+/* Service report */
+.report-eq .section-head .text-caption { color: var(--text-muted); }
+.report-eq .eq-ch-row .row-text .text-caption .text-readout { font: var(--text-readout); }
+.report-eq .row .state-word { font: var(--text-caption); color: var(--text-muted); white-space: nowrap; }
+.report-eq .state-word.is-warn { color: var(--warning); }

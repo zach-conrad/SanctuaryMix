@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
+use mix_core::eq::{ChannelEq, EqChange};
 use mix_core::{ChannelId, ConsoleEvent};
 use tokio::sync::broadcast;
 
@@ -50,6 +51,8 @@ pub struct SimulatedConsole {
     names: Mutex<HashMap<ChannelId, String>>,
     /// Fader positions; every input starts at 0 dB.
     faders: Mutex<HashMap<ChannelId, Option<f32>>>,
+    /// Input EQ; every input starts flat.
+    eqs: Mutex<HashMap<ChannelId, ChannelEq>>,
     events: broadcast::Sender<ConsoleEvent>,
 }
 
@@ -61,6 +64,7 @@ impl SimulatedConsole {
             input_count,
             names: Mutex::new(HashMap::new()),
             faders: Mutex::new(HashMap::new()),
+            eqs: Mutex::new(HashMap::new()),
             events,
         }
     }
@@ -142,9 +146,97 @@ impl ConsoleAdapter for SimulatedConsole {
         Ok(())
     }
 
+    fn supports_eq(&self) -> bool {
+        true
+    }
+
+    async fn set_eq(&self, id: ChannelId, change: EqChange) -> Result<()> {
+        self.check(id)?;
+        if let EqChange::BandKind { band, kind } = change {
+            if !kind.allowed_on(band) {
+                return Err(ConsoleError::UnsupportedChannel(id));
+            }
+        }
+        // Snap to the desk's grid, like a real dLive.
+        let mut eq = self
+            .eqs
+            .lock()
+            .unwrap()
+            .get(&id)
+            .copied()
+            .unwrap_or_default();
+        eq.apply(&change);
+        let eq = eq.snapped();
+        self.eqs.lock().unwrap().insert(id, eq);
+        let change = snapped_change(&eq, change);
+        self.emit(ConsoleEvent::Eq { id, change });
+        Ok(())
+    }
+
+    async fn request_eq(&self, id: ChannelId) -> Result<()> {
+        self.check(id)?;
+        let eq = *self.eqs.lock().unwrap().entry(id).or_default();
+        for change in ChannelEq::default().diff(&eq).into_iter().chain(full(&eq)) {
+            self.emit(ConsoleEvent::Eq { id, change });
+        }
+        Ok(())
+    }
+
     fn subscribe(&self) -> broadcast::Receiver<ConsoleEvent> {
         self.events.subscribe()
     }
+}
+
+/// The value `change` ended up with on the desk.
+fn snapped_change(eq: &ChannelEq, change: EqChange) -> EqChange {
+    let band = |b: u8| eq.bands[b as usize];
+    match change {
+        EqChange::BandKind { band: b, .. } => EqChange::BandKind {
+            band: b,
+            kind: band(b).kind,
+        },
+        EqChange::BandFreq { band: b, .. } => EqChange::BandFreq {
+            band: b,
+            hz: band(b).freq_hz,
+        },
+        EqChange::BandWidth { band: b, .. } => EqChange::BandWidth {
+            band: b,
+            width: band(b).width,
+        },
+        EqChange::BandGain { band: b, .. } => EqChange::BandGain {
+            band: b,
+            db: band(b).gain_db,
+        },
+        EqChange::HpfOn { .. } => EqChange::HpfOn { on: eq.hpf.on },
+        EqChange::HpfFreq { .. } => EqChange::HpfFreq { hz: eq.hpf.freq_hz },
+    }
+}
+
+/// Every parameter of `eq`, the way a full read reports it.
+fn full(eq: &ChannelEq) -> Vec<EqChange> {
+    let mut out = vec![
+        EqChange::HpfFreq { hz: eq.hpf.freq_hz },
+        EqChange::HpfOn { on: eq.hpf.on },
+    ];
+    for (i, b) in eq.bands.iter().enumerate() {
+        let band = i as u8;
+        out.extend([
+            EqChange::BandKind { band, kind: b.kind },
+            EqChange::BandFreq {
+                band,
+                hz: b.freq_hz,
+            },
+            EqChange::BandWidth {
+                band,
+                width: b.width,
+            },
+            EqChange::BandGain {
+                band,
+                db: b.gain_db,
+            },
+        ]);
+    }
+    out
 }
 
 #[cfg(test)]
@@ -186,6 +278,36 @@ mod tests {
             desk.set_fader(ChannelId::input(0), Some(0.0)).await,
             Err(ConsoleError::NotConnected)
         ));
+    }
+
+    #[tokio::test]
+    async fn keeps_eq_on_the_desk_grid() {
+        let mut desk = SimulatedConsole::new(8);
+        desk.connect().await.unwrap();
+        let mut rx = desk.subscribe();
+        let id = ChannelId::input(0);
+        desk.set_eq(id, EqChange::BandGain { band: 1, db: -3.1 })
+            .await
+            .unwrap();
+        let ConsoleEvent::Eq {
+            change: EqChange::BandGain { db, .. },
+            ..
+        } = rx.recv().await.unwrap()
+        else {
+            panic!("expected an EQ event");
+        };
+        assert!((db + 3.1).abs() < 0.13, "{db}");
+        desk.request_eq(id).await.unwrap();
+        let mut eq = ChannelEq::default();
+        while let Ok(ConsoleEvent::Eq { change, .. }) = rx.try_recv() {
+            eq.apply(&change);
+        }
+        assert!((eq.bands[1].gain_db - db).abs() < 1e-6);
+        let hp = mix_core::eq::EqBandKind::HighPass;
+        assert!(desk
+            .set_eq(id, EqChange::BandKind { band: 2, kind: hp })
+            .await
+            .is_err());
     }
 
     #[tokio::test]

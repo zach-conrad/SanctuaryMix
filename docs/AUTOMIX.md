@@ -2,7 +2,7 @@
 
 Auto-mix rides the input faders the operator picks so the mix sounds the same
 every week, whoever is in the booth. It covers levels and balance only; EQ
-comes later. The numbers come from the project's church live-mix research
+is AI EQ's job (docs/AIEQ.md). The numbers come from the project's church live-mix research
 (`research/live-mix/church-auto-mix-research.md` in the project files).
 
 ## How it decides
@@ -81,6 +81,11 @@ from the UI are clamped to hard limits, and the choke point clamps again.
   channel back where the operator set it and holds it there.
 - Every move, takeover, freeze and undo is logged in the local SQLite database
   with a one-sentence reason.
+- With AI EQ: when a channel rings, AI EQ has auto-mix pull its fader 3 dB
+  (6 dB at most per ring), even with auto-mix off. Every raise then waits
+  10 s, and that fader never goes back above where it rang this service.
+  The feedback check's ceilings cap raises the same way. Auto-mix leaves a
+  channel alone for 3 s after an EQ change on it. See docs/AIEQ.md.
 
 ## Code map
 

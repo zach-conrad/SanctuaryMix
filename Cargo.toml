@@ -17,6 +17,7 @@ automix = { path = "crates/automix" }
 store = { path = "crates/store" }
 recorder = { path = "crates/recorder" }
 listen = { path = "crates/listen" }
+tonal = { path = "crates/tonal" }
 
 anyhow = "1"
 async-trait = "0.1"

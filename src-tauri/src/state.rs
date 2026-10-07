@@ -10,6 +10,8 @@ use mix_core::{ChangeSource, ChannelId, ConsoleEvent};
 use store::Store;
 use tauri::async_runtime::JoinHandle;
 use tauri::{AppHandle, Emitter, Manager};
+use tonal::analyser::Analyser;
+use tonal::runner::AiEqHandle;
 
 use crate::control::ControlBus;
 use crate::playback::Playback;
@@ -34,6 +36,11 @@ pub struct AppState {
     pub playback: Playback,
     /// Room loudness from the measurement input.
     pub spl: Spl,
+    /// AI EQ's loop, and its analyser on the audio tap.
+    pub aieq: AiEqHandle,
+    pub analyser: Arc<Analyser>,
+    /// The recording of the service under way, for AI EQ's ideas.
+    pub aieq_service: crate::aieq::ServiceRecording,
 }
 
 impl AppState {
@@ -51,6 +58,7 @@ impl AppState {
             .unwrap_or_default();
         let spl = Spl::new(crate::spl::load_config(&store.lock().unwrap()));
         let targets = listen_targets(&config);
+        let picks = config.clone();
         let (automix, task) = automix::start(
             config,
             Arc::new(ConsoleSink(app.clone())),
@@ -60,7 +68,10 @@ impl AppState {
             },
         );
         tauri::async_runtime::spawn(task);
-        let listener = start_listening(&automix, targets);
+        let aieq_service = crate::aieq::ServiceRecording::default();
+        let (aieq, analyser) =
+            crate::aieq::start(app, &store, &automix, &picks, aieq_service.clone());
+        let listener = start_listening(&automix, &analyser, targets);
         Self {
             metering: Mutex::new(None),
             console: tokio::sync::Mutex::new(None),
@@ -79,12 +90,21 @@ impl AppState {
                 .ok(),
             playback: Playback::default(),
             spl,
+            aieq,
+            analyser,
+            aieq_service,
         }
     }
 }
 
-/// Loads the listening models and points them at auto-mix's channels.
-fn start_listening(automix: &AutoMixHandle, targets: Vec<ListenTarget>) -> Option<Arc<Listener>> {
+/// Loads the listening models and points them at auto-mix's channels. Who
+/// is at each mic also gates AI EQ's analyser (a voice mic only counts while
+/// its own voice is on it).
+fn start_listening(
+    automix: &AutoMixHandle,
+    analyser: &Arc<Analyser>,
+    targets: Vec<ListenTarget>,
+) -> Option<Arc<Listener>> {
     let models = match Models::load() {
         Ok(m) => m,
         Err(e) => {
@@ -93,7 +113,17 @@ fn start_listening(automix: &AutoMixHandle, targets: Vec<ListenTarget>) -> Optio
         }
     };
     let automix = automix.clone();
-    let listener = Listener::start(models, move |frame| automix.push_hearing(frame));
+    let analyser = analyser.clone();
+    let listener = Listener::start(models, move |frame| {
+        analyser.push_voice(
+            frame
+                .channels
+                .iter()
+                .map(|h| (h.channel, h.voice))
+                .collect(),
+        );
+        automix.push_hearing(frame);
+    });
     listener.set_targets(targets);
     Some(Arc::new(listener))
 }

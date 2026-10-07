@@ -20,6 +20,7 @@ console.workspace = true
 auth.workspace = true
 recorder.workspace = true
 automix.workspace = true
+tonal.workspace = true
 store.workspace = true
 listen.workspace = true
 

@@ -1,5 +1,6 @@
 import { Hand, Play } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useAiEq } from "../store/aieq";
 import { useAutoMix } from "../store/automix";
 import { useMixer, type Theme } from "../store/mixer";
 import { RecordControl } from "./RecordControl";
@@ -95,19 +96,23 @@ function AssistMode() {
   );
 }
 
-/** While auto-mix runs, Freeze (or Resume) sits right beside Record service, always one tap away. */
+/** While auto-mix or AI EQ runs, Freeze (or Resume) sits right beside Record service, always one tap away. */
 function FreezeButton() {
   const engaged = useAutoMix((s) => s.status?.engaged ?? false);
-  const frozen = useAutoMix((s) => s.status?.frozen ?? false);
+  const autoFrozen = useAutoMix((s) => s.status?.frozen ?? false);
+  const eqOn = useAiEq((s) => s.status?.enabled ?? false);
+  const eqFrozen = useAiEq((s) => s.status?.frozen ?? false);
   const { freeze, resume } = useAutoMix();
-  if (!engaged) return null;
+  if (!engaged && !eqOn) return null;
+  // One freeze stops both: the core's freeze covers levels and EQ.
+  const frozen = (engaged && autoFrozen) || (!engaged && eqFrozen);
   return frozen ? (
-    <button className="sm-btn topbar-freeze" onClick={() => void resume()}>
+    <button className="sm-btn topbar-freeze" onClick={() => void resume()} title="Let AI move levels and EQ again">
       <Play />
       Resume
     </button>
   ) : (
-    <button className="sm-btn topbar-freeze" onClick={() => void freeze()} title="Stop every auto-mix move (Esc)">
+    <button className="sm-btn topbar-freeze" onClick={() => void freeze()} title="Stop every AI move, levels and EQ (Esc)">
       <Hand />
       Freeze
     </button>
