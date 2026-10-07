@@ -20,11 +20,14 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(req) });
   if (req.method !== "POST") return reply(req, 405, { msg: "Use POST" });
 
-  const caller = await getCaller(req);
+  const caller = getCaller(req);
   if (!caller) return reply(req, 401, { msg: "Sign in again" });
 
   const { data: status, error: statusError } = await caller.asCaller.rpc("owner_status");
-  if (statusError) return reply(req, 500, { msg: "Couldn't check your access. Try again" });
+  if (statusError) {
+    console.error("owner_status failed", statusError.code, statusError.message);
+    return reply(req, 500, { msg: "Couldn't check your access. Try again" });
+  }
   if (!status?.owner) return reply(req, 404, { msg: "Not found" });
   if (!status?.mfa) return reply(req, 403, { msg: "Enter your two-factor code first" });
 
