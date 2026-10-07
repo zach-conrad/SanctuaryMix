@@ -558,3 +558,24 @@ label.row[aria-disabled="true"] { cursor: default; }
 label.row[aria-disabled="true"]:hover { background: none; }
 label.row[aria-disabled="true"] .row-text { color: var(--text-muted); }
 .eq-row__sep { margin-right: var(--space-2); color: var(--text-subtle); }
+
+/* ---------- Owner Admin page and Team section ---------- */
+/* A row that opens a dialog: a full-width button styled like a link row. */
+.row--button { width: 100%; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+.row--button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; border-radius: var(--radius-lg); }
+.admin__search { position: relative; display: block; }
+.admin__search svg {
+  position: absolute; left: var(--space-3); top: 50%; transform: translateY(-50%);
+  width: 20px; height: 20px; stroke-width: 1.75; color: var(--text-muted); pointer-events: none;
+}
+.admin__search .sm-input { width: 100%; height: var(--hit-min); padding-left: calc(var(--space-3) + 20px + var(--space-2)); }
+.admin__pills { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.admin__confirm { display: flex; gap: var(--space-2); }
+.admin__date { height: var(--hit-min); }
+.share .row-text { min-width: calc(var(--space-8) + var(--space-5)); }
+.share .row--actions { flex-wrap: wrap; }
+.share .sm-seg button { min-height: var(--hit-min); }
+/* Two-factor set-up: the QR code needs a light ground to scan in both themes. */
+.mfa__qr { justify-self: center; padding: var(--space-3); border-radius: var(--radius-lg); background: var(--brand-paper); }
+.mfa__qr img { display: block; }
+.mfa__secret { overflow-wrap: anywhere; color: var(--text); }

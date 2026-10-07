@@ -41,7 +41,7 @@ interface FieldProps {
   showErrors: boolean;
 }
 
-function Field({ label, type = "text", value, onChange, autoComplete, help, check, showErrors }: FieldProps) {
+export function Field({ label, type = "text", value, onChange, autoComplete, help, check, showErrors }: FieldProps) {
   const id = useId();
   const [touched, setTouched] = useState(false);
   const error = (touched || showErrors) && check ? check(value) : null;
@@ -64,7 +64,7 @@ function Field({ label, type = "text", value, onChange, autoComplete, help, chec
   );
 }
 
-const checkEmail = (v: string) => (EMAIL.test(v.trim()) ? null : "Enter an email like name@church.org");
+export const checkEmail = (v: string) => (EMAIL.test(v.trim()) ? null : "Enter an email like name@church.org");
 const checkNewPassword = (v: string) =>
   v.length >= MIN_PASSWORD && /[a-z]/i.test(v) && /\d/.test(v)
     ? null
@@ -72,11 +72,11 @@ const checkNewPassword = (v: string) =>
 const checkPassword = (v: string) => (v ? null : "Enter your password");
 const checkRequired = (what: string) => (v: string) => (v.trim() ? null : `Enter ${what}`);
 
-function FormError({ message }: { message: string | null }) {
+export function FormError({ message }: { message: string | null }) {
   return message ? <p className="auth__error" role="alert">{message}</p> : null;
 }
 
-function AuthShell({ title, lede, children }: { title: string; lede?: string | null; children: ReactNode }) {
+export function AuthShell({ title, lede, children }: { title: string; lede?: string | null; children: ReactNode }) {
   return (
     <div className="auth">
       <header className="page-header">
