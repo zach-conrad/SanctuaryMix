@@ -80,7 +80,12 @@ export function Share() {
                 </div>
               </header>
               <div className="service__layout">
-                <MixPlayer audioUrl={shared.audioUrl} durationMs={shared.recording.durationMs} events={shared.events} />
+                <MixPlayer
+                  audioUrl={shared.audioUrl}
+                  durationMs={shared.recording.durationMs}
+                  events={shared.events}
+                  eq={shared.eq ? { audit: shared.eq, audience: "shared" } : null}
+                />
                 {shared.previewNote ? (
                   <p className="section-foot footnote" role="note">
                     <Info aria-hidden="true" />

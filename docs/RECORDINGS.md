@@ -155,6 +155,13 @@ Engineer and Admin can make a share link (`/share/?t=<token>`) that lets anyone
 listen without an account, for 7 days, 30 days or until turned off, with or
 without the moves. Draft schema and the public lookup: `docs/supabase/share_links.sql`.
 
+The service page also lists every EQ change around the service (AI EQ's
+soundcheck changes and who applied them, feedback cuts, tone moves, undos,
+hand edits and hand-backs, and its ideas for next week). Every member sees all
+of it. A share link includes EQ changes only when the person sharing ticks
+**EQ changes** (off by default), and then shows roles instead of names and
+leaves out the ideas for next week. Draft schema: `docs/supabase/eq_audit.sql`.
+
 Today the website reads a demo copy of the sample service from
 `website/public/demo-cloud/`, laid out like the Storage keys, and keeps share
 links in the browser. Nothing is uploaded yet.

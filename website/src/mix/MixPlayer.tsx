@@ -10,7 +10,8 @@ import {
   formatClock,
   stateAt,
 } from "../../../src/lib/recordings";
-import type { RecordedEvent } from "../cloud/types";
+import type { EqAudit as Audit, RecordedEvent } from "../cloud/types";
+import { EqAudit } from "./EqAudit";
 import { Timeline } from "./Timeline";
 import { usePlayback } from "./usePlayback";
 
@@ -19,6 +20,8 @@ interface Props {
   durationMs: number;
   /** Empty hides the moves (a share link made without them). */
   events: RecordedEvent[];
+  /** EQ audit, when the viewer may see it. */
+  eq?: { audit: Audit; audience: "church" | "shared" } | null;
 }
 
 const SKIP_MS = 10_000;
@@ -28,7 +31,7 @@ const SKIP_MS = 10_000;
  * Nothing here can reach a console, and there's no output to choose; the
  * browser plays through whatever the listener is using.
  */
-export function MixPlayer({ audioUrl, durationMs, events }: Props) {
+export function MixPlayer({ audioUrl, durationMs, events, eq }: Props) {
   const p = usePlayback(audioUrl, durationMs);
   const lanes = useMemo(() => buildLanes(events, durationMs), [events, durationMs]);
   const rows = useMemo(() => describeEvents(events), [events]);
@@ -145,6 +148,8 @@ export function MixPlayer({ audioUrl, durationMs, events }: Props) {
           </div>
         </>
       ) : null}
+
+      {eq ? <EqAudit audit={eq.audit} audience={eq.audience} positionMs={p.positionMs} onSeek={p.seek} /> : null}
     </div>
   );
 }

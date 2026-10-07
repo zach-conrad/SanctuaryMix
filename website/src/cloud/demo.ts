@@ -4,16 +4,19 @@
 // Accounts are real (see src/auth); nothing here signs anyone in.
 
 import {
+  eqForShareLink,
   isLive,
   storageKey,
   type CloudRecording,
   type CloudSession,
+  type EqAudit,
   type RecordedEvent,
   type RecordingsCloud,
   type ShareLink,
   type ShareOptions,
   type SharedMix,
 } from "./types";
+import { SAMPLE_EQ } from "./demoEq";
 
 const DAY_MS = 86_400_000;
 const LINKS_KEY = "sanctuarymix.demo.shareLinks";
@@ -105,6 +108,12 @@ export class DemoCloud implements RecordingsCloud {
     return file ? this.url(storageKey(recording.orgId!, recording.id, file.relPath)) : null;
   }
 
+  async getEqAudit(recording: CloudRecording): Promise<EqAudit> {
+    const list = await this.listRecordings();
+    // The demo only has EQ for the newest sample service.
+    return recording.id === list[0]?.id ? SAMPLE_EQ : { entries: [], ideas: [] };
+  }
+
   async listShareLinks(recordingId: string): Promise<ShareLink[]> {
     return this.memoryLinks.filter((l) => l.recordingId === recordingId).sort((a, b) => b.createdAt - a.createdAt);
   }
@@ -120,6 +129,7 @@ export class DemoCloud implements RecordingsCloud {
       expiresAt: options.expiresInDays === null ? null : now + options.expiresInDays * DAY_MS,
       revokedAt: null,
       showMoves: options.showMoves,
+      showEq: options.showEq,
     };
     this.memoryLinks = [...this.memoryLinks, link];
     writeLinks(this.memoryLinks);
@@ -143,6 +153,7 @@ export class DemoCloud implements RecordingsCloud {
     const recording = (link && list.find((r) => r.id === link.recordingId)) ?? list[0];
     if (!recording) return { status: "notFound" };
     const showMoves = link?.showMoves ?? true;
+    const showEq = link?.showEq ?? false;
     return {
       status: "ok",
       orgName: SAMPLE_SESSION.orgName,
@@ -150,6 +161,7 @@ export class DemoCloud implements RecordingsCloud {
       events: showMoves ? await this.getEvents(recording) : [],
       audioUrl: await this.listenUrl(recording),
       showMoves,
+      eq: showEq ? eqForShareLink(await this.getEqAudit(recording)) : null,
       expiresAt: link?.expiresAt ?? null,
       // A link made in another browser isn't in this one's storage. Until the
       // cloud is connected, play the sample service rather than fail.
