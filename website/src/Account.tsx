@@ -1,6 +1,7 @@
-import { AppWindow, ChevronRight, CircleCheck, CloudOff, Download, Laptop, Monitor, Music } from "lucide-react";
+import { AppWindow, ChevronRight, CircleCheck, CloudOff, Download, Laptop, Monitor, Music, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { audioModeLabel, formatClock, serviceDateLabel, timeOfDay } from "../../src/lib/recordings";
+import { ownerStatus } from "./auth/admin";
 import { appSignInLink, appWaiting, cancelAppHandoff } from "./auth/appHandoff";
 import { AuthForm, ChurchForm, NewPasswordForm } from "./auth/AuthForms";
 import { authMessage } from "./auth/client";
@@ -8,6 +9,7 @@ import { cloudSession, signOut, useAccount, type Account as SignedIn } from "./a
 import { connectCloud, type CloudRecording, type RecordingsCloud } from "./cloud";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
+import { Team } from "./Team";
 import { FOUNDING_OFFER, PLANS, formatPrice, foundingPrice } from "./pricing";
 import { downloadUrl, fetchLatestRelease, type ReleaseLookup } from "./release";
 
@@ -111,6 +113,18 @@ function AccountHome({ account }: { account: SignedIn }) {
   const [lookup, setLookup] = useState<ReleaseLookup>({ status: "loading" });
   const release = lookup.status === "ok" ? lookup.release : null;
   const notYet = lookup.status === "none";
+  const [owner, setOwner] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    ownerStatus().then(
+      (s) => live && setOwner(s.owner),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -216,6 +230,8 @@ function AccountHome({ account }: { account: SignedIn }) {
             </p>
           </section>
 
+          {church.role === "admin" ? <Team church={church} me={account.user.id} /> : null}
+
           <Services cloud={cloud} />
         </div>
 
@@ -250,6 +266,24 @@ function AccountHome({ account }: { account: SignedIn }) {
               </div>
             </dl>
           </section>
+          {owner ? (
+            <section className="grouped" aria-label="Owner">
+              <ul className="group">
+                <li>
+                  <a className="row row--link" href={`${ROOT}admin/`}>
+                    <span className="row-icon">
+                      <ShieldCheck aria-hidden="true" />
+                    </span>
+                    <span className="row-text">
+                      <span>Admin</span>
+                      <span className="text-caption">Every church and account</span>
+                    </span>
+                    <ChevronRight aria-hidden="true" className="row-chevron" />
+                  </a>
+                </li>
+              </ul>
+            </section>
+          ) : null}
         </aside>
       </div>
     </>

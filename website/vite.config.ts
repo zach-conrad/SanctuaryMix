@@ -3,7 +3,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 // Static pages: the landing page, the account page (sign-in), a recorded service
-// in that account, and the public page a share link opens.
+// in that account, the public page a share link opens, and the owner Admin page.
 // Relative base so the build works at a domain root or under a sub-path
 // (for example GitHub Pages at /SanctuaryMix/).
 export default defineConfig({
@@ -16,6 +16,7 @@ export default defineConfig({
       input: {
         home: resolve(__dirname, "index.html"),
         account: resolve(__dirname, "account/index.html"),
+        admin: resolve(__dirname, "admin/index.html"),
         service: resolve(__dirname, "account/service/index.html"),
         share: resolve(__dirname, "share/index.html"),
       },

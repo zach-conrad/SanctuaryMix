@@ -32,3 +32,28 @@ The refresh token and the last confirmed church and plan are kept in the macOS K
 The Edge Function is deployed with `verify_jwt` off (the app has no session yet) and reads `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, which Supabase sets for every function. Redeploy it with `supabase functions deploy app-handoff --no-verify-jwt`.
 
 Deep links only work from an installed build (`npm run app:build`), not `tauri dev` on macOS.
+
+## Owner Admin page and church Teams
+
+`/admin/` on the website lists every church and account and lets an owner extend a trial, change a plan, send a password reset or a confirmation/invite again, sign someone out everywhere, and turn sign-in off or on. Church Admins get a **Team** section on their Account page (invite by email, change role, remove). Migration `20261007180000_owner_admin.sql` adds:
+
+- `private.platform_admins`: who is an owner. Filled by hand; no client can read or write it. Every `admin_*` function also requires a two-factor session (aal2), so the page asks owners to set up an authenticator app the first time.
+- `private.admin_audit`: who changed what (owner actions and Team changes), shown under Recent changes.
+- `admin_*` functions (owner reads and trial/plan/sign-out changes), `team_*` functions (church Admins), and the Essentials 3-login limit as a trigger on `memberships`.
+
+Two Edge Functions, both deployed **with** JWT verification: `owner-admin` (password reset, resend email, disable/enable; owners with two-factor only) and `team-invite` (church Admins). They check the caller with the caller's own token before using the service role, and log to the audit table.
+
+```
+supabase functions deploy owner-admin
+supabase functions deploy team-invite
+```
+
+Make someone an owner (SQL editor):
+
+```sql
+insert into private.platform_admins (user_id)
+select id from auth.users where email = 'owner@example.com'
+on conflict do nothing;
+```
+
+Emails these send (invites, owner-sent resets) land on `/account/` with the session in the link, where the person chooses a password. They use the redirect URL already allowed in step 1 above.

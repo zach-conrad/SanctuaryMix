@@ -49,17 +49,29 @@ export function cloudSession(account: Account): CloudSession {
   };
 }
 
+interface UrlState {
+  notice: string | null;
+  /** Set a new password before anything else (reset link or invite). */
+  reset: boolean;
+  /** A session in the #hash, from an email the server sent (invite, owner-sent reset). */
+  tokens: { access_token: string; refresh_token: string } | null;
+}
+
 /** Errors Supabase puts in the URL when an email or Google link fails. Read once, then cleaned up. */
-function takeUrlState(): { notice: string | null; reset: boolean } {
+function takeUrlState(): UrlState {
   const url = new URL(window.location.href);
   const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
   const description = url.searchParams.get("error_description") ?? hash.get("error_description");
   const code = url.searchParams.get("error_code") ?? hash.get("error_code");
-  const reset = url.searchParams.get("reset") === "1";
+  const access = hash.get("access_token");
+  const refreshToken = hash.get("refresh_token");
+  const tokens = access && refreshToken ? { access_token: access, refresh_token: refreshToken } : null;
+  const linkType = hash.get("type");
+  const reset = url.searchParams.get("reset") === "1" || (tokens !== null && (linkType === "recovery" || linkType === "invite"));
   let notice: string | null = null;
   if (code === "otp_expired") notice = "That link has expired or was already used. Sign in, or ask for a new one.";
   else if (description) notice = authMessage({ message: description.replace(/\+/g, " ") });
-  return { notice, reset };
+  return { notice, reset, tokens };
 }
 
 function cleanUrl() {
@@ -158,16 +170,21 @@ export function useAccount() {
   }, []);
 
   useEffect(() => {
-    const { notice, reset } = takeUrlState();
+    const { notice, reset, tokens } = takeUrlState();
     recovery.current = reset;
     let live = true;
     let lastUser: string | null = null;
 
     // getSession waits for the client to finish reading ?code= from the URL.
-    supabase.auth.getSession().then(({ data, error }) => {
+    // A session in the #hash (an invite or reset sent by the server) replaces it.
+    const start = tokens
+      ? supabase.auth.setSession(tokens).then(({ data, error }) => ({ data: { session: data.session }, error }))
+      : supabase.auth.getSession();
+    start.then(({ data, error }) => {
       if (!live) return;
       cleanUrl();
       lastUser = data.session?.user.id ?? null;
+      if (tokens && !data.session) recovery.current = false;
       void resolve(data.session, error ? authMessage(error) : notice);
     });
 

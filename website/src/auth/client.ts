@@ -17,7 +17,11 @@ export const supabase = createClient(
   {
     auth: {
       flowType: "pkce",
-      detectSessionInUrl: true,
+      // Browser sign-ins use PKCE (?code=). Emails sent from the server
+      // (invites, owner-sent password resets) arrive with tokens in the
+      // #hash instead; useAccount reads those itself, so the client only
+      // handles errors there.
+      detectSessionInUrl: (_url, params) => Boolean(params.error || params.error_description || params.error_code),
       persistSession: true,
       autoRefreshToken: true,
     },
