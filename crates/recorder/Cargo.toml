@@ -11,7 +11,7 @@ mix-core.workspace = true
 auth.workspace = true
 async-trait.workspace = true
 fs4.workspace = true
-rusqlite = { version = "0.37", features = ["bundled"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
